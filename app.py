@@ -173,46 +173,75 @@ def remove_container_from_db(name):
          app.logger.error(f"数据库错误 remove_container_from_db for {name}: {e}")
 
 
-def get_container_ip(container_name):
-    success, data = run_incus_command(['list', container_name, '--format', 'json'])
+def _get_container_raw_info(name):
+    db_info = query_db('SELECT * FROM containers WHERE incus_name = ?', [name], one=True)
+    success_live, live_data = run_incus_command(['list', name, '--format', 'json'])
 
-    if not success:
-        app.logger.warning(f"无法获取容器 {container_name} 的列表信息以解析IP: {data}")
-        return None
+    if success_live and isinstance(live_data, list) and len(live_data) > 0 and isinstance(live_data[0], dict):
+        container_data = live_data[0]
+        info_output = {
+            'name': container_data.get('name', name),
+            'status': container_data.get('status', 'Unknown'),
+            'status_code': container_data.get('status_code', 0),
+            'type': container_data.get('type', 'unknown'),
+            'architecture': container_data.get('architecture', 'N/A'),
+            'ephemeral': container_data.get('ephemeral', False),
+            'created_at': container_data.get('created_at', None),
+            'profiles': container_data.get('profiles', []),
+            'config': container_data.get('config', {}),
+            'devices': container_data.get('devices', {}),
+            'snapshots': container_data.get('snapshots', []),
+             'state': container_data.get('state', {}),
+            'description': container_data.get('config', {}).get('image.description', 'N/A'),
+            'ip': 'N/A',
+            'live_data_available': True,
+            'message': '数据主要来自 Incus 实时信息。',
+        }
 
-    if not isinstance(data, list) or not data:
-        app.logger.warning(f"incus list for {container_name} returned unexpected data format or empty: {data}")
-        return None
+        container_state = info_output.get('state')
+        if isinstance(container_state, dict):
+            network_info = container_state.get('network')
+            if isinstance(network_info, dict):
+                for iface_name, iface_data in network_info.items():
+                    if isinstance(iface_data, dict):
+                        addresses = iface_data.get('addresses')
+                        if isinstance(addresses, list):
+                            for addr_entry in addresses:
+                                if isinstance(addr_entry, dict):
+                                    addr = addr_entry.get('address')
+                                    family = addr_entry.get('family')
+                                    scope = addr_entry.get('scope')
+                                    if addr and family == 'inet' and scope == 'global':
+                                        info_output['ip'] = addr.split('/')[0]
+                                        break
+                            if info_output['ip'] != 'N/A': break
 
-    container_data = data[0]
+        return info_output, None
 
-    if not isinstance(container_data, dict) or 'state' not in container_data or not isinstance(container_data['state'], dict):
-         app.logger.warning(f"incus list data for {container_name} missing 'state' or 'state' not a dict: {container_data}")
-         return None
+    elif db_info:
+        info_output = {
+            'name': db_info['incus_name'],
+            'status': db_info.get('status', 'Unknown'),
+            'status_code': 0,
+            'type': 'container',
+            'architecture': db_info.get('architecture', 'N/A'),
+            'ephemeral': False,
+            'created_at': db_info.get('created_at', None),
+            'profiles': [],
+            'config': {},
+            'devices': {},
+            'snapshots': [],
+             'state': {'status': db_info.get('status', 'Unknown'), 'status_code': 0, 'network': {}},
+            'description': db_info.get('image_source', 'N/A'),
+            'ip': 'N/A',
+            'live_data_available': False,
+            'message': '无法从 Incus 获取实时信息，数据主要来自数据库快照。',
+        }
+        return info_output, info_output['message']
 
-    container_state = container_data['state']
-    network_info = container_state.get('network')
-
-    if not isinstance(network_info, dict):
-        app.logger.warning(f"Container {container_name} 'state' does not contain network info or it's not a dict.")
-        return None
-
-    for iface_name, iface_data in network_info.items():
-        if isinstance(iface_data, dict):
-            addresses = iface_data.get('addresses')
-            if isinstance(addresses, list):
-                for addr_entry in addresses:
-                    if isinstance(addr_entry, dict):
-                        addr = addr_entry.get('address')
-                        family = addr_entry.get('family')
-                        scope = addr_entry.get('scope')
-                        if addr and family == 'inet' and scope == 'global':
-                            ip_address = addr.split('/')[0]
-                            app.logger.info(f"成功从 incus list JSON 解析出容器 {container_name} 的全局 IPv4 地址: {ip_address}")
-                            return ip_address
-
-    app.logger.warning(f"在容器 {container_name} 的 incus list JSON 输出中无法找到全局 IPv4 地址 (用于NAT等功能)。请确保容器正在运行且已分配IP。")
-    return None
+    else:
+        error_message = f"获取容器 {name} 信息失败: 数据库中无记录且无法从 Incus 获取实时信息。"
+        return None, error_message
 
 def check_nat_rule_exists_in_db(container_name, host_port, protocol):
     try:
@@ -554,7 +583,7 @@ def container_action(name):
              return jsonify({'status': 'error', 'message': f'删除容器前从数据库获取NAT规则失败: {rules}'}), 500
 
         failed_rule_deletions = []
-        warning_rule_deletions = [] # To track rules that failed with "Bad rule"
+        warning_rule_deletions = []
         if rules:
             app.logger.info(f"Found {len(rules)} associated NAT rules in DB for {name}. Attempting iptables delete...")
             for rule in rules:
@@ -567,28 +596,20 @@ def container_action(name):
 
                 if not success_iptables_delete:
                     if is_bad_rule:
-                         warning_rule_deletions.append(iptables_message) # Store the specific warning message
+                         warning_rule_deletions.append(iptables_message)
                          app.logger.warning(f"IPTables delete failed with 'Bad rule' for rule ID {rule.get('id', 'N/A')}: {iptables_message}. Proceeding with DB delete.")
-                         # If it's a "Bad rule" error, treat it as successful for the container delete flow
-                         # Remove the rule record from the database anyway as it doesn't exist in iptables
                          db_success, db_msg = remove_nat_rule_from_db(rule['id'])
                          if not db_success:
                               app.logger.error(f"IPTables rule deletion reported 'Bad rule' for ID {rule['id']}, but failed to remove record from DB: {db_msg}")
-                              # If DB delete fails even here, maybe add to failed_rule_deletions?
-                              # For now, just log and let the orphan cleanup handle it later if necessary.
                     else:
-                         # Other iptables deletion errors are treated as fatal for this rule
-                         failed_rule_deletions.append(iptables_message) # Store the specific error message
+                         failed_rule_deletions.append(iptables_message)
                          app.logger.error(f"IPTables delete failed (not Bad rule) for rule ID {rule.get('id', 'N/A')}: {iptables_message}. Aborting container delete attempt for this rule.")
 
                 else:
-                    # iptables deletion succeeded for this rule, remove from DB record
                     db_success, db_msg = remove_nat_rule_from_db(rule['id'])
                     if not db_success:
                         app.logger.error(f"IPTables rule deleted for ID {rule['id']}, but failed to remove record from DB: {db_msg}")
-                        # Log this but don't fail container delete
 
-        # 3. Check if any iptables deletions failed (excluding "Bad rule")
         if failed_rule_deletions:
             error_message = f"删除容器 {name} 前，未能移除所有关联的 NAT 规则 ({len(failed_rule_deletions)}/{len(rules) if rules else 0} 条 iptables 删除失败)。请手动检查 iptables。<br>失败详情: " + "; ".join(failed_rule_deletions)
             if warning_rule_deletions:
@@ -596,13 +617,11 @@ def container_action(name):
             app.logger.error(error_message)
             return jsonify({'status': 'error', 'message': error_message}), 500
 
-        # 4. If all NAT rules successfully removed from iptables (or reported 'Bad rule'), proceed with Incus container deletion
-        # We rely on the DB delete after 'Bad rule' or success to track state.
         app.logger.info(f"All {len(rules) if rules else 0} associated NAT rules for {name} successfully handled for iptables delete (or none existed). Proceeding with Incus container deletion.")
         success_incus_delete, incus_output = run_incus_command(['delete', name, '--force'], parse_json=False, timeout=120)
 
         if success_incus_delete:
-            remove_container_from_db(name) # This will also clean up any remaining DB NAT rules for this container
+            remove_container_from_db(name)
             message = f'容器 {name} 及其关联的 {len(rules) if rules else 0} 条 NAT 规则记录已成功删除。'
             if warning_rule_deletions:
                  message += "<br>注意: 部分 iptables 规则在删除时已不存在。"
@@ -611,7 +630,6 @@ def container_action(name):
         else:
             error_message = f'删除容器 {name} 失败: {incus_output}'
             app.logger.error(error_message)
-            # NAT rules were attempted to be removed from iptables. DB records might still exist.
             return jsonify({'status': 'error', 'message': error_message}), 500
 
     if action not in commands:
@@ -688,84 +706,12 @@ def exec_command(name):
 
 @app.route('/container/<name>/info')
 def container_info(name):
-    db_info = query_db('SELECT * FROM containers WHERE incus_name = ?', [name], one=True)
+    info_output, error_message = _get_container_raw_info(name)
 
-    success_live, live_data = run_incus_command(['list', name, '--format', 'json'])
-
-    if success_live and isinstance(live_data, list) and len(live_data) > 0 and isinstance(live_data[0], dict):
-        container_data = live_data[0]
-        info_output = {
-            'name': container_data.get('name', name),
-            'status': container_data.get('status', 'Unknown'),
-            'status_code': container_data.get('status_code', 0),
-            'type': container_data.get('type', 'unknown'),
-            'architecture': container_data.get('architecture', 'N/A'),
-            'ephemeral': container_data.get('ephemeral', False),
-            'created_at': container_data.get('created_at', None),
-            'profiles': container_data.get('profiles', []),
-            'config': container_data.get('config', {}),
-            'devices': container_data.get('devices', {}),
-            'snapshots': container_data.get('snapshots', []),
-             'state': container_data.get('state', {}),
-            'description': container_data.get('config', {}).get('image.description', 'N/A'),
-            'ip': 'N/A',
-            'live_data_available': True,
-            'message': '数据主要来自 Incus 实时信息。',
-        }
-
-        container_state = info_output.get('state')
-        if isinstance(container_state, dict):
-            network_info = container_state.get('network')
-            if isinstance(network_info, dict):
-                for iface_name, iface_data in network_info.items():
-                    if isinstance(iface_data, dict):
-                        addresses = iface_data.get('addresses')
-                        if isinstance(addresses, list):
-                            for addr_entry in addresses:
-                                if isinstance(addr_entry, dict):
-                                    addr = addr_entry.get('address')
-                                    family = addr_entry.get('family')
-                                    scope = addr_entry.get('scope')
-                                    if addr and family == 'inet' and scope == 'global':
-                                        info_output['ip'] = addr.split('/')[0]
-                                        break
-                            if info_output['ip'] != 'N/A': break
-
-
+    if info_output is None:
+        return jsonify({'status': 'NotFound', 'message': error_message}), 404
     else:
-        db_info = query_db('SELECT * FROM containers WHERE incus_name = ?', [name], one=True)
-        if db_info:
-            info_output = {
-                'name': db_info['incus_name'],
-                'status': db_info.get('status', 'Unknown'),
-                'status_code': 0,
-                'type': 'container',
-                'architecture': db_info.get('architecture', 'N/A'),
-                'ephemeral': False,
-                'created_at': db_info.get('created_at', None),
-                'profiles': [],
-                'config': {},
-                'devices': {},
-                'snapshots': [],
-                 'state': {'status': db_info.get('status', 'Unknown'), 'status_code': 0, 'network': {}},
-                'description': db_info.get('image_source', 'N/A'),
-                'ip': 'N/A',
-                'live_data_available': False,
-                'message': '无法从 Incus 获取实时信息，数据主要来自数据库快照。',
-            }
-        else:
-            info_output = {
-                'name': name,
-                'status': 'NotFound',
-                'status_code': -1,
-                'message': f"获取容器 {name} 信息失败: 数据库中无记录且无法从 Incus 获取实时信息。",
-                'live_data_available': False,
-                'ip': 'N/A',
-            }
-            return jsonify(info_output), 404
-
-
-    return jsonify(info_output), 200
+        return jsonify(info_output), 200
 
 
 @app.route('/container/<name>/add_nat_rule', methods=['POST'])
@@ -796,9 +742,13 @@ def add_nat_rule(name):
         app.logger.warning(message)
         return jsonify({'status': 'warning', 'message': message}), 200
 
-    container_info_data, status_code = container_info(name)
+    container_info_data, info_error_message = _get_container_raw_info(name)
 
-    if status_code != 200 or container_info_data.get('status') != 'Running':
+    if container_info_data is None:
+         return jsonify({'status': 'error', 'message': f'无法获取容器 {name} 信息: {info_error_message}'}), 404
+
+
+    if container_info_data.get('status') != 'Running':
          status_msg = container_info_data.get('status', 'Unknown')
          return jsonify({'status': 'error', 'message': f'容器 {name} 必须处于 Running 状态才能添加 NAT 规则 (当前状态: {status_msg})。'}), 400
 
@@ -891,7 +841,7 @@ def delete_nat_rule(rule_id):
 
         if not db_success:
              message += f" 但从数据库移除记录失败: {db_message}"
-             app.logger.error(f"IPTables rule deletion succeeded or was 'Bad rule' for ID {rule_id}, but failed to remove record from DB: {db_message}")
+             app.logger.error(f"IPTables rule deletion succeeded or was 'Bad rule' for ID {rule['id']}, but failed to remove record from DB: {db_message}")
              return jsonify({'status': 'warning', 'message': message}), 200
 
         return jsonify({'status': 'success', 'message': message}), 200
@@ -950,7 +900,7 @@ def main():
                      break
 
         if not has_unique_incus_name:
-             print("警告：数据库表 'containers' 的 'incus_name' 列可能没有 UNIQUE 约束。这可能导致同步问题。")
+             print("警告：数据库表 'containers' 的 'incus_name' 列可能没有 UNIQUE约束。这可能导致同步问题。")
              print("建议删除旧的 incus_manager.db 文件然后重新运行 init_db.py 创建正确的表结构。")
 
 
