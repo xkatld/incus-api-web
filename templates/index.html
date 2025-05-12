@@ -9,10 +9,15 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body { padding-top: 20px; }
-        #execOutput, #infoContent pre, #natOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
-        #execOutput.success, #natOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
-        #execOutput.error, #natOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
+        #execOutput, #infoContent pre { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
+        #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
+        #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
         #infoContent { background-color: #fff; border: none; padding: 0; } /* Adjust styling for structured info */
+        #natOutput { /* Kept for delete output, hidden in add modal */
+            white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 150px; overflow-y: auto; font-family: monospace; font-size: 0.9em;
+        }
+         #natOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
+         #natOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
 
 
         .btn-processing {
@@ -244,6 +249,9 @@
                             <li>正在加载 NAT 规则...</li>
                         </ul>
                          <div id="natRulesError" class="alert alert-warning mt-2 d-none"></div>
+                         <!-- Output area for Delete NAT rule action -->
+                         <h6 class="mt-3">NAT 规则删除输出:</h6>
+                         <pre id="natOutput" class="mt-2"></pre>
                     </div>
 
                      <div id="infoError" class="alert alert-danger mt-2 d-none"></div>
@@ -311,8 +319,9 @@
                         </div>
                         <button type="submit" class="btn btn-primary" id="addNatButton">添加规则</button>
                     </form>
-                     <h6 class="mt-3">输出:</h6>
-                    <pre id="natOutput" class="mt-2"></pre>
+                    <!-- Removed output area from add modal -->
+                    <!-- <h6 class="mt-3">输出:</h6>
+                    <pre id="natOutput" class="mt-2"></pre> -->
                 </div>
             </div>
         </div>
@@ -459,6 +468,9 @@ $('#confirmActionButton').click(function() {
      // For NAT delete, we handle refreshing the modal list instead
      if (actionType !== 'delete_nat_rule') {
         setButtonProcessing(buttonElement, true);
+     } else {
+         // Clear previous NAT delete output when a new delete is confirmed
+         $('#natOutput').text('').removeClass('success error');
      }
 
 
@@ -469,6 +481,8 @@ $('#confirmActionButton').click(function() {
             type: 'DELETE',
             success: function(data) {
                 showToast(data.message, data.status); // Use status directly for toast type
+                 $('#natOutput').text(data.output || data.message).addClass(data.status); // Display output/message in info modal
+
                 if (data.status === 'success') {
                     // Refresh the NAT rules list in the open info modal
                     const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', ''); // Assuming label format
@@ -478,11 +492,15 @@ $('#confirmActionButton').click(function() {
                          // If container name not found in label, force a full page reload (less ideal)
                          setTimeout(() => location.reload(), 1000);
                     }
+                } else {
+                     // Error during deletion, keep the list as is, show error in output area
+                      $('#natOutput').text('删除失败: ' + (data.output || data.message)).addClass('error');
                 }
             },
             error: function(jqXHR) {
                 const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `删除 NAT 规则请求失败。`;
                 showToast("操作失败: " + message, 'danger');
+                 $('#natOutput').text("请求失败:\n" + message).addClass('error');
             },
             complete: function() {
                 const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
@@ -580,6 +598,7 @@ function showInfo(containerName, buttonElement) {
     const natRulesContent = $('#natRulesContent');
     const natRulesError = $('#natRulesError');
     const infoError = $('#infoError');
+    const natOutput = $('#natOutput'); // Get the output area in info modal
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
 
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
@@ -587,6 +606,7 @@ function showInfo(containerName, buttonElement) {
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
      infoError.addClass('d-none').text('');
+     natOutput.text('').removeClass('success error'); // Clear previous NAT delete output
 
 
     setButtonProcessing(buttonElement, true);
@@ -753,8 +773,7 @@ function openNatModal(containerName) {
     $('#hostPort').val('');
     $('#containerPort').val('');
     $('#protocol').val('tcp');
-    $('#natOutput').text('');
-    $('#natOutput').removeClass('success error');
+    // $('#natOutput').text('').removeClass('success error'); // Moved output to info modal
     $('#natContainerIP').val('正在获取 IP...'); // Indicate IP is loading
     setButtonProcessing($('#addNatButton'), false); // Disable initially
 
@@ -784,7 +803,7 @@ $('#addNatForm').submit(function(event) {
     event.preventDefault();
     const form = $(this);
     const submitButton = $('#addNatButton', form);
-    const outputArea = $('#natOutput');
+    // const outputArea = $('#natOutput'); // Output is now in info modal for delete
 
     const containerName = $('#natContainerName').val();
     const hostPort = $('#hostPort').val();
@@ -796,8 +815,8 @@ $('#addNatForm').submit(function(event) {
         return;
     }
 
-    outputArea.text('正在添加 NAT 规则...');
-    outputArea.removeClass('success error');
+    // outputArea.text('正在添加 NAT 规则...'); // Output is now in info modal for delete
+    // outputArea.removeClass('success error'); // Output is now in info modal for delete
 
     setButtonProcessing(submitButton, true);
 
@@ -810,21 +829,30 @@ $('#addNatForm').submit(function(event) {
         showToast(data.message, data.status); // Use data.status for toast type
 
         if (data.status === 'success' || data.status === 'warning') {
-            outputArea.text('IPTABLES 输出:\n' + data.output);
-            outputArea.addClass('success');
-            // On success or warning (duplicate detected), refresh the NAT rules list in the info modal
+            // Success or Warning (duplicate detected) - refresh the NAT rules list in the info modal
              const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', ''); // Assuming info modal is the one to update
              if (containerNameInModalLabel) {
                  loadNatRules(containerNameInModalLabel); // Reload the list
              }
+             // Optionally clear the form on success
+             if (data.status === 'success') {
+                 $('#hostPort').val('');
+                 $('#containerPort').val('');
+                 $('#protocol').val('tcp');
+             }
+
         } else { // status is 'error'
-            outputArea.text('添加规则失败:\n' + (data.output || data.message || '无详细输出'));
-            outputArea.addClass('error');
+            // Display error in the NAT add modal itself
+            const natAddOutputArea = $('#natModal').find('#natOutput'); // Find the output area within this modal if it were there (it's removed now)
+            // Since we removed the output area in the add modal, just rely on the toast and modal message.
+            // If you wanted to show output here again, you'd need to add the <pre> back.
+            // For now, the toast is sufficient feedback.
         }
     }).fail(function(jqXHR) {
         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "添加 NAT 规则请求失败。";
-        outputArea.text("请求失败:\n" + message);
-        outputArea.addClass('error');
+        // Display error in the NAT add modal itself if needed, or just rely on toast
+        // const natAddOutputArea = $('#natModal').find('#natOutput');
+        // natAddOutputArea.text("请求失败:\n" + message).addClass('error');
         showToast("请求失败。", 'danger');
     }).always(function() {
         setButtonProcessing(submitButton, false);
@@ -836,6 +864,7 @@ $('#infoModal').on('hidden.bs.modal', function () {
   $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
   $('#natRulesError').addClass('d-none').text('');
   $('#infoError').addClass('d-none').text('');
+  $('#natOutput').text('').removeClass('success error'); // Clear NAT delete output
   $('#infoModalLabel').text('容器信息');
 });
 
@@ -854,8 +883,7 @@ $('#natModal').on('hidden.bs.modal', function () {
     $('#hostPort').val('');
     $('#containerPort').val('');
     $('#protocol').val('tcp');
-    $('#natOutput').text('');
-    $('#natOutput').removeClass('success error');
+    // $('#natOutput').text('').removeClass('success error'); // Output is now in info modal
     $('#natModalLabel').text('为容器添加 NAT 规则');
     setButtonProcessing($('#addNatButton'), false);
      $('#addNatButton').prop('disabled', false).text('添加规则'); // Reset button state and re-enable
