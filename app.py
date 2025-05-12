@@ -1,14 +1,13 @@
---- START OF FILE app.txt ---
-
 # app.py
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 import subprocess # 用于执行命令行
-import json       # 用于解析 Incus 的 JSON 输出 (虽然info不用了，list还需要)
+import json       # 用于解析 Incus 的 JSON 输出 (虽然info不用了, list还需要)
 import sqlite3
 import datetime
 import os # 引入 os 模块
 import time # 引入 time 模块
 import re # 引入 re 模块用于正则表达式解析文本
+import shlex # 用于安全分割命令字符串
 
 app = Flask(__name__)
 DATABASE_NAME = 'incus_manager.db' # 确保和 init_db.py 中的一致
@@ -69,7 +68,8 @@ def run_incus_command(command_parts, parse_json=True):
             try:
                 # 尝试更灵活的 JSON 解析，处理可能的 BOM 或其他前缀
                 output_text = result.stdout.strip()
-                if output_text.startswith(u'\ufeff'): # 处理BOM
+                # Remove potential leading BOM
+                if output_text.startswith(u'\ufeff'):
                     output_text = output_text[1:]
                 return True, json.loads(output_text)
             except json.JSONDecodeError as e:
@@ -96,66 +96,74 @@ def sync_container_to_db(name, image_source, status, created_at_str):
     conn = get_db_connection()
     cursor = conn.cursor()
     try:
-        created_at_to_db = str(created_at_str) if created_at_str else datetime.datetime.now().isoformat()
+        # Ensure created_at_str is a string or None
+        created_at_to_db = str(created_at_str) if created_at_str is not None else datetime.datetime.now().isoformat()
+        original_created_at_to_db = created_at_to_db # Keep original for logging if needed
+
         try:
-            # 尝试解析并格式化日期时间，处理 Incus 输出的各种可能格式
+            # Attempt to parse and format datetime, handle various possible formats from Incus output
             # Incus V5.21+ created_at is a string like "2024-02-21T08:08:10.123456789Z" or "2024-03-15T14:00:00Z"
             # incus info text format might be "2024/03/15 10:30 UTC" or similar
             # Database stores ISO format.
-            
-            # If it looks like Incus V5.21+ JSON output format
-            if 'T' in created_at_to_db and ('Z' in created_at_to_db or '+' in created_at_to_db or '-' in created_at_to_db.split('T')[-1]):
+
+            # If it looks like Incus JSON ISO format (contains 'T' and timezone/Z)
+            if isinstance(created_at_to_db, str) and 'T' in created_at_to_db and ('Z' in created_at_to_db or '+' in created_at_to_db or (len(created_at_to_db.split('T')[-1]) > 5 and created_at_to_db.split('T')[-1][0] in '+-')):
                  # Handle Incus JSON ISO format string
                  # Python's fromisoformat before 3.11 doesn't like more than 6 decimal places for microseconds
-                 if 'Z' in created_at_to_db:
-                    created_at_to_db = created_at_to_db.replace("Z", "+00:00")
+                 # And needs Z replaced with +00:00
 
+                 # Replace Z with +00:00
+                 if created_at_to_db.endswith('Z'):
+                    created_at_to_db = created_at_to_db[:-1] + '+00:00'
+                 # Handle timezone formats like -HHMM (convert to -HH:MM for fromisoformat)
+                 tz_match_hhmm = re.search(r'([+-])(\d{4})$', created_at_to_db)
+                 if tz_match_hhmm:
+                     sign = tz_match_hhmm.group(1)
+                     hhmm = tz_match_hhmm.group(2)
+                     created_at_to_db = created_at_to_db[:-4] + f"{sign}{hhmm[:2]}:{hhmm[2:]}"
+
+
+                 # Truncate microseconds if too long (more than 6 digits)
                  parts = created_at_to_db.split('.')
                  if len(parts) > 1:
-                    second_part_and_tz = parts[1]
-                    tz_part = ""
-                    # Find timezone separator (+ or -)
-                    tz_idx = -1
-                    if '+' in second_part_and_tz:
-                        tz_idx = second_part_and_tz.find('+')
-                    elif '-' in second_part_and_tz: # Could be date part or timezone
-                         # Check if '-' is likely a timezone offset (-HH:MM or -HHMM)
-                         tz_match = re.search(r'-(\d{2}:?\d{2}|\d{4})$', second_part_and_tz)
-                         if tz_match:
-                              tz_idx = second_part_and_tz.rfind('-') # Find the last '-'
-                         else: # Could be negative microseconds? Unlikely but handle
-                              pass # Keep full microseconds if no timezone found
-                    
-                    if tz_idx != -1:
-                        tz_part = second_part_and_tz[tz_idx:]
-                        second_part = second_part_and_tz[:tz_idx]
-                    else:
-                         second_part = second_part_and_tz
+                     second_part_and_tz = parts[1]
+                     tz_part_match = re.search(r'[+-]\d{2}:?\d{2}$', second_part_and_tz)
+                     if tz_part_match:
+                          tz_part = tz_part_match.group(0)
+                          second_part = second_part_and_tz[:second_part_and_tz.rfind(tz_part)]
+                     else:
+                          tz_part = ""
+                          second_part = second_part_and_tz
 
-                    # Truncate microseconds to 6 digits
-                    if len(second_part) > 6:
-                        second_part = second_part[:6]
+                     if len(second_part) > 6:
+                         second_part = second_part[:6]
 
-                    created_at_to_db = parts[0] + '.' + second_part + tz_part
-                 # No fractional seconds part? Add .000000
-                 elif '+' in created_at_to_db or ('-' in created_at_to_db and len(created_at_to_db.split('-')[-1].split('T')[-1]) > 4): # Ensure it's a TZ part, not just date separator
-                      # Check if there's a timezone offset like +00:00 or -0500 but no microseconds
-                      tz_match = re.search(r'[+-](\d{2}:?\d{2}|\d{4})$', created_at_to_db)
-                      if tz_match and '.' not in created_at_to_db.split('T')[-1].split(tz_match.group(0)[0])[0]: # No dot before TZ separator
-                           created_at_to_db = created_at_to_db.replace(tz_match.group(0), '.000000' + tz_match.group(0))
+                     created_at_to_db = parts[0] + '.' + second_part + tz_part
+                 # No fractional seconds part but has timezone? Add .000000
+                 elif re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db):
+                      # Check if there's a timezone offset but no microseconds dot before it
+                      if '.' not in created_at_to_db.split('T')[-1].split(re.search(r'[+-]', created_at_to_db.split('T')[-1]).group(0))[0]:
+                           tz_part = re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db).group(0)
+                           created_at_to_db = created_at_to_db.replace(tz_part, '.000000' + tz_part)
 
 
-            # Validate the final ISO format string (or near-ISO)
+            # Validate the final ISO format string
             datetime.datetime.fromisoformat(created_at_to_db)
 
-        except (ValueError, AttributeError, TypeError) as ve: # AttributeError if created_at_to_db is None
-            app.logger.warning(f"无法精确解析 Incus 创建时间 '{created_at_str}' for {name} 为 ISO 格式 ({ve}). 将使用数据库记录的原值或当前时间.")
-            # 如果解析 Incus 提供的字符串失败，尝试从数据库获取旧值
+        except (ValueError, AttributeError, TypeError) as ve: # AttributeError if created_at_to_db is not a string
+            app.logger.warning(f"无法精确解析 Incus 创建时间 '{original_created_at_to_db}' for {name} 为 ISO 格式 ({ve}). 将尝试使用数据库记录的原值或当前时间.")
+            # If parsing Incus provided string fails, try to get old value from DB
             old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
             if old_db_entry and old_db_entry['created_at']:
-                 created_at_to_db = old_db_entry['created_at']
+                 # Validate the old DB value before using it
+                 try:
+                      datetime.datetime.fromisoformat(old_db_entry['created_at'])
+                      created_at_to_db = old_db_entry['created_at']
+                 except (ValueError, TypeError):
+                      app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式.")
+                      created_at_to_db = datetime.datetime.now().isoformat() # Use current time if DB value is also invalid
             else:
-                 # 如果数据库也没有有效值，则使用当前时间
+                 # If DB also has no valid value, use current time
                  created_at_to_db = datetime.datetime.now().isoformat()
 
 
@@ -165,11 +173,11 @@ def sync_container_to_db(name, image_source, status, created_at_str):
             ON CONFLICT(incus_name) DO UPDATE SET
                 image_source = excluded.image_source,
                 status = excluded.status,
-                created_at = excluded.created_at, -- 优先使用 Incus 提供的或解析后的时间
+                created_at = excluded.created_at, -- Prioritize Incus provided or parsed time
                 last_synced = CURRENT_TIMESTAMP
         ''', (name, image_source, status, created_at_to_db))
         conn.commit()
-        #app.logger.info(f"Synced container {name} to DB.") # 避免日志过多
+        #app.logger.info(f"Synced container {name} to DB.") # Avoid excessive logging
     except sqlite3.Error as e:
         app.logger.error(f"数据库错误 sync_container_to_db for {name}: {e}")
     finally:
@@ -179,6 +187,7 @@ def sync_container_to_db(name, image_source, status, created_at_str):
 def remove_container_from_db(name):
     """从数据库中移除容器信息"""
     try:
+        # Using query_db which handles conn/commit/close
         query_db('DELETE FROM containers WHERE incus_name = ?', [name])
         app.logger.info(f"从数据库中移除了容器: {name}")
     except sqlite3.Error as e:
@@ -190,42 +199,46 @@ def remove_container_from_db(name):
 @app.route('/')
 def index():
     """主页面，列出容器"""
-    # 仍然使用 JSON 格式获取列表，因为更稳定且包含创建时间等信息
+    # Still use JSON format for list, as it's generally supported and structured
     success, containers_data = run_incus_command(['incus', 'list', '--format', 'json'])
 
     listed_containers = []
     db_containers_dict = {}
+    incus_error = False
     incus_error_message = None
 
-    # 1. 从数据库加载现有容器作为 fallback
+    # 1. Load existing containers from DB as fallback
     try:
         db_containers_dict = {row['incus_name']: dict(row) for row in query_db('SELECT * FROM containers')}
     except sqlite3.OperationalError as e:
         app.logger.error(f"数据库表 'containers' 可能不存在: {e}. 请运行 init_db.py.")
+        incus_error = True
         incus_error_message = f"数据库错误：容器表未找到，请运行 init_db.py。原始错误: {e}"
-        # 如果数据库都出问题，直接返回错误模板
-        return render_template('index.html', 
-                               containers=[], 
+        # If DB has issues, render error template directly
+        return render_template('index.html',
+                               containers=[],
                                images=[],
-                               incus_error=(True, incus_error_message))
+                               incus_error=(incus_error, incus_error_message),
+                               image_error=(True, "无法加载可用镜像列表.")) # Assume image list also fails without DB
 
 
-    # 2. 从 Incus 获取实时列表并同步
+    # 2. Get real-time list from Incus and sync
     if not success:
+        incus_error = True
         incus_error_message = containers_data # containers_data contains error message if success is False
         app.logger.warning(f"无法从 Incus 获取容器列表 ({incus_error_message})，尝试从数据库加载。")
-        # Incus 失败，但数据库有数据，使用数据库数据填充 listed_containers
+        # Incus failed, but DB has data, use DB data to populate listed_containers
         for name, data in db_containers_dict.items():
             listed_containers.append({
                 'name': name,
                 'status': data.get('status', 'Unknown (from DB)'),
                 'image_source': data.get('image_source', 'N/A (from DB)'),
-                # IP地址在 list JSON 输出中并不总是直接 available，通常在 info 或 state 里
-                'ip': 'N/A (DB info)', # IP 从列表页难获取，详情页获取
+                # IP address is not reliably available in 'list' JSON output, better in 'info' or 'state'
+                'ip': 'N/A (DB info)', # IP is hard to get from list view, will get it in detail view
                 'created_at': data.get('created_at', 'N/A (from DB)')
             })
 
-    elif isinstance(containers_data, list): # Incus 成功且返回了列表
+    elif isinstance(containers_data, list): # Incus success and returned a list
         incus_container_names = set()
         for item in containers_data:
             if not isinstance(item, dict) or 'name' not in item:
@@ -268,6 +281,7 @@ def index():
                  network_info = container_state.get('network')
                  if isinstance(network_info, dict):
                      for iface_name, iface_data in network_info.items():
+                         # Look for standard interface names
                          if (iface_name.startswith('eth') or iface_name.startswith('enp') or iface_name.startswith('ens')) and isinstance(iface_data, dict):
                              addresses = iface_data.get('addresses')
                              if isinstance(addresses, list):
@@ -304,9 +318,10 @@ def index():
                 remove_container_from_db(db_name)
 
     else: # Incus success but returned unexpected data format
+        incus_error = True
         incus_error_message = f"Incus list 返回了未知数据格式: {containers_data}"
         app.logger.error(incus_error_message)
-        # Incus 失败，但数据库有数据，使用数据库数据填充 listed_containers
+        # Incus failed, but DB has data, use DB data to populate listed_containers
         for name, data in db_containers_dict.items():
             listed_containers.append({
                 'name': name,
@@ -320,6 +335,7 @@ def index():
     # Get available images (still using JSON format as it's generally supported for image list)
     success_img, images_data = run_incus_command(['incus', 'image', 'list', '--format', 'json'])
     available_images = []
+    image_error = False
     image_error_message = None
     if success_img and isinstance(images_data, list):
         for img in images_data:
@@ -329,11 +345,12 @@ def index():
             aliases = img.get('aliases')
             if isinstance(aliases, list) and aliases:
                 # Find the first alias
-                alias_entry = next((a for a in aliases if isinstance(a, dict)), None)
+                alias_entry = next((a for a in aliases if isinstance(a, dict) and a.get('name')), None) # Ensure alias dict has 'name'
                 if alias_entry:
                      alias_name = alias_entry.get('name')
 
             if not alias_name:
+                # Fallback to fingerprint prefix if no alias found
                 fingerprint = img.get('fingerprint')
                 alias_name = fingerprint[:12] if isinstance(fingerprint, str) else 'unknown_image'
 
@@ -342,11 +359,10 @@ def index():
             if isinstance(description_props, dict):
                 description = description_props.get('description', 'N/A')
 
-            # Skip images without aliases or description that look like base images without useful names
-            # Example: images from private remotes might just have fingerprint aliases.
-            # Let's just add all found images for now.
+            # Add image to list
             available_images.append({'name': alias_name, 'description': f"{alias_name} ({description})"})
     else:
+        image_error = True
         image_error_message = images_data if not success_img else 'Invalid image data format from Incus.'
         app.logger.error(f"获取镜像列表失败: {image_error_message}")
 
@@ -354,8 +370,8 @@ def index():
     return render_template('index.html',
                            containers=listed_containers,
                            images=available_images,
-                           incus_error=(not success, incus_error_message),
-                           image_error=(not success_img, image_error_message))
+                           incus_error=(incus_error, incus_error_message),
+                           image_error=(image_error, image_error_message))
 
 
 @app.route('/container/create', methods=['POST'])
@@ -371,46 +387,29 @@ def create_container():
         # Give Incus a moment to register the new container and start it
         time.sleep(3) # Increased sleep slightly
 
-        # Try to get initial info via plain text info command to sync DB
-        _, info_text = run_incus_command(['incus', 'info', name], parse_json=False)
+        # Try to get initial info via incus list (JSON is reliable here) to sync DB
+        # Using list is often quicker and more reliable for basic status/created_at after launch
+        _, list_output = run_incus_command(['incus', 'list', name, '--format', 'json'])
 
-        created_at = datetime.datetime.now().isoformat() # Default if parsing fails
-        image_source_desc = image # Default image source description
-        status_val = 'Pending' # Assume pending initially, text parsing might update
+        created_at = datetime.datetime.now().isoformat() # Default if list fails or no created_at
+        image_source_desc = image # Default image source description from input
+        status_val = 'Pending' # Assume pending initially, list might update
 
-        # Attempt to parse key info from text output
-        if info_text and isinstance(info_text, str):
-            lines = info_text.splitlines()
-            for line in lines:
-                line = line.strip()
-                if line.startswith('Status:'):
-                    status_val = line.split(':', 1)[1].strip() if ':' in line else status_val
-                # Parsing Created time from text is fragile, sticking to DB/default
-                # Parsing image.description/alias from text config is also hard
-                # Description line might give image description
-                elif line.startswith('Description:'):
-                     image_source_desc = line.split(':', 1)[1].strip() if ':' in line else image_source_desc
-                     if image_source_desc == 'N/A': # If description is N/A, use the launch image name
-                          image_source_desc = image
-
-
-        # Use the image name from launch command as a fallback image source description
-        if image_source_desc == 'N/A':
-            image_source_desc = f"Launched from: {image}"
-
-
-        # If parsing status failed, try getting it from list (JSON format)
-        if status_val == 'Pending':
-             _, list_output = run_incus_command(['incus', 'list', name, '--format', 'json'])
-             if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
-                  status_val = list_output[0].get('status', 'Unknown')
-                  # Also attempt to get created_at from list json
-                  created_at = list_output[0].get('created_at', created_at)
-                  # And image source description from list json config
-                  list_cfg = list_output[0].get('config')
-                  if isinstance(list_cfg, dict):
-                       list_img_desc = list_cfg.get('image.description')
-                       if list_img_desc: image_source_desc = list_img_desc
+        if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
+             container_data = list_output[0]
+             status_val = container_data.get('status', 'Unknown')
+             created_at = container_data.get('created_at', created_at)
+             # Get image source from list JSON config
+             list_cfg = container_data.get('config')
+             if isinstance(list_cfg, dict):
+                  list_img_desc = list_cfg.get('image.description')
+                  if list_img_desc: image_source_desc = list_img_desc
+             app.logger.info(f"Successfully got list info for new container {name}.")
+        else:
+             # list command failed, use defaults or info text (optional, list is better)
+             app.logger.warning(f"Failed to get list info for new container {name}. list output: {list_output}")
+             # Fallback to incus info text parsing is possible but sync_container_to_db can handle defaults
+             # Or rely on index sync later
 
 
         # Sync the obtained info to the database
@@ -498,9 +497,6 @@ def exec_command(name):
         return jsonify({'status': 'error', 'message': '执行的命令不能为空'}), 400
 
     # Split command string safely, handle potential quotes if needed for robustness
-    # Simple split might break commands with spaces in arguments (e.g., echo "hello world")
-    # For more robust parsing, consider shlex.split
-    import shlex
     try:
         command_parts = shlex.split(command_to_exec)
     except ValueError as e:
@@ -523,31 +519,28 @@ def exec_command(name):
 def container_info(name):
     """
     获取容器详细信息。
-    通过解析 incus info 命令的纯文本输出来模拟 JSON 输出结构。
+    通过解析 incus info 命令的纯文本输出来模拟 Incus info JSON 输出的部分结构。
     """
 
-    # 1. 尝试执行 incus info (纯文本)
-    # 不使用 --format json
-    success_text, text_data = run_incus_command(['incus', 'info', name], parse_json=False)
-
-    # 2. 从数据库获取基本信息作为补充和fallback
+    # 1. 从数据库获取基本信息作为补充和fallback
     db_info = query_db('SELECT * FROM containers WHERE incus_name = ?', [name], one=True)
 
-    # 3. 初始化一个字典，模拟 Incus JSON 输出的结构
+    # 2. 初始化一个字典，模拟 Incus JSON 输出的部分结构
     # 用数据库信息填充可信度高的字段
     simulated_json_output = {
         'name': name,
-        # 从DB或解析文本获取的状态
-        'status': db_info['status'] if db_info else 'Unknown',
-        'status_code': 0, # 文本输出没有status_code, 默认为0
-        'image_source': db_info['image_source'] if db_info and db_info['image_source'] else 'N/A',
-        'created_at': db_info['created_at'] if db_info and db_info['created_at'] else datetime.datetime.now().isoformat(),
+        # 从DB获取初始状态
+        'status': db_info['status'] if db_info and 'status' in db_info else 'Unknown',
+        'status_code': 0, # 文本输出通常没有status_code, 默认为0
+        # 从DB获取 image_source 和 created_at
+        'image_source': db_info['image_source'] if db_info and 'image_source' in db_info and db_info['image_source'] else 'N/A',
+        'created_at': db_info['created_at'] if db_info and 'created_at' in db_info and db_info['created_at'] else datetime.datetime.now().isoformat(),
         'architecture': 'N/A', # 尝试从文本解析
         'description': 'N/A', # 尝试从文本解析
 
         # 模拟 incus info --format json 中的 state 部分
         'state': {
-            'status': db_info['status'] if db_info else 'Unknown', # state里的状态和顶级状态一致
+            'status': db_info['status'] if db_info and 'status' in db_info else 'Unknown', # state里的状态和顶级状态一致
             'status_code': 0, # 文本输出没有status_code
             'network': {}, # 尝试从文本解析网络信息
             # 文本输出通常不包含 pid, cpu, memory, diskio 等详细实时状态，这些将缺失
@@ -565,57 +558,62 @@ def container_info(name):
         'config': {},
         'devices': {},
         'snapshots': [],
-        'type': 'container', # 文本输出有Type: container
-        # 'profiles': [], # 文本输出有Profiles:
+        'type': 'container', # 尝试从文本解析 Type
+        'profiles': [], # 尝试从文本解析 Profiles
         # 'expanded_config': {}, # 文本输出没有这个
         # 'expanded_devices': {}, # 文本输出没有这个
-        # 'ephemeral': False, # 文本输出没有
-        # 'features': {}, # 文本输出没有
+        'ephemeral': False, # 尝试从文本解析
+        'features': {}, # 文本输出没有这个
 
         'live_data_available': False, # 标记是否成功解析了 incus info 文本
-        'message': '无法从 Incus 获取实时信息，数据来自数据库快照。' # 默认消息
+        'message': '无法从 Incus 获取实时信息，数据主要来自数据库快照。' # 默认消息
         # 'raw_text_info': '' # 可选：包含原始文本输出用于调试
     }
 
-    # 如果数据库没有找到容器，返回错误
+    # If database doesn't have the container, it might mean it doesn't exist
     if not db_info:
-         simulated_json_output['message'] = f"获取容器 {name} 信息失败: 数据库中无记录且无法从 Incus 获取实时信息。"
-         simulated_json_output['status'] = 'NotFound' # 模拟一个状态
-         # http status code should be 404, but jsonify might return 200. Let's return 404 explicitly.
-         return jsonify(simulated_json_output), 404
+         # Even if DB is empty for this name, try to get info from Incus in case it exists but wasn't synced
+         app.logger.warning(f"Container {name} not found in DB. Attempting to get live info from Incus.")
+         # Keep going to try incus info
 
 
-    # 4. 如果 incus info 命令成功，开始解析文本并更新模拟的 JSON 结构
+    # 3. Attempt to execute incus info (plain text)
+    # Not using --format json
+    success_text, text_data = run_incus_command(['incus', 'info', name], parse_json=False)
+
+
+    # 4. If incus info command successful, parse text and update simulated JSON structure
     if success_text:
         simulated_json_output['live_data_available'] = True
         simulated_json_output['message'] = '数据主要来自 Incus (通过文本解析)，部分来自数据库。'
-        # simulated_json_output['raw_text_info'] = text_data # 可选：包含原始文本输出
+        # simulated_json_output['raw_text_info'] = text_data # Optional: include raw text output for debugging
 
         lines = text_data.splitlines()
-        current_section = None # 跟踪当前解析的文本段落
+        current_section = None # Track current text paragraph being parsed
 
-        # 遍历每一行进行解析
+        # Iterate through each line to parse
         for line in lines:
             line = line.strip()
             if not line:
-                 current_section = None # 空行表示段落结束
+                 current_section = None # Empty line ends a paragraph
                  continue
 
-            # 检查是否是新的主段落标题 (以冒号结尾)
+            # Check for new main paragraph titles (ending with colon)
             if line.endswith(':'):
-                # 特殊处理网络状态，它有子行
+                # Special handling for multi-line sections
                 if line == 'Network state:':
                     current_section = 'Network state'
-                # 特殊处理 Profiles:
+                    simulated_json_output['state']['network'] = {} # Initialize network dict
                 elif line == 'Profiles:':
                     current_section = 'Profiles'
-                # 可以添加其他需要特殊处理的多行段落
+                    simulated_json_output['profiles'] = [] # Initialize profiles list
+                # Add other multi-line sections here if needed
                 else:
-                    current_section = None # 其他冒号结尾的单行主属性，如下一行会解析其值
+                    current_section = None # Other colon-ending lines are usually single-line main properties, next line parses value
 
-                continue # 处理完标题行，进入下一行解析内容
+                continue # Processed title line, move to next line for content
 
-            # 解析单行主属性 (不在任何多行段落内)
+            # Parse single-line main properties (not within any multi-line section)
             if current_section is None:
                 if ':' in line:
                     key, value = line.split(':', 1)
@@ -624,34 +622,40 @@ def container_info(name):
 
                     if key == 'Status':
                         simulated_json_output['status'] = value
-                        simulated_json_output['state']['status'] = value # 更新 state 中的状态
+                        simulated_json_output['state']['status'] = value # Update state status too
+                        # Attempt to map status string to a code (very rough guess)
+                        status_code_map = {
+                             'Running': 100, 'Stopped': 101, 'Frozen': 102,
+                             'Starting': 103, 'Stopping': 104, 'Aborting': 105,
+                             'Error': 106, 'Created': 107, 'Pending': 108
+                        }
+                        simulated_json_output['status_code'] = status_code_map.get(value, 0)
+                        simulated_json_output['state']['status_code'] = simulated_json_output['status_code']
+
                     elif key == 'Architecture':
                         simulated_json_output['architecture'] = value
                     elif key == 'Description':
-                         # 如果 incus info 的 Description 提供了更详细的镜像描述，使用它
+                         # If incus info Description provides a more detailed image description, use it
                          if value and value != 'N/A':
                             simulated_json_output['description'] = value
-                            # 也可以考虑用这个更新 image_source，但 DB 的 image_source 可能更可靠
-                            # simulated_json_output['image_source'] = value
-                         else:
-                             # 如果文本描述是 N/A，保留数据库或默认的 image_source
-                             pass
-                    # Created 时间解析复杂，依赖DB，不在这里覆盖
-                    # elif key == 'Created':
-                    #    pass # 暂时不解析文本创建时间
+                            # Optionally: update image_source if this description is better than DB/default
+                            # simulated_json_output['image_source'] = value # Decide whether to overwrite DB source
+                         pass # Keep DB's image_source unless description is preferred
+                    elif key == 'Created':
+                         # Parsing Created time from text is fragile, keep DB's value
+                         pass
                     elif key == 'Type':
                         simulated_json_output['type'] = value
+                    elif key == 'Ephemeral':
+                         simulated_json_output['ephemeral'] = (value.lower() == 'true')
                     # Add other simple fields if needed and parsable
-                    # elif key == 'PID': # PID通常在state里，info文本不一定有
-                    #     try: simulated_json_output['state']['pid'] = int(value)
-                    #     except ValueError: pass
 
-            # 解析网络状态段落内的行
+            # Parse lines within the Network state section
             elif current_section == 'Network state':
-                # 网络行的格式通常是 "- <interface> (<family>): <address>/<mask> (<scope>)"
-                # 示例文本行: - eth0 (inet): 192.168.4.123/24 (global)
-                # 示例文本行: - eth0 (inet6): fe80::.../64 (link)
-                # 示例文本行: - eth0 (link): 00:16:3E:... (ether)
+                # Network line format is typically "- <interface> (<family>): <address>/<mask> (<scope>)"
+                # Example: - eth0 (inet): 192.168.4.123/24 (global)
+                # Example: - eth0 (inet6): fe80::.../64 (link)
+                # Example: - eth0 (link): 00:16:3E:... (ether)
                 network_match = re.match(r'^\s*-\s+([^ ]+)\s+\((inet|inet6|link)\):\s+([^ ]+)\s+\((global|link|host|ether)\)', line)
                 if network_match:
                     iface_name = network_match.group(1)
@@ -659,42 +663,73 @@ def container_info(name):
                     address_with_mask = network_match.group(3)
                     addr_scope = network_match.group(4)
 
-                    # 确保模拟的 network 结构存在该接口
+                    # Ensure simulated network structure exists for this interface
                     if iface_name not in simulated_json_output['state']['network']:
-                        simulated_json_output['state']['network'][iface_name] = {'addresses': [], 'state': 'up'} # state: 'up' 是推测的，文本info不直接提供
+                         # Text info doesn't give interface state (up/down), assume up if addresses listed
+                        simulated_json_output['state']['network'][iface_name] = {'addresses': [], 'state': 'up', 'hwaddr': 'N/A'}
 
-                    # 添加地址信息
+                    # Extract IP address without mask
+                    ip_address_only = address_with_mask.split('/')[0]
+
+                    # Add address information
                     simulated_json_output['state']['network'][iface_name]['addresses'].append({
-                        'address': address_with_mask.split('/')[0], # 提取IP地址，去掉掩码
+                        'address': ip_address_only,
                         'family': addr_family,
+                        'netmask': address_with_mask.split('/')[-1] if '/' in address_with_mask else '', # Add netmask if present
                         'scope': addr_scope
                     })
-
-            # 解析 Profiles 段落内的行 (如果需要)
-            # elif current_section == 'Profiles':
-            #    profile_match = re.match(r'^\s*-\s+([^ ]+)', line)
-            #    if profile_match:
-            #       simulated_json_output.setdefault('profiles', []).append(profile_match.group(1))
-
-
-        # --- 后处理 / 填充缺失信息 ---
-        # 如果从文本解析到的状态与数据库状态不同，优先使用解析到的状态
-        # 如果解析到的 image_source (来自 Description) 比数据库的 N/A 更好，也可以考虑更新
-        # 但为了稳定，image_source 和 created_at 优先保留来自 DB 的值
-
-        # 如果文本解析成功获取到状态，更新顶级和 state 中的状态
-        if 'status' in simulated_json_output and simulated_json_output['status'] != (db_info['status'] if db_info else 'Unknown'):
-             simulated_json_output['state']['status'] = simulated_json_output['status']
+                else:
+                     # Handle potential hardware address line in network state section
+                     # Example: - eth0 (link): 00:16:3E:... (ether)
+                     hwaddr_match = re.match(r'^\s*-\s+([^ ]+)\s+\(link\):\s+([^ ]+)\s+\(ether\)', line)
+                     if hwaddr_match:
+                         iface_name = hwaddr_match.group(1)
+                         hw_address = hwaddr_match.group(2)
+                         if iface_name not in simulated_json_output['state']['network']:
+                            simulated_json_output['state']['network'][iface_name] = {'addresses': [], 'state': 'up', 'hwaddr': hw_address}
+                         else:
+                             simulated_json_output['state']['network'][iface_name]['hwaddr'] = hw_address
 
 
-    else: # incus info (纯文本) 命令执行失败的情况
-        incus_error_detail = text_data # text_data 变量此时包含 run_incus_command 返回的错误信息
+            # Parse lines within the Profiles section
+            elif current_section == 'Profiles':
+               profile_match = re.match(r'^\s*-\s+([^ ]+)', line)
+               if profile_match:
+                  simulated_json_output['profiles'].append(profile_match.group(1))
+
+
+        # --- Post-processing / Filling missing info ---
+        # If incus info text parsing didn't find a status, keep the status from the database
+        if simulated_json_output['status'] == 'Unknown' and db_info and 'status' in db_info:
+             simulated_json_output['status'] = db_info['status']
+             simulated_json_output['state']['status'] = db_info['status']
+
+
+        # If incus info text parsing didn't find architecture, keep DB's or default
+        if simulated_json_output['architecture'] == 'N/A' and db_info and 'architecture' in db_info: # Assuming DB might store architecture
+             simulated_json_output['architecture'] = db_info['architecture']
+
+        # Image source and created_at are more reliably from list JSON/DB sync, so they are populated from DB first
+        # Keep the DB values unless text parsing found something definitively better (e.g., a full description)
+        # simulated_json_output['image_source'] is already from DB or default
+
+    else: # incus info (plain text) command failed
+        incus_error_detail = text_data # text_data variable now contains the error message from run_incus_command
         simulated_json_output['message'] = f"获取容器 {name} 实时信息失败 (命令执行失败: {incus_error_detail}). 数据主要来自数据库快照。"
-        # live_data_available 保持 False
-        # 解析字段保持初始的数据库值或 N/A
+        simulated_json_output['live_data_available'] = False
+        # Parsing fields remain at initial database values or defaults
 
-    # 返回模拟的 JSON 结构
-    # 如果数据库信息不存在，前面已经返回404了，这里肯定是db_info存在的
+    # If Incus info failed and DB didn't have the container either
+    if not success_text and not db_info:
+         simulated_json_output['message'] = f"获取容器 {name} 信息失败: 数据库中无记录且无法从 Incus 获取实时信息 ({incus_error_detail})."
+         simulated_json_output['status'] = 'NotFound' # Simulate a status
+         # Return 404 explicitly as the container likely doesn't exist
+         return jsonify(simulated_json_output), 404
+
+
+    # Return the constructed simulated JSON structure
+    # If we reach here, either incus info succeeded (and parsing updated the struct)
+    # or incus info failed but db_info was available (and the struct is populated from db_info/defaults)
     return jsonify(simulated_json_output)
 
 
@@ -708,25 +743,43 @@ def main():
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
-        # 检查 containers 表是否存在
+        # Check if containers table exists
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='containers';")
         if not cursor.fetchone():
             print(f"错误：数据库表 'containers' 在 '{DATABASE_NAME}' 中未找到。")
             print("请确保 'python init_db.py' 已成功运行并创建了表结构。")
-            # 建议删除旧文件并重新运行init_db.py
+            # Suggest deleting old file and rerunning init_db.py
             print("您可以尝试删除旧的 incus_manager.db 文件然后重新运行 init_db.py。")
             return
 
-        # 检查 containers 表是否有必需的列 (至少 incus_name, status, created_at, image_source)
+        # Check if containers table has required columns (at least incus_name, status, created_at, image_source)
         cursor.execute("PRAGMA table_info(containers);")
-        columns = [col[1] for col in cursor.fetchall()]
+        columns_info = cursor.fetchall()
+        column_names = [col[1] for col in columns_info]
         required_columns = ['incus_name', 'status', 'created_at', 'image_source']
-        missing_columns = [col for col in required_columns if col not in columns]
+        missing_columns = [col for col in required_columns if col not in column_names]
         if missing_columns:
             print(f"错误：数据库表 'containers' 缺少必需的列: {', '.join(missing_columns)}")
             print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
             print("您可以尝试删除旧的 incus_manager.db 文件然后重新运行 init_db.py。")
             return
+
+        # Check if incus_name column has a UNIQUE constraint
+        incus_name_cid = next((col[0] for col in columns_info if col[1] == 'incus_name'), None)
+        if incus_name_cid is not None:
+             cursor.execute(f"PRAGMA index_list(containers);")
+             indexes = cursor.fetchall()
+             is_unique = False
+             for index in indexes:
+                 index_name = index[1]
+                 cursor.execute(f"PRAGMA index_info('{index_name}');")
+                 index_cols = cursor.fetchall()
+                 if len(index_cols) == 1 and index_cols[0][2] == 'incus_name' and index[2] == 1: # cid, name, cid_name_in_index, primary key (isunique)
+                     is_unique = True
+                     break
+             if not is_unique:
+                 print("警告：数据库表 'containers' 的 'incus_name' 列没有 UNIQUE 约束。这可能导致同步问题。")
+                 print("建议删除旧的 incus_manager.db 文件然后重新运行 init_db.py 创建正确的表结构。")
 
 
     except sqlite3.Error as e:
@@ -736,7 +789,7 @@ def main():
         if conn:
             conn.close()
 
-    # 确保Inc us命令存在且可执行 (基本检查)
+    # Ensure Incus command exists and is executable (basic check)
     try:
         subprocess.run(['incus', '--version'], check=True, capture_output=True, text=True)
         print("Incus 命令检查通过。")
