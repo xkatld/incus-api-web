@@ -32,6 +32,10 @@
             right: 20px;
             z-index: 1050;
         }
+         /* Ensure modal z-index is appropriate */
+        .modal { z-index: 1040; }
+        .modal-backdrop { z-index: 1039; }
+
     </style>
 </head>
 <body>
@@ -98,7 +102,7 @@
                         {% if c.status == 'Running' %}
                         <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
                         <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
-                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button> <!-- Exec doesn't disable the row button, handled in modal -->
+                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
                         {% elif c.status == 'Stopped' %}
                         <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
                         {% endif %}
@@ -157,6 +161,26 @@
         </div>
     </div>
 
+    <!-- 通用确认 Modal -->
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="confirmModalLabel">请确认</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body" id="confirmModalBody">
+                    <!-- Confirmation message will be inserted here -->
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmActionButton">确认</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
 <script>
 // Function to show Bootstrap Toast notifications
 function showToast(message, type = 'info') {
@@ -186,8 +210,6 @@ function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
     if (isProcessing) {
         $button.data('original-text', $button.html()); // Store original content
-        // Check if it's a delete button to use a different spinner color maybe, not strictly needed now
-        // const spinnerColor = $button.hasClass('btn-danger') ? 'text-danger' : 'text-light'; // Example
         const spinnerHtml = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
         $button.html(spinnerHtml + ' 处理中...');
         $button.addClass('btn-processing').prop('disabled', true);
@@ -200,6 +222,103 @@ function setButtonProcessing(button, isProcessing) {
     }
 }
 
+// Global variables to store context for confirmation modal
+let currentConfirmAction = null;
+let currentConfirmContainerName = null;
+let currentConfirmButtonElement = null;
+
+// Function to show the confirmation modal
+function showConfirmationModal(containerName, action, buttonElement) {
+    currentConfirmAction = action;
+    currentConfirmContainerName = containerName;
+    currentConfirmButtonElement = buttonElement;
+
+    const modalTitle = $('#confirmModalLabel');
+    const modalBody = $('#confirmModalBody');
+    const confirmButton = $('#confirmActionButton');
+
+    let message = '';
+    let buttonClass = 'btn-primary'; // Default class for confirm button
+
+    if (action === 'restart') {
+        modalTitle.text('确认重启');
+        message = `确定要重启容器 ${containerName} 吗？`;
+        buttonClass = 'btn-warning'; // Use warning style for restart confirmation
+    } else if (action === 'delete') {
+        modalTitle.text('确认删除');
+        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${containerName}</strong> 及其所有数据！确定吗？`;
+        buttonClass = 'btn-danger'; // Use danger style for delete confirmation
+    } else {
+        // Fallback or handle other actions if needed
+        modalTitle.text('确认操作');
+        message = `确定要对容器 ${containerName} 执行 ${action} 操作吗？`;
+        buttonClass = 'btn-primary';
+    }
+
+    modalBody.html(message); // Use html to allow bold tags in warning message
+    confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text('确认'); // Set button text and style
+    setButtonProcessing(confirmButton, false); // Ensure confirm button is not processing when shown
+
+    const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
+    confirmModal.show();
+}
+
+
+// Execute the confirmed action
+$('#confirmActionButton').click(function() {
+    const containerName = currentConfirmContainerName;
+    const action = currentConfirmAction;
+    const buttonElement = currentConfirmButtonElement;
+    const confirmButton = $(this);
+
+    if (!containerName || !action || !buttonElement) {
+        showToast("确认信息丢失，无法执行操作。", 'danger');
+        // Hide modal manually if context is lost
+        const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+        if (confirmModal) confirmModal.hide();
+        return;
+    }
+
+    // Disable the CONFIRM button in the modal while processing
+    setButtonProcessing(confirmButton, true);
+    // Disable the ORIGINAL button in the row while processing (already done by performAction logic below, but keep for clarity if logic changes)
+    // setButtonProcessing(buttonElement, true);
+
+
+    $.post(`/container/${containerName}/action`, { action: action }, function(data) {
+        showToast(data.message, data.status === 'success' ? 'success' : 'danger');
+        if (data.status === 'success') {
+             // Reload after a small delay if action was successful and likely changed state
+             setTimeout(() => location.reload(), 1000);
+        } else {
+            // On failure, re-enable the original button in the row
+            setButtonProcessing(buttonElement, false);
+        }
+    }).fail(function(jqXHR) {
+         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
+         showToast("操作失败: " + message, 'danger');
+         // On failure, re-enable the original button in the row
+         setButtonProcessing(buttonElement, false);
+    }).always(function() {
+        // Always hide the confirmation modal after AJAX is done (success or failure)
+        const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
+        if (confirmModal) confirmModal.hide();
+        // The confirm button in the modal will be reset by the modal's hidden event handler
+    });
+});
+
+// Clear confirmation context and reset modal button when modal is hidden
+$('#confirmModal').on('hidden.bs.modal', function () {
+    currentConfirmAction = null;
+    currentConfirmContainerName = null;
+    currentConfirmButtonElement = null;
+    // Reset the confirm button in the modal
+    const confirmButton = $('#confirmActionButton');
+    confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass('btn-primary').text('确认');
+    setButtonProcessing(confirmButton, false); // Ensure it's not processing for next time
+});
+
+
 // 创建容器
 $('#createContainerForm').submit(function(event) {
     event.preventDefault();
@@ -211,7 +330,6 @@ $('#createContainerForm').submit(function(event) {
     $.post("{{ url_for('create_container') }}", formData, function(data) {
         showToast(data.message, data.status === 'success' ? 'success' : 'danger');
         if (data.status === 'success') {
-            // Optional: Clear form or redirect. For simplicity, refresh for now.
             form[0].reset(); // Reset form fields
              setTimeout(() => location.reload(), 1000); // Reload after a small delay
         }
@@ -226,14 +344,18 @@ $('#createContainerForm').submit(function(event) {
 // 执行操作 (启动/停止/重启/删除)
 // Added button element as the third argument
 function performAction(containerName, action, buttonElement) {
-    let confirmMessage = `确定要 ${action} 容器 ${containerName} 吗?`;
-    if (action === 'delete') {
-        confirmMessage = `警告：这将永久删除容器 ${containerName} 及其所有数据！确定吗？`;
-    }
-    if (!confirm(confirmMessage)) {
-        return;
+
+    // Handle actions that require confirmation modal
+    if (action === 'restart' || action === 'delete') {
+        showConfirmationModal(containerName, action, buttonElement);
+        // DO NOT proceed with AJAX here. The AJAX will be triggered by the modal's confirm button click handler.
+        // Optionally disable the original button IMMEDIATELY when modal is opened, but waiting for confirm click is better UX.
+        return; // Stop execution here
     }
 
+    // Handle actions that DO NOT require confirmation modal (e.g., start, stop)
+    // (These actions already use the spinner and toast from the previous optimization)
+    // For consistency and immediate feedback, we apply processing state now
     setButtonProcessing(buttonElement, true);
 
     $.post(`/container/${containerName}/action`, { action: action }, function(data) {
@@ -252,7 +374,6 @@ function performAction(containerName, action, buttonElement) {
 }
 
 // 显示容器信息
-// Added button element as the second argument, though not strictly necessary to disable it here
 function showInfo(containerName, buttonElement) {
     $('#infoContent').text('正在加载...'); // Reset content
     $('#infoContent').removeClass('success error'); // Remove previous state classes
@@ -260,15 +381,13 @@ function showInfo(containerName, buttonElement) {
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
     infoModal.show();
 
-    // setButtonProcessing(buttonElement, true); // Optional: disable button while modal loads
-
     $.get(`/container/${containerName}/info`, function(data) {
         $('#infoContent').text(JSON.stringify(data, null, 2));
     }).fail(function() {
         $('#infoContent').text('加载信息失败。请检查容器状态或网络连接。');
          $('#infoContent').addClass('error'); // Indicate error state
     }).always(function() {
-        // setButtonProcessing(buttonElement, false); // Optional: restore button
+        // Button state is not managed here as modal itself has loading indicator
     });
 }
 
@@ -341,7 +460,6 @@ $('#execModal').on('hidden.bs.modal', function () {
   $('#execModalLabel').text('在容器内执行命令');
   setButtonProcessing($('#execButton'), false); // Ensure button state is reset
 });
-
 
 </script>
 </body>
