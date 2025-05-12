@@ -1,7 +1,7 @@
 # app.py
 from flask import Flask, render_template, request, jsonify, redirect, url_for
 import subprocess # 用于执行命令行
-import json       # 用于解析 Incus 的 JSON 输出 (虽然info不用了, list还需要)
+import json       # 用于解析 Incus 的 JSON 输出
 import sqlite3
 import datetime
 import os # 引入 os 模块
@@ -204,7 +204,7 @@ def remove_container_from_db(name):
 
 def get_container_ip(container_name):
     """
-    尝试获取容器的主要 IPv4 地址 (global scope)。
+    尝试获取容器的主要 IPv4 地址 (global scope) 用于需要精确IP的场景 (如NAT)。
     解析 incus info 的文本输出。
     返回 IP 地址字符串或 None。
     """
@@ -232,6 +232,7 @@ def get_container_ip(container_name):
             # Step 3: Check if this line indicates the start of a new main section (end of Network state)
             # A main section header is typically not indented and ends with a colon
             # This acts as an exit condition for the Network state block parsing
+            # Check for non-indented line ending with colon, but not the Network state header itself
             if not line.startswith(' ') and line_stripped.endswith(':') and line_stripped != 'Network state:':
                 in_network_state_section = False # Exit network state parsing
                 # We found the start of a new section, no need to process this line for network info
@@ -248,7 +249,7 @@ def get_container_ip(container_name):
             if ip_match:
                 ip_with_mask = ip_match.group(1)
                 ip_address = ip_with_mask.split('/')[0]
-                app.logger.info(f"成功找到容器 {container_name} 的全局 IPv4 地址: {ip_address}") # Log success explicitly
+                app.logger.info(f"成功从 incus info 解析出容器 {container_name} 的全局 IPv4 地址: {ip_address}") # Log success explicitly
                 return ip_address # Found it, return immediately
 
             # If we are still in the Network state section but the current line
@@ -263,8 +264,9 @@ def get_container_ip(container_name):
         pass # Do nothing if not in the network state section
 
     # If the loop finishes without finding a global IPv4 address
-    app.logger.warning(f"在容器 {container_name} 的 incus info 输出中无法找到全局 IPv4 地址。")
+    app.logger.warning(f"在容器 {container_name} 的 incus info 输出中无法找到全局 IPv4 地址 (用于NAT等功能)。")
     return None
+
 
 # --- Flask 路由 ---
 
@@ -272,7 +274,7 @@ def get_container_ip(container_name):
 def index():
     """主页面，列出容器"""
     # Use JSON format for list, as it's generally supported and structured
-    # Corrected: Pass only args after 'incus'
+    # Pass only args after 'incus'
     success, containers_data = run_incus_command(['list', '--format', 'json'])
 
     listed_containers = []
@@ -307,8 +309,7 @@ def index():
                 'name': name,
                 'status': data.get('status', 'Unknown (from DB)'),
                 'image_source': data.get('image_source', 'N/A (from DB)'),
-                # IP address is not reliably available in 'list' JSON output, better in 'info' or 'state'
-                'ip': 'N/A (DB info)', # IP is hard to get from list view, will get it in detail view
+                'ip': 'N/A (DB info)', # IP is hard to get from list view, will get it in detail view or leave as N/A from DB
                 'created_at': data.get('created_at', 'N/A (from DB)')
             })
 
@@ -344,33 +345,47 @@ def index():
             # Get created_at from Incus list JSON
             created_at_str = item.get('created_at') # Incus provides this, use it
 
-            # --- IP Address (Attempt to get from state if available, fallback to N/A) ---
-            # Incus list JSON state *can* contain network info, but it's often less reliable
-            # than parsing 'incus info' text, especially for filtering global IPv4.
-            # Let's use the more reliable `get_container_ip` helper if status is Running.
-            ip_address = 'N/A'
-            container_status = item.get('status', 'Unknown')
-            if container_status == 'Running':
-                 # Call helper function to get the IP address
-                 # NOTE: This calls `incus info` for *each* running container in the list view,
-                 # which might be slow for many containers. A better approach for large lists
-                 # might be to only show IP in the info modal or add a specific endpoint to get IPs.
-                 # For now, do it for each running container.
-                 container_ip = get_container_ip(item_name)
-                 if container_ip:
-                      ip_address = container_ip
+            # --- IP Address (Restore logic from first version, parsing list JSON state) ---
+            ip_address = 'N/A' # Default
+            container_state = item.get('state')
+            if isinstance(container_state, dict):
+                 network_info = container_state.get('network')
+                 if isinstance(network_info, dict):
+                     for iface_name, iface_data in network_info.items():
+                         # Look for standard interface names (eth, enp, ens) and valid data
+                         # The IP info is typically within the 'addresses' list for 'inet' (IPv4) and 'global' scope
+                         if (iface_name.startswith('eth') or iface_name.startswith('enp') or iface_name.startswith('ens')) and isinstance(iface_data, dict):
+                             addresses = iface_data.get('addresses')
+                             if isinstance(addresses, list):
+                                 found_ip = False # Flag to stop after finding one primary IP
+                                 for addr_entry in addresses:
+                                     # Each address entry is a dict with 'address', 'family', 'scope'
+                                     if isinstance(addr_entry, dict):
+                                         addr = addr_entry.get('address')
+                                         family = addr_entry.get('family')
+                                         scope = addr_entry.get('scope')
+                                         # Prioritize global IPv4 address
+                                         if addr and family == 'inet' and scope == 'global':
+                                             ip_address = addr # Found the IP
+                                             found_ip = True
+                                             break # Stop searching addresses for this interface
+                                 if found_ip: break # Stop searching interfaces for this container
+
+
+            # --- End IP Address extraction from list JSON ---
 
 
             container_info = {
                 'name': item_name,
-                'status': container_status, # Use status from Incus list
+                'status': item.get('status', 'Unknown'), # Use status from Incus list
                 'image_source': image_source,
-                'ip': ip_address, # Use IP from get_container_ip helper
+                'ip': ip_address, # Use IP extracted from list JSON
                 'created_at': created_at_str, # Use created_at from Incus list
             }
             listed_containers.append(container_info)
             # Sync current Incus state to DB (status, image_source, created_at are from live Incus)
-            sync_container_to_db(item_name, image_source, container_status, created_at_str)
+            # We are NOT syncing the IP from the list here, as it's less reliable/detailed than info
+            sync_container_to_db(item_name, image_source, item.get('status', 'Unknown'), created_at_str)
 
 
         # Remove containers from DB that are no longer in Incus list
@@ -380,23 +395,28 @@ def index():
             if db_name not in incus_container_names:
                 remove_container_from_db(db_name)
 
-    else: # Incus success but returned unexpected data format
+    else: # Incus success but returned unexpected data format OR Incus failed
         incus_error = True
-        incus_error_message = f"Incus list 返回了未知数据格式或错误结构: {containers_data}"
+        # If success was False, containers_data is the error message
+        # If success was True but data format is wrong, use a generic message
+        incus_error_message = containers_data if not success else f"Incus list 返回了未知数据格式或错误结构: {containers_data}"
         app.logger.error(incus_error_message)
-        # Incus failed, but DB has data, use DB data to populate listed_containers
+        app.logger.warning("尝试从数据库加载容器列表。")
+
+        # Incus failed or returned invalid data, but DB has data, use DB data
+        # Note: DB might not have the IP address, so it will likely show N/A
         for name, data in db_containers_dict.items():
             listed_containers.append({
                 'name': name,
                 'status': data.get('status', 'Unknown (from DB)'),
                 'image_source': data.get('image_source', 'N/A (from DB)'),
-                'ip': 'N/A (DB info)',
+                'ip': 'N/A (DB info)', # IP is NOT stored in DB in this simple schema
                 'created_at': data.get('created_at', 'N/A (from DB)')
             })
 
 
     # Get available images (still using JSON format as it's generally supported for image list)
-    # Corrected: Pass only args after 'incus'
+    # Pass only args after 'incus'
     success_img, images_data = run_incus_command(['image', 'list', '--format', 'json'])
     available_images = []
     image_error = False
@@ -427,6 +447,8 @@ def index():
             available_images.append({'name': alias_name, 'description': f"{alias_name} ({description})"})
     else:
         image_error = True
+        # If success_img was False, images_data is the error message
+        # If success_img was True but data format is wrong, use a generic message
         image_error_message = images_data if not success_img else 'Invalid image data format from Incus.'
         app.logger.error(f"获取镜像列表失败: {image_error_message}")
 
@@ -446,7 +468,7 @@ def create_container():
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
 
     # Incus launch command does not output JSON by default
-    # Corrected: Pass only args after 'incus'
+    # Pass only args after 'incus'
     success, output = run_incus_command(['launch', image, name], parse_json=False, timeout=120) # Increased timeout for launch
 
     if success:
@@ -456,7 +478,7 @@ def create_container():
 
         # Try to get initial info via incus list (JSON is reliable here) to sync DB
         # Using list is often quicker and more reliable for basic status/created_at after launch
-        # Corrected: Pass only args after 'incus'
+        # Pass only args after 'incus'
         _, list_output = run_incus_command(['list', name, '--format', 'json'])
 
         created_at = None # Default if list fails or no created_at
@@ -488,7 +510,7 @@ def create_container():
 @app.route('/container/<name>/action', methods=['POST'])
 def container_action(name):
     action = request.form.get('action')
-    # Corrected: commands dictionary now contains the full command including 'incus'
+    # commands dictionary contains the full command including 'incus'
     commands = {
         'start': ['incus', 'start', name],
         'stop': ['incus', 'stop', name, '--force'],
@@ -503,7 +525,7 @@ def container_action(name):
     timeout_val = 60
     if action == 'delete': timeout_val = 120
 
-    # Corrected: Use run_command directly since the command list is complete
+    # Use run_command directly since the command list is complete
     success, output = run_command(commands[action], parse_json=False, timeout=timeout_val)
 
     if success:
@@ -517,7 +539,7 @@ def container_action(name):
         else:
             # After action, attempt to get updated status using incus list (JSON is reliable here)
             # Use a small timeout for the list command itself
-            # Corrected: Pass only args after 'incus'
+            # Pass only args after 'incus'
             _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=10)
 
             new_status_val = 'Unknown' # Default status if list fails or container not found
@@ -579,7 +601,7 @@ def exec_command(name):
 
 
     # Incus exec does not output JSON by default
-    # Corrected: Pass only args after 'incus'
+    # Pass only args after 'incus'
     success, output = run_incus_command(['exec', name, '--'] + command_parts, parse_json=False)
 
     if success:
@@ -640,7 +662,7 @@ def container_info(name):
 
 
     # 3. Attempt to execute incus info (plain text)
-    # Corrected: Pass only args after 'incus'
+    # Pass only args after 'incus'
     success_text, text_data = run_incus_command(['info', name], parse_json=False)
 
 
@@ -730,45 +752,35 @@ def container_info(name):
                 # Example: - eth0 (link): 00:16:3E:... (ether)
 
                 # Match address lines
-                network_addr_match = re.match(r'^\s*-\s+([^ ]+)\s+\((inet|inet6)\):\s+([^ ]+)\s+\((global|link|host)\)', line)
+                # Adjust regex for varying indentation and format found in incus info output
+                # Look for lines that are indented and contain "inet: " followed by address and "(global)"
+                network_addr_match = re.match(r'^\s+(eth\d+|enp\d+s?\d+|ens\d+s?\d+):\s*|\s+inet:\s*([^ ]+)\s+\(global\)', line) # Updated regex logic
                 if network_addr_match:
-                    iface_name = network_addr_match.group(1)
-                    addr_family = network_addr_match.group(2)
-                    address_with_mask = network_addr_match.group(3)
-                    addr_scope = network_addr_match.group(4)
+                     # Check if it's the IP line we are interested in
+                     if network_addr_match.group(2): # group(2) captures the IP/mask from the 'inet:' part
+                        ip_with_mask = network_addr_match.group(2)
+                        # Ensure structure exists - this parsing doesn't give interface name reliably from the IP line itself
+                        # A more complex parser would track the interface name from the line above
+                        # For now, just capture the global IPv4 if found anywhere in the network section
+                        # A simple structure for network state if we find *any* IP
+                        if 'eth0' not in simulated_json_output['state']['network']:
+                            simulated_json_output['state']['network']['eth0'] = {'addresses': [], 'state': 'up', 'hwaddr': 'N/A'} # Use a default iface name
 
-                    # Ensure simulated network structure exists for this interface
-                    if iface_name not in simulated_json_output['state']['network']:
-                        # Text info doesn't give interface state (up/down) directly, assume up if addresses listed
-                        simulated_json_output['state']['network'][iface_name] = {'addresses': [], 'state': 'up', 'hwaddr': 'N/A'}
+                        ip_address_only = ip_with_mask.split('/')[0]
+                        # Avoid adding duplicate IPs if multiple global IPv4 were somehow listed
+                        if not any(addr_entry['address'] == ip_address_only for addr_entry in simulated_json_output['state']['network']['eth0']['addresses']):
+                             simulated_json_output['state']['network']['eth0']['addresses'].append({
+                                'address': ip_address_only,
+                                'family': 'inet', # Assume inet since regex matched 'inet:'
+                                'netmask': ip_with_mask.split('/')[-1] if '/' in ip_with_mask else '',
+                                'scope': 'global' # Assume global since regex matched '(global)'
+                             })
+                             # Optionally set the top-level IP if it's the first/main one found
+                             if simulated_json_output['ip'] == 'N/A':
+                                 simulated_json_output['ip'] = ip_address_only
 
-                    # Extract IP address without mask
-                    ip_address_only = address_with_mask.split('/')[0]
+                     # Handle hardware address line if needed - regex could be added here
 
-                    # Add address information
-                    simulated_json_output['state']['network'][iface_name]['addresses'].append({
-                        'address': ip_address_only,
-                        'family': addr_family,
-                        'netmask': address_with_mask.split('/')[-1] if '/' in address_with_mask else '', # Add netmask if present
-                        'scope': addr_scope
-                    })
-                else:
-                     # Match hardware address line
-                     hwaddr_match = re.match(r'^\s*-\s+([^ ]+)\s+\(link\):\s+([^ ]+)\s+\(ether\)', line)
-                     if hwaddr_match:
-                         iface_name = hwaddr_match.group(1)
-                         hw_address = hwaddr_match.group(2)
-                         if iface_name not in simulated_json_output['state']['network']:
-                            simulated_json_output['state']['network'][iface_name] = {'addresses': [], 'state': 'up', 'hwaddr': hw_address}
-                         else:
-                             simulated_json_output['state']['network'][iface_name]['hwaddr'] = hw_address
-
-
-            # Parse lines within the Profiles section
-            elif current_section == 'Profiles':
-               profile_match = re.match(r'^\s*-\s+([^ ]+)', line)
-               if profile_match:
-                  simulated_json_output['profiles'].append(profile_match.group(1))
 
             # Add parsing for Config, Devices, Snapshots sections if needed (complex)
             # elif current_section == 'Config':
@@ -819,6 +831,15 @@ def container_info(name):
          # Return 404 explicitly as the container likely doesn't exist
          return jsonify(simulated_json_output), 404
 
+    # If we successfully parsed info text, update the top-level IP in the simulated output
+    # This ensures the NAT function (which calls get_container_ip) gets the most reliable IP
+    # even if the IP in the 'list' JSON was missing or old.
+    # The IP displayed on the index page comes from the 'list' JSON parsing,
+    # the IP used for NAT comes from 'info' text parsing.
+    info_ip = get_container_ip(name) # Re-call the helper to get IP from info text if successful
+    if info_ip:
+         simulated_json_output['ip'] = info_ip
+
 
     # Return the constructed simulated JSON structure
     # If we reach here, either incus info succeeded (and parsing updated the struct)
@@ -846,8 +867,8 @@ def add_nat_rule(name):
     if protocol not in ['tcp', 'udp']:
          return jsonify({'status': 'error', 'message': '协议必须是 tcp 或 udp'}), 400
 
-    # Check if the container is running to get its IP
-    # Corrected: Pass only args after 'incus'
+    # Check if the container is running to get its status
+    # Pass only args after 'incus'
     _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=5)
 
     container_status = 'Unknown'
@@ -864,7 +885,8 @@ def add_nat_rule(name):
     if container_status != 'Running':
          return jsonify({'status': 'error', 'message': f'容器 {name} 必须处于 Running 状态才能添加 NAT 规则 (当前状态: {container_status})。'}), 400
 
-    # Get the container's IP address
+    # Get the container's IP address using the helper function that parses incus info text
+    # This helper is specifically kept for this purpose as info text often has the most reliable IP
     container_ip = get_container_ip(name)
 
     if not container_ip:
