@@ -33,8 +33,8 @@
             z-index: 1050;
         }
          /* Ensure modal z-index is appropriate */
-        .modal { z-index: 1040; }
-        .modal-backdrop { z-index: 1039; }
+        .modal { z-index: 1050; } /* Increased z-index for modals */
+        .modal-backdrop { z-index: 1049; }
 
         /* Adjust vertical alignment for flex container within table cell (for desktop table view) */
         .container-actions .d-flex-desktop {
@@ -150,6 +150,7 @@
                                 <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
                                 <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
                                 <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
+                                <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}', this)">添加NAT</button> {# Added NAT button #}
                                 {% elif c.status == 'Stopped' %}
                                 <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
                                 {% endif %}
@@ -187,6 +188,7 @@
                         <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
                         <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
                         <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
+                         <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}', this)">添加NAT</button> {# Added NAT button #}
                         {% elif c.status == 'Stopped' %}
                         <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
                         {% endif %}
@@ -249,6 +251,45 @@
         </div>
     </div>
 
+    <!-- 添加 NAT 规则 Modal -->
+    <div class="modal fade" id="natModal" tabindex="-1" aria-labelledby="natModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="natModalLabel">为容器添加 NAT 规则</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning" role="alert">
+                        注意：这将在主机上添加一个临时的 iptables NAT 规则。规则在主机重启后会丢失，且需要此Web应用以足够权限(如 root 或 sudo)运行。
+                    </div>
+                    <form id="addNatForm">
+                        <input type="hidden" id="natContainerName" name="container_name">
+                        <div class="mb-3">
+                            <label for="hostPort" class="form-label">主机端口</label>
+                            <input type="number" class="form-control" id="hostPort" name="host_port" required min="1" max="65535">
+                        </div>
+                         <div class="mb-3">
+                            <label for="containerPort" class="form-label">容器端口</label>
+                            <input type="number" class="form-control" id="containerPort" name="container_port" required min="1" max="65535">
+                        </div>
+                        <div class="mb-3">
+                            <label for="protocol" class="form-label">协议</label>
+                            <select class="form-select" id="protocol" name="protocol" required>
+                                <option value="tcp">TCP</option>
+                                <option value="udp">UDP</option>
+                            </select>
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="addNatButton">添加规则</button>
+                    </form>
+                     <h6 class="mt-3">输出:</h6>
+                    <pre id="natOutput" class="mt-2"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <!-- 通用确认 Modal -->
     <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -297,42 +338,45 @@ function showToast(message, type = 'info') {
 function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
     // Check if the button element still exists in the DOM before trying to modify it
+    // This is important if the row/card containing the button might be removed while async operation is pending
     if (!$button.length) {
          console.warn("Button element not found for processing state update.");
          return;
     }
 
     if (isProcessing) {
-        $button.data('original-html', $button.html()); // Store original content (using html instead of text)
-        const spinnerHtml = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-        // Check if button text exists before adding spinner text
-        const originalText = $button.text().trim();
-        // Use original text if available, otherwise just spinner
-        $button.html(spinnerHtml + (originalText ? ' 处理中...' : ''));
-        $button.addClass('btn-processing').prop('disabled', true);
+        // Store original content only if not already stored
+        if (!$button.data('original-html')) {
+            $button.data('original-html', $button.html());
+             // Check if button text exists before adding spinner text
+            const originalText = $button.text().trim();
+            const spinnerHtml = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+            // Use original text if available, otherwise just spinner
+            $button.html(spinnerHtml + (originalText ? ' 处理中...' : ''));
+            $button.addClass('btn-processing').prop('disabled', true);
+        }
     } else {
-        // Restore original content
+         // Restore original content only if stored
         if ($button.data('original-html')) {
              $button.html($button.data('original-html'));
              $button.data('original-html', null); // Clear stored data after use
-        } else {
-            // Fallback if original-html wasn't stored (shouldn't happen with current logic but good practice)
-            $button.text($button.text().replace(' 处理中...', '')); // Simple text fallback
+             $button.removeClass('btn-processing').prop('disabled', false);
         }
-        $button.removeClass('btn-processing').prop('disabled', false);
+        // If original-html wasn't stored, the button wasn't put into processing state by this function, so do nothing.
     }
 }
 
 // Global variables to store context for confirmation modal
 let currentConfirmAction = null;
 let currentConfirmContainerName = null;
-let currentConfirmButtonElement = null;
+let currentConfirmButtonElement = null; // The button that triggered the action
+
 
 // Function to show the confirmation modal
 function showConfirmationModal(containerName, action, buttonElement) {
     currentConfirmAction = action;
     currentConfirmContainerName = containerName;
-    currentConfirmButtonElement = buttonElement;
+    currentConfirmButtonElement = buttonElement; // Store the original button
 
     const modalTitle = $('#confirmModalLabel');
     const modalBody = $('#confirmModalBody');
@@ -409,6 +453,7 @@ $('#confirmActionButton').click(function() {
         const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
         if (confirmModal) confirmModal.hide();
         // The confirm button in the modal will be reset by the modal's hidden event handler
+        // The original button processing state is handled in .done/.fail
     });
 });
 
@@ -484,15 +529,27 @@ function showInfo(containerName, buttonElement) {
     $('#infoContent').removeClass('success error'); // Remove previous state classes
     var infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
-    infoModal.show();
+
+    // Optionally set processing state on the info button while loading the modal content
+    setButtonProcessing(buttonElement, true);
 
     $.get(`/container/${containerName}/info`, function(data) {
         $('#infoContent').text(JSON.stringify(data, null, 2));
-    }).fail(function() {
-        $('#infoContent').text('加载信息失败。请检查容器状态或网络连接。');
+         // Based on live_data_available or status, potentially show warning/error about data source
+        if (!data.live_data_available && data.status !== 'NotFound') { // Don't show warning if container not found
+             showToast(data.message, 'warning');
+        } else if (data.status === 'NotFound') {
+             $('#infoContent').text(data.message);
+             $('#infoContent').addClass('error');
+        }
+    }).fail(function(jqXHR) {
+         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
+        $('#infoContent').text(message);
          $('#infoContent').addClass('error'); // Indicate error state
+         showToast("加载容器信息失败。", 'danger');
     }).always(function() {
-        // Button state is not managed here as modal itself has loading indicator
+        infoModal.show(); // Show modal regardless of success/failure
+        setButtonProcessing(buttonElement, false); // Reset button state
     });
 }
 
@@ -550,11 +607,79 @@ $('#execCommandForm').submit(function(event) {
     });
 });
 
+// --- NAT Modal Functions ---
+
+// Open the NAT modal
+function openNatModal(containerName, buttonElement) {
+    $('#natContainerName').val(containerName);
+    $('#natModalLabel').text(`为容器 ${containerName} 添加 NAT 规则`);
+    $('#hostPort').val(''); // Clear previous inputs
+    $('#containerPort').val('');
+    $('#protocol').val('tcp');
+    $('#natOutput').text('');   // Clear previous output
+    $('#natOutput').removeClass('success error'); // Clear state classes
+    // Ensure the add nat button in the modal is not in processing state when opened
+    setButtonProcessing($('#addNatButton'), false);
+    var natModal = new bootstrap.Modal(document.getElementById('natModal'));
+    natModal.show();
+    // No need to set processing state on the trigger button, modal opens instantly
+}
+
+// Handle NAT form submission
+$('#addNatForm').submit(function(event) {
+    event.preventDefault();
+    const form = $(this);
+    const submitButton = $('#addNatButton', form);
+    const outputArea = $('#natOutput');
+
+    const containerName = $('#natContainerName').val();
+    const hostPort = $('#hostPort').val();
+    const containerPort = $('#containerPort').val();
+    const protocol = $('#protocol').val();
+
+    if (!hostPort || !containerPort || !protocol) {
+        showToast("请填写所有 NAT 规则信息。", 'warning');
+        return;
+    }
+
+    outputArea.text('正在添加 NAT 规则...');
+    outputArea.removeClass('success error'); // Remove any previous state classes
+
+    setButtonProcessing(submitButton, true);
+
+    // Use the correct container name from the hidden input in the modal
+    $.post(`/container/${containerName}/add_nat_rule`, {
+        host_port: hostPort,
+        container_port: containerPort,
+        protocol: protocol
+    }, function(data) {
+        if (data.status === 'success') {
+            outputArea.text('iptables 输出:\n' + data.output);
+            outputArea.addClass('success');
+            showToast(data.message, 'success');
+        } else {
+            outputArea.text('添加规则失败:\n' + (data.output || data.message || '无详细输出'));
+            outputArea.addClass('error');
+             showToast(data.message || "添加 NAT 规则失败。", 'danger');
+        }
+    }).fail(function(jqXHR) {
+        const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || '未知错误') : "添加 NAT 规则请求失败。";
+        outputArea.text("请求失败:\n" + message);
+        outputArea.addClass('error');
+        showToast("请求失败。", 'danger');
+    }).always(function() {
+        setButtonProcessing(submitButton, false);
+    });
+});
+
 // Bootstrap modal events to clear content when hidden
 $('#infoModal').on('hidden.bs.modal', function () {
   $('#infoContent').text('正在加载...');
   $('#infoContent').removeClass('success error');
   $('#infoModalLabel').text('容器信息');
+  // Reset button state for the button that opened this modal?
+  // This is tricky as we don't store which button opened it globally like the confirm modal.
+  // For simplicity, we rely on the user refreshing the page or states being re-fetched.
 });
 
 $('#execModal').on('hidden.bs.modal', function () {
@@ -565,6 +690,18 @@ $('#execModal').on('hidden.bs.modal', function () {
   $('#execModalLabel').text('在容器内执行命令');
   setButtonProcessing($('#execButton'), false); // Ensure button state is reset
 });
+
+$('#natModal').on('hidden.bs.modal', function () {
+    $('#natContainerName').val('');
+    $('#hostPort').val('');
+    $('#containerPort').val('');
+    $('#protocol').val('tcp');
+    $('#natOutput').text('');
+    $('#natOutput').removeClass('success error');
+    $('#natModalLabel').text('为容器添加 NAT 规则');
+    setButtonProcessing($('#addNatButton'), false); // Ensure button state is reset
+});
+
 
 </script>
 </body>
