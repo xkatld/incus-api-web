@@ -43,26 +43,30 @@ def run_command(command_parts, parse_json=True, timeout=60):
         env_vars['LANG'] = 'C.UTF-8'
 
         app.logger.info(f"Executing command: {' '.join(shlex.quote(part) for part in command_parts)}")
+        # Check=False so we can handle non-zero exit codes ourselves
         result = subprocess.run(command_parts, capture_output=True, text=True, check=False, timeout=timeout, env=env_vars)
 
         if result.returncode != 0:
             error_message = result.stderr.strip() if result.stderr else result.stdout.strip()
             app.logger.error(f"Command failed (Exit code {result.returncode}): {' '.join(shlex.quote(part) for part in command_parts)}\nError: {error_message}")
-            full_output = f"STDOUT:\n{result.stdout.strip()}\nSTDERR:\n{result.stderr.strip()}"
-            return False, f"命令执行失败 (退出码 {result.returncode}): {error_message}\n完整输出:\n{full_output}"
-
-        if parse_json:
-            try:
-                output_text = result.stdout.strip()
-                if output_text.startswith(u'\ufeff'):
-                    output_text = output_text[1:]
-                return True, json.loads(output_text)
-            except json.JSONDecodeError as e:
-                app.logger.error(f"Failed to parse JSON from command output: {result.stdout}\nError: {e}")
-                return False, f"解析命令输出为 JSON 失败: {e}\n原始输出: {result.stdout.strip()}"
+            # For non-JSON output, return the error message directly
+            return False, error_message
         else:
-            # For non-JSON output, return True and the stripped stdout on success
-            return True, result.stdout.strip()
+             # For successful commands, check if parsing JSON is expected
+             if parse_json:
+                 try:
+                    output_text = result.stdout.strip()
+                    if output_text.startswith(u'\ufeff'): # Handle potential BOM
+                        output_text = output_text[1:]
+                    return True, json.loads(output_text)
+                 except json.JSONDecodeError as e:
+                    app.logger.error(f"Failed to parse JSON from command output: {result.stdout}\nError: {e}")
+                    return False, f"解析命令输出为 JSON 失败: {e}\n原始输出: {result.stdout.strip()}"
+             else:
+                 # For non-JSON output and success, return True and the stripped stdout
+                 # Note: iptables -A/-D often has empty stdout on success
+                 return True, result.stdout.strip() # This will often be '' for iptables add/delete
+
 
     except FileNotFoundError:
         command_name = command_parts[0] if command_parts else 'command'
@@ -173,11 +177,12 @@ def sync_container_to_db(name, image_source, status, created_at_str):
 
 
 def remove_container_from_db(name):
+    """Removes container and its associated NAT rules from the database."""
     try:
-        query_db('DELETE FROM containers WHERE incus_name = ?', [name])
-        # Associated NAT rules are also deleted here
-        query_db('DELETE FROM nat_rules WHERE container_name = ?', [name])
-        app.logger.info(f"从数据库中移除了容器及其NAT规则: {name}")
+        # Order matters if foreign key constraints were enforced (not default in SQLite)
+        query_db('DELETE FROM nat_rules WHERE container_name = ?', [name]) # Remove associated NAT rules first
+        query_db('DELETE FROM containers WHERE incus_name = ?', [name]) # Then remove the container record
+        app.logger.info(f"从数据库中移除了容器及其NAT规则记录: {name}")
     except sqlite3.Error as e:
          app.logger.error(f"数据库错误 remove_container_from_db for {name}: {e}")
 
@@ -207,7 +212,8 @@ def get_container_ip(container_name):
         return None
 
     for iface_name, iface_data in network_info.items():
-        if (iface_name.startswith('eth') or iface_name.startswith('enp') or iface_name.startswith('ens')) and isinstance(iface_data, dict):
+        # Check common container network interfaces and ensure it's a dict
+        if isinstance(iface_data, dict):
             addresses = iface_data.get('addresses')
             if isinstance(addresses, list):
                 for addr_entry in addresses:
@@ -215,6 +221,7 @@ def get_container_ip(container_name):
                         addr = addr_entry.get('address')
                         family = addr_entry.get('family')
                         scope = addr_entry.get('scope')
+                        # Use the same logic as in index view to find global IPv4
                         if addr and family == 'inet' and scope == 'global':
                             ip_address = addr.split('/')[0]
                             app.logger.info(f"成功从 incus list JSON 解析出容器 {container_name} 的全局 IPv4 地址: {ip_address}")
@@ -251,11 +258,14 @@ def add_nat_rule_to_db(rule_details):
         ''', (rule_details['container_name'], rule_details['host_port'],
               rule_details['container_port'], rule_details['protocol'],
               rule_details['ip_at_creation']))
-        app.logger.info(f"Added NAT rule to DB: {rule_details['container_name']}, host={rule_details['host_port']}/{rule_details['protocol']}, container={rule_details['ip_at_creation']}:{rule_details['container_port']}")
-        return True, "规则记录成功添加到数据库。"
+        # Get the ID of the newly inserted row
+        inserted_row = query_db('SELECT last_insert_rowid()', one=True)
+        rule_id = inserted_row[0] if inserted_row else None
+        app.logger.info(f"Added NAT rule to DB: ID {rule_id}, {rule_details['container_name']}, host={rule_details['host_port']}/{rule_details['protocol']}, container={rule_details['ip_at_creation']}:{rule_details['container_port']}")
+        return True, rule_id # Return success status and the new rule ID
     except sqlite3.Error as e:
         app.logger.error(f"数据库错误 add_nat_rule_to_db for {rule_details.get('container_name', 'N/A')}: {e}")
-        return False, f"添加规则记录到数据库失败: {e}"
+        return False, f"添加规则记录到数据库失败: {e}" # Return failure status and error message
 
 def get_nat_rules_for_container(container_name):
     """Retrieves all NAT rules for a given container from the database."""
@@ -280,12 +290,62 @@ def get_nat_rule_by_id(rule_id):
 def remove_nat_rule_from_db(rule_id):
     """Removes a NAT rule record from the database by its ID."""
     try:
+        # Use rule_id directly for deletion
         query_db('DELETE FROM nat_rules WHERE id = ?', [rule_id])
-        app.logger.info(f"Removed NAT rule from DB: ID {rule_id}")
+        app.logger.info(f"Removed NAT rule record from DB: ID {rule_id}")
         return True, "规则记录成功从数据库移除。"
     except sqlite3.Error as e:
         app.logger.error(f"数据库错误 remove_nat_rule_from_db for id {rule_id}: {e}")
         return False, f"从数据库移除规则记录失败: {e}"
+
+def perform_iptables_delete_for_rule(rule_details):
+    """
+    Constructs and executes the iptables -D command for a given rule dictionary.
+    Returns True, output_text on success, False, error_message on failure.
+    """
+    if not isinstance(rule_details, dict):
+        return False, "Invalid rule details provided for iptables deletion."
+
+    # Ensure necessary keys exist
+    required_keys = ['host_port', 'container_port', 'protocol', 'ip_at_creation']
+    if not all(key in rule_details for key in required_keys):
+        return False, f"Missing required keys in rule details for iptables deletion. Requires: {required_keys}"
+
+    try:
+        host_port = rule_details['host_port']
+        container_port = rule_details['container_port']
+        protocol = rule_details['protocol']
+        ip_at_creation = rule_details['ip_at_creation']
+
+        # Construct the iptables command to delete the rule
+        # Must match the parameters used for insertion (-A) precisely
+        iptables_command = [
+            'iptables',
+            '-t', 'nat',
+            '-D', 'PREROUTING',
+            '-p', protocol,
+            '--dport', str(host_port),
+            '-j', 'DNAT',
+            '--to-destination', f'{ip_at_creation}:{container_port}' # Use IP recorded at creation
+        ]
+
+        app.logger.info(f"Executing iptables delete for rule ID {rule_details.get('id', 'N/A')}: {' '.join(shlex.quote(part) for part in iptables_command)}")
+
+        # Execute the command (output is text, parse_json=False)
+        # Use a longer timeout for iptables operations if needed, though usually fast
+        success, output = run_command(iptables_command, parse_json=False, timeout=10) # Reduced timeout slightly, adjust if needed
+
+        if success:
+             # iptables -D on success often has empty output.
+             return True, output or "iptables delete command executed successfully (no output)."
+        else:
+             # output contains the error message from run_command
+             return False, output
+
+    except Exception as e:
+        app.logger.error(f"Exception during perform_iptables_delete_for_rule for rule ID {rule_details.get('id', 'N/A')}: {e}")
+        return False, f"执行 iptables 删除命令时发生异常: {str(e)}"
+
 
 def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
     """Removes NAT rules from the DB whose containers no longer exist in Incus."""
@@ -302,8 +362,10 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
 
         if orphaned_names:
             app.logger.warning(f"检测到数据库中存在孤立的NAT规则记录，对应的容器已不存在于Incus: {orphaned_names}")
-            # Delete NAT rules for these orphaned container names
-            # Using execute_many would be more efficient for many names
+            # Delete NAT rules for these orphaned container names from DB
+            # Note: We *don't* attempt to delete these from iptables here, as the container is gone
+            # and attempting to delete rules for a non-existent target IP might cause issues or fail predictably.
+            # This cleanup is solely for the database records.
             placeholders = ','.join('?' * len(orphaned_names))
             query = f'DELETE FROM nat_rules WHERE container_name IN ({placeholders})'
             query_db(query, orphaned_names)
@@ -359,8 +421,8 @@ def index():
                 'ip': 'N/A (DB info)', # Cannot reliably get live IP without Incus list
                 'created_at': data.get('created_at', 'N/A (from DB)')
             })
-            # We don't have live names, so we can't perform the primary sync or orphan cleanup accurately here.
-            # The best we can do is show what we have in the DB.
+            # We don't have reliable live names, so we cannot accurately perform the primary sync or orphan cleanup here.
+            # Orphan cleanup will only run fully when Incus list is successful.
 
     elif isinstance(containers_data, list):
         # Incus list succeeded, perform sync and cleanup
@@ -397,7 +459,7 @@ def index():
                  if isinstance(network_info, dict):
                      for iface_name, iface_data in network_info.items():
                          # Check common container network interfaces and ensure it's a dict
-                         if (iface_name.startswith('eth') or iface_name.startswith('enp') or iface_name.startswith('ens')) and isinstance(iface_data, dict):
+                         if isinstance(iface_data, dict):
                              addresses = iface_data.get('addresses')
                              if isinstance(addresses, list):
                                  found_ip = False
@@ -422,7 +484,7 @@ def index():
                 'created_at': created_at_str,
             }
             listed_containers.append(container_info)
-            # Sync this live container's info to the database
+            # Sync this live container's info to the database (adds or updates)
             sync_container_to_db(item_name, image_source, item.get('status', 'Unknown'), created_at_str)
 
         # --- Primary Sync: Remove DB entries for containers no longer in Incus ---
@@ -431,16 +493,15 @@ def index():
         # Find names in the DB that are not in the live Incus list
         vanished_names_from_db = [db_name for db_name in current_db_names if db_name not in incus_container_names_set]
         for db_name in vanished_names_from_db:
-             # remove_container_from_db also removes associated NAT rules
+             # remove_container_from_db also removes associated NAT rules from DB
              remove_container_from_db(db_name)
              app.logger.info(f"根据 Incus 列表移除数据库中不存在的容器和NAT规则记录: {db_name}")
 
 
         # --- Secondary Cleanup: Remove Orphaned NAT Rules ---
-        # This catches NAT rules whose container_name might exist in nat_rules
-        # but for some reason the container wasn't in the Incus list
-        # and perhaps its entry wasn't properly removed from the 'containers' table earlier (less likely with the above sync)
-        # but serves as a safety net directly on the nat_rules table.
+        # This catches NAT rules whose container_name exists in nat_rules
+        # but the container is no longer in the Incus list *and* its container record
+        # was removed from the 'containers' table.
         cleanup_orphaned_nat_rules_in_db(incus_container_names_set)
 
 
@@ -459,8 +520,7 @@ def index():
                 'ip': 'N/A (DB info)',
                 'created_at': data.get('created_at', 'N/A (from DB)')
             })
-        # Cannot perform orphan cleanup as we don't have reliable live Incus names
-
+        # Cannot perform accurate orphan cleanup as we don't have reliable live Incus names
 
     # Fetch available images
     success_img, images_data = run_incus_command(['image', 'list', '--format', 'json'])
@@ -512,23 +572,27 @@ def create_container():
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
 
     # Basic check if container name already exists in DB before attempting launch
+    # This prevents attempting to launch if our DB is already tracking it (maybe Incus is down?)
+    # A more robust check would also query Incus directly here.
     db_exists = query_db('SELECT 1 FROM containers WHERE incus_name = ?', [name], one=True)
     if db_exists:
+        app.logger.warning(f"Attempted to create container {name} which already exists in DB.")
         # Can optionally check against live Incus list too if needed
         # success_live, live_list = run_incus_command(['list', name, '--format', 'json'])
         # if success_live and isinstance(live_list, list) and len(live_list) > 0:
         #     return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器已存在。'}), 409 # Conflict
         # else:
         #     # DB says it exists, but live list doesn't confirm or failed. Proceed with caution?
-        #     pass # Let the launch command fail
+        #     pass # Let the launch command fail, it will report conflict if Incus has it
 
-        return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器在数据库中已存在记录。请尝试刷新列表或使用其他名称。'}), 409
+        return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器在数据库中已存在记录。请尝试刷新列表或使用其他名称。'}), 409 # Assume DB is primary source for names tracked
 
 
     success, output = run_incus_command(['launch', image, name], parse_json=False, timeout=120)
 
     if success:
-        time.sleep(5) # Give container a moment to start and get IP
+        # Give container a moment to appear in list and get IP
+        time.sleep(5)
 
         # Attempt to get latest info after launch
         _, list_output = run_incus_command(['list', name, '--format', 'json'])
@@ -555,7 +619,7 @@ def create_container():
         return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。状态将很快同步。'})
     else:
         # If launch failed, do not add to DB (or consider removing if it was partially created)
-        # Assuming launch command cleans up after itself on failure
+        # Assuming launch command cleans up after itself on failure and won't leave a dangling DB record
         app.logger.error(f"Failed to launch container {name}: {output}")
         return jsonify({'status': 'error', 'message': f'创建容器 {name} 失败: {output}'}), 500
 
@@ -563,65 +627,114 @@ def create_container():
 @app.route('/container/<name>/action', methods=['POST'])
 def container_action(name):
     action = request.form.get('action')
+    # Commands dictionary doesn't change, but logic for 'delete' does
     commands = {
         'start': ['incus', 'start', name],
         'stop': ['incus', 'stop', name, '--force'], # Use force for quicker state change
         'restart': ['incus', 'restart', name, '--force'], # Use force
-        'delete': ['incus', 'delete', name, '--force'], # Use force
+        # 'delete' action is handled separately to manage NAT rules first
     }
+
+    if action == 'delete':
+        # --- Special Handling for Delete Action ---
+        app.logger.info(f"Attempting to delete container {name} and its associated NAT rules.")
+
+        # 1. Get all NAT rules from DB for this container
+        success_db_rules, rules = get_nat_rules_for_container(name)
+        if not success_db_rules:
+             app.logger.error(f"Failed to fetch NAT rules for container {name} before deletion: {rules}")
+             return jsonify({'status': 'error', 'message': f'删除容器前获取NAT规则失败: {rules}'}), 500
+
+        # 2. Attempt to delete each NAT rule from iptables
+        failed_rule_deletions = []
+        for rule in rules:
+            # Ensure rule details are sufficient for deletion
+            if not all(key in rule for key in ['id', 'host_port', 'container_port', 'protocol', 'ip_at_creation']):
+                 app.logger.error(f"Incomplete NAT rule details in DB for deletion: {rule}")
+                 failed_rule_deletions.append(f"Rule ID {rule.get('id', 'N/A')} (incomplete details)")
+                 continue # Skip this rule, mark as failed
+
+            success_iptables_delete, iptables_output = perform_iptables_delete_for_rule(rule)
+
+            if not success_iptables_delete:
+                # iptables deletion failed for this rule
+                failed_rule_deletions.append(f"规则 ID {rule['id']} (主机端口 {rule['host_port']}/{rule['protocol']} 转发到容器 IP {rule['ip_at_creation']} 端口 {rule['container_port']}): {iptables_output}")
+                app.logger.error(f"Failed to delete iptables rule for container {name}, rule ID {rule['id']}: {iptables_output}")
+
+        # 3. Check if any iptables deletions failed
+        if failed_rule_deletions:
+            error_message = f"删除容器 {name} 前，未能移除以下 NAT 规则 ({len(failed_rule_deletions)}/{len(rules)} 条): " + "; ".join(failed_rule_deletions)
+            app.logger.error(error_message)
+            # Do NOT proceed with Incus container deletion if NAT rules couldn't be removed
+            return jsonify({'status': 'error', 'message': error_message}), 500
+
+        # 4. If all NAT rules deleted successfully from iptables, proceed with Incus container deletion
+        app.logger.info(f"All {len(rules)} associated NAT rules for {name} successfully removed from iptables. Proceeding with Incus container deletion.")
+        success_incus_delete, incus_output = run_incus_command(['incus', 'delete', name, '--force'], parse_json=False, timeout=120)
+
+        if success_incus_delete:
+            # If Incus deletion was successful, remove records from DB (container and NAT rules)
+            # The remove_container_from_db function already handles deleting NAT rules from DB
+            remove_container_from_db(name)
+            message = f'容器 {name} 及其关联的 {len(rules)} 条 NAT 规则已成功删除。'
+            app.logger.info(message)
+            return jsonify({'status': 'success', 'message': message})
+        else:
+            # Incus deletion failed
+            error_message = f'删除容器 {name} 失败: {incus_output}'
+            app.logger.error(error_message)
+            # Note: NAT rules were already removed from iptables. DB records for NAT and container remain for troubleshooting.
+            return jsonify({'status': 'error', 'message': error_message}), 500
+
+    # --- Standard Handling for Other Actions (start, stop, restart) ---
     if action not in commands:
         return jsonify({'status': 'error', 'message': '无效的操作'}), 400
 
     timeout_val = 60
-    if action in ['stop', 'restart', 'delete']: timeout_val = 120 # Give more time for state changes/deletion
+    if action in ['stop', 'restart']: timeout_val = 120 # Give more time for state changes
 
     success, output = run_command(commands[action], parse_json=False, timeout=timeout_val)
 
     if success:
         message = f'容器 {name} {action} 操作提交成功。'
         # Give Incus a moment to update status
-        time.sleep(action in ['stop', 'restart', 'start'] and 3 or action == 'delete' and 1 or 1)
+        time.sleep(action in ['stop', 'restart', 'start'] and 3 or 1)
 
-        if action == 'delete':
-            # If deletion was successful, remove from DB (which also removes NAT rules)
-            remove_container_from_db(name)
-            message = f'容器 {name} 已删除。'
+        # Attempt to get latest status after action
+        _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=10)
+
+        new_status_val = 'Unknown'
+        db_image_source = 'N/A'
+        db_created_at = None
+
+        # Fetch existing DB info to retain image_source and created_at if list fails
+        old_db_entry = query_db('SELECT image_source, created_at, status FROM containers WHERE incus_name = ?', [name], one=True)
+        if old_db_entry:
+             db_image_source = old_db_entry['image_source']
+             db_created_at = old_db_entry['created_at']
+             new_status_val = old_db_entry['status'] # Start with old status
+
+        if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
+            container_data = list_output[0]
+            new_status_val = container_data.get('status', new_status_val) # Use new status if available
+            list_cfg = container_data.get('config')
+            if isinstance(list_cfg, dict):
+                 list_img_desc = list_cfg.get('image.description')
+                 if list_img_desc: db_image_source = list_img_desc # Update image source if available
+            list_created_at = container_data.get('created_at')
+            if list_created_at: db_created_at = list_created_at # Update created_at if available
+
+            message = f'容器 {name} {action} 操作成功，新状态: {new_status_val}。'
         else:
-            # For start/stop/restart, attempt to get latest status after action
-            _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=10)
+             # If list failed, set a best-guess status based on the action
+             if action == 'start': new_status_val = 'Running'
+             elif action == 'stop': new_status_val = 'Stopped'
+             elif action == 'restart': new_status_val = 'Running'
+             message = f'容器 {name} {action} 操作提交成功，但无法获取最新状态（list命令失败或容器状态未立即更新）。'
+             app.logger.warning(f"Failed to get updated status for {name} after {action}. list output: {list_output}")
 
-            new_status_val = 'Unknown'
-            db_image_source = 'N/A'
-            db_created_at = None
-
-            # Fetch existing DB info to retain image_source and created_at if list fails
-            old_db_entry = query_db('SELECT image_source, created_at, status FROM containers WHERE incus_name = ?', [name], one=True)
-            if old_db_entry:
-                 db_image_source = old_db_entry['image_source']
-                 db_created_at = old_db_entry['created_at']
-                 new_status_val = old_db_entry['status'] # Start with old status
-
-            if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
-                container_data = list_output[0]
-                new_status_val = container_data.get('status', new_status_val) # Use new status if available
-                list_cfg = container_data.get('config')
-                if isinstance(list_cfg, dict):
-                     list_img_desc = list_cfg.get('image.description')
-                     if list_img_desc: db_image_source = list_img_desc # Update image source if available
-                list_created_at = container_data.get('created_at')
-                if list_created_at: db_created_at = list_created_at # Update created_at if available
-
-                message = f'容器 {name} {action} 操作成功，新状态: {new_status_val}。'
-            else:
-                 # If list failed, set a best-guess status based on the action
-                 if action == 'start': new_status_val = 'Running'
-                 elif action == 'stop': new_status_val = 'Stopped'
-                 elif action == 'restart': new_status_val = 'Running'
-                 message = f'容器 {name} {action} 操作提交成功，但无法获取最新状态（list命令失败或容器状态未立即更新）。'
-                 app.logger.warning(f"Failed to get updated status for {name} after {action}. list output: {list_output}")
-
-            # Sync updated status (and potentially other info) to DB
-            sync_container_to_db(name, db_image_source, new_status_val, db_created_at)
+        # Sync updated status (and potentially other info) to DB
+        sync_container_to_db(name, db_image_source, new_status_val, db_created_at)
 
 
         return jsonify({'status': 'success', 'message': message})
@@ -691,7 +804,8 @@ def container_info(name):
             network_info = container_state.get('network')
             if isinstance(network_info, dict):
                 for iface_name, iface_data in network_info.items():
-                    if isinstance(iface_data, dict): # Check common interfaces
+                    # Check common container network interfaces and ensure it's a dict
+                    if isinstance(iface_data, dict):
                         addresses = iface_data.get('addresses')
                         if isinstance(addresses, list):
                             for addr_entry in addresses:
@@ -765,6 +879,7 @@ def add_nat_rule(name):
     # --- Check if rule already exists in DB *before* iptables ---
     db_check_success, rule_exists = check_nat_rule_exists_in_db(name, host_port, protocol)
     if not db_check_success:
+        # An error occurred trying to check the DB
         app.logger.error(f"检查现有 NAT 规则记录失败: {rule_exists}") # rule_exists contains the error message here
         return jsonify({'status': 'error', 'message': f"检查现有 NAT 规则记录失败: {rule_exists}"}), 500
     if rule_exists: # Rule already exists in DB
@@ -773,21 +888,43 @@ def add_nat_rule(name):
         message = f'容器 {name} 的主机端口 {host_port}/{protocol} NAT 规则已存在记录，跳过添加。'
         app.logger.warning(message)
         # Return warning status so the frontend can show a different message
-        return jsonify({'status': 'warning', 'message': message, 'output': ''}), 200
+        return jsonify({'status': 'warning', 'message': message}), 200
 
 
-    # Check if the container is running
+    # Check if the container is running and get its current IP
     _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=5)
     container_status = 'Unknown'
-    # Attempt to get live status first
+    container_ip = None
+    # Attempt to get live status and IP first
     if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
-         container_status = list_output[0].get('status', 'Unknown')
+         container_data = list_output[0]
+         container_status = container_data.get('status', 'Unknown')
+         # Attempt to parse IP from live state
+         container_state = container_data.get('state')
+         if isinstance(container_state, dict):
+            network_info = container_state.get('network')
+            if isinstance(network_info, dict):
+                for iface_name, iface_data in network_info.items():
+                    if isinstance(iface_data, dict):
+                        addresses = iface_data.get('addresses')
+                        if isinstance(addresses, list):
+                            for addr_entry in addresses:
+                                if isinstance(addr_entry, dict):
+                                    addr = addr_entry.get('address')
+                                    family = addr_entry.get('family')
+                                    scope = addr_entry.get('scope')
+                                    if addr and family == 'inet' and scope == 'global':
+                                        container_ip = addr.split('/')[0]
+                                        break
+                            if container_ip: break
+
+
     else:
          # Fallback to DB status if list fails, but warn it might be stale
          db_info = query_db('SELECT status FROM containers WHERE incus_name = ?', [name], one=True)
          if db_info:
              container_status = db_info['status']
-             app.logger.warning(f"Could not get live status for {name}, falling back to DB status: {container_status}")
+             app.logger.warning(f"Could not get live status/IP for {name}, falling back to DB status: {container_status}")
          else:
             # If not in live list and not in DB, container likely doesn't exist
             return jsonify({'status': 'error', 'message': f'容器 {name} 不存在或无法获取其状态。'}), 404
@@ -795,10 +932,8 @@ def add_nat_rule(name):
     if container_status != 'Running':
          return jsonify({'status': 'error', 'message': f'容器 {name} 必须处于 Running 状态才能添加 NAT 规则 (当前状态: {container_status})。'}), 400
 
-    # Get the container's current IP using the reliable method
-    container_ip = get_container_ip(name)
-
     if not container_ip:
+         # Even if status is Running, IP might not be assigned yet or parseable
          return jsonify({'status': 'error', 'message': f'无法获取容器 {name} 的 IP 地址。请确保容器正在运行且已分配 IP。'}), 500
 
     # Construct the iptables command to add the rule
@@ -814,7 +949,7 @@ def add_nat_rule(name):
 
     app.logger.info(f"Adding NAT rule via iptables: {' '.join(shlex.quote(part) for part in iptables_command)}")
 
-    # Execute the iptables command
+    # Execute the iptables command (output is text, parse_json=False)
     success_iptables, output = run_command(iptables_command, parse_json=False) # output will be empty string on success
 
     if success_iptables:
@@ -826,23 +961,28 @@ def add_nat_rule(name):
              'protocol': protocol,
              'ip_at_creation': container_ip # Store the IP used for the rule
         }
-        db_success, db_message = add_nat_rule_to_db(rule_details)
+        db_success, db_message = add_nat_rule_to_db(rule_details) # db_message is the new rule ID on success
+
+        # Message for frontend
         message = f'已成功为容器 {name} 添加 NAT 规则: 主机端口 {host_port}/{protocol} 转发到容器 IP {container_ip} 端口 {container_port}。'
 
         if not db_success:
-             # This case should be rare with the DB check upfront, but possible in theory (e.g., concurrent adds)
+             # This case should be rare with the DB check upfront and UNIQUE constraint,
+             # but handle potential DB errors during insertion
              message += f" 但记录规则到数据库失败: {db_message}"
              app.logger.error(f"Failed to record NAT rule for {name} in DB after successful iptables: {db_message}")
              # Return 200 with warning status, as the primary action (iptables) succeeded
-             return jsonify({'status': 'warning', 'message': message, 'output': output})
+             return jsonify({'status': 'warning', 'message': message}), 200 # Still 200 OK because iptables worked
 
         # Both iptables and DB insertion successful
-        return jsonify({'status': 'success', 'message': message, 'output': output})
+        # Include the rule_id in the response for potential frontend use (though not strictly needed for this UI)
+        return jsonify({'status': 'success', 'message': message, 'rule_id': db_message}), 200 # Return 200 OK
+
     else:
         # If iptables command failed, report the error and DO NOT add to DB
         message = f'添加 NAT 规则失败: {output}'
         app.logger.error(f"iptables command failed for {name}: {output}")
-        return jsonify({'status': 'error', 'message': message, 'output': output}), 500
+        return jsonify({'status': 'error', 'message': message}), 500 # Return 500 on iptables failure
 
 @app.route('/container/<name>/nat_rules', methods=['GET'])
 def list_nat_rules(name):
@@ -852,21 +992,22 @@ def list_nat_rules(name):
         # Return raw data, formatting will be done in frontend
         return jsonify({'status': 'success', 'rules': rules})
     else:
-        return jsonify({'status': 'error', 'message': rules}), 500
+        return jsonify({'status': 'error', 'message': rules}), 500 # Return 500 on database read error
 
 @app.route('/container/nat_rule/<int:rule_id>', methods=['DELETE'])
 def delete_nat_rule(rule_id):
     """API endpoint to delete a NAT rule by its ID."""
+    app.logger.info(f"Attempting to delete NAT rule ID {rule_id}.")
     # Get rule details from DB to construct the iptables command
     success_db, rule = get_nat_rule_by_id(rule_id)
 
     if not success_db:
-         app.logger.error(f"Error fetching rule ID {rule_id} from DB: {rule}")
-         return jsonify({'status': 'error', 'message': rule}), 500
+         app.logger.error(f"Error fetching rule ID {rule_id} from DB for deletion: {rule}")
+         return jsonify({'status': 'error', 'message': f'删除NAT规则前从数据库获取规则失败: {rule}'}), 500
 
     if not rule:
         app.logger.warning(f"NAT rule ID {rule_id} not found in DB for deletion.")
-        return jsonify({'status': 'error', 'message': f'数据库中找不到ID为 {rule_id} 的NAT规则记录，可能已被手动删除。'}), 404
+        return jsonify({'status': 'warning', 'message': f'数据库中找不到ID为 {rule_id} 的NAT规则记录，可能已被手动删除。跳过 iptables 删除。'}), 200 # Report as warning if DB record is missing
 
     container_name = rule.get('container_name', 'unknown')
     host_port = rule['host_port']
@@ -874,46 +1015,39 @@ def delete_nat_rule(rule_id):
     protocol = rule['protocol']
     ip_at_creation = rule['ip_at_creation'] # Use the IP recorded at creation time
 
-    # Construct the iptables command to delete the rule
-    # Use the exact parameters used for insertion to match the rule precisely
-    # Deleting a DNAT rule requires matching the parameters used when it was added (-p, --dport, -j DNAT, --to-destination).
-    # The --to-destination includes the target IP and port. We must use the IP recorded at creation time
-    # because the container's IP might have changed since the rule was added, but the iptables rule
-    # refers to the IP it was told to forward *to* at the time of creation.
-
-    iptables_command = [
-        'iptables',
-        '-t', 'nat',
-        '-D', 'PREROUTING',
-        '-p', protocol,
-        '--dport', str(host_port),
-        '-j', 'DNAT',
-        '--to-destination', f'{ip_at_creation}:{container_port}' # Use IP recorded at creation
-    ]
-
-    app.logger.info(f"Deleting NAT rule via iptables: {' '.join(shlex.quote(part) for part in iptables_command)}")
+    # Construct the iptables command parameters using the rule details
+    rule_details_for_iptables = {
+         'id': rule_id, # Pass ID for logging in the helper function
+         'host_port': host_port,
+         'container_port': container_port,
+         'protocol': protocol,
+         'ip_at_creation': ip_at_creation
+    }
 
     # Execute the iptables command to delete the rule
-    success_iptables, output = run_command(iptables_command, parse_json=False) # output will be empty string on success
+    success_iptables, output = perform_iptables_delete_for_rule(rule_details_for_iptables) # output is message/error from helper
 
     if success_iptables:
         # If iptables deletion was successful, remove the record from the database
-        db_success, db_message = remove_nat_rule_from_db(rule_id)
-        message = f'已成功删除ID为 {rule_id} 的NAT规则。IPTABLES 输出:\n{output}' # Include iptables output even on success
+        db_success, db_message = remove_nat_rule_from_db(rule_id) # db_message is a simple success string
+
+        message = f'已成功删除ID为 {rule_id} 的NAT规则记录。'
         if not db_success:
+             # This case is unlikely but handle potential DB errors during deletion
              message += f" 但从数据库移除记录失败: {db_message}"
              app.logger.error(f"Failed to remove NAT rule ID {rule_id} from DB after successful iptables: {db_message}")
-             # Return 200 with warning status as primary action succeeded
-             return jsonify({'status': 'warning', 'message': message, 'output': output})
+             # Return 200 with warning status as primary action (iptables) succeeded
+             return jsonify({'status': 'warning', 'message': message}), 200 # Still 200 OK because iptables worked
 
 
-        return jsonify({'status': 'success', 'message': message, 'output': output})
+        return jsonify({'status': 'success', 'message': message}), 200 # Return 200 OK
     else:
         # If iptables deletion failed, report the error and DO NOT remove from DB
+        # output contains the error message from perform_iptables_delete_for_rule
         message = f'删除ID为 {rule_id} 的NAT规则失败: {output}'
         app.logger.error(f"iptables delete command failed for rule ID {rule_id}: {output}")
         # Keep the rule in DB so the user sees it's still there and can investigate/retry
-        return jsonify({'status': 'error', 'message': message, 'output': output}), 500
+        return jsonify({'status': 'error', 'message': message}), 500 # Return 500 on iptables failure
 
 
 def check_permissions():
@@ -945,7 +1079,7 @@ def main():
         cursor.execute("PRAGMA table_info(containers);")
         columns_info = cursor.fetchall()
         column_names = [col[1] for col in columns_info]
-        required_columns = ['incus_name', 'status', 'created_at', 'image_source']
+        required_columns = ['incus_name', 'status', 'created_at', 'image_source', 'last_synced'] # Check for last_synced as well
         missing_columns = [col for col in required_columns if col not in column_names]
         if missing_columns:
             print(f"错误：数据库表 'containers' 缺少必需的列: {', '.join(missing_columns)}")
@@ -982,7 +1116,7 @@ def main():
         cursor.execute("PRAGMA table_info(nat_rules);")
         nat_columns_info = cursor.fetchall()
         nat_column_names = [col[1] for col in nat_columns_info]
-        required_nat_columns = ['container_name', 'host_port', 'container_port', 'protocol', 'ip_at_creation']
+        required_nat_columns = ['container_name', 'host_port', 'container_port', 'protocol', 'ip_at_creation', 'created_at'] # Check for created_at as well
         missing_nat_columns = [col for col in required_nat_columns if col not in nat_column_names]
         if missing_nat_columns:
             print(f"错误：数据库表 'nat_rules' 缺少必需的列: {', '.join(missing_nat_columns)}")
