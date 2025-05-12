@@ -88,9 +88,10 @@ def run_command(command_parts, parse_json=True, timeout=60):
         return False, f"执行命令时发生异常: {str(e)}"
 
 # --- Specific Incus Helper Functions using run_command ---
-def run_incus_command(command_parts, parse_json=True, timeout=60):
-    """Helper specifically for incus commands."""
-    return run_command(['incus'] + command_parts, parse_json, timeout)
+def run_incus_command(command_args, parse_json=True, timeout=60):
+    """Helper specifically for incus commands, adds 'incus' automatically."""
+    # command_args should be the list of arguments *after* 'incus'
+    return run_command(['incus'] + command_args, parse_json, timeout)
 
 
 def sync_container_to_db(name, image_source, status, created_at_str):
@@ -207,7 +208,8 @@ def get_container_ip(container_name):
     解析 incus info 的文本输出。
     返回 IP 地址字符串或 None。
     """
-    success, output = run_incus_command(['incus', 'info', container_name], parse_json=False)
+    # Corrected: Pass only args after 'incus'
+    success, output = run_incus_command(['info', container_name], parse_json=False)
 
     if not success:
         app.logger.warning(f"无法获取容器 {container_name} 的 incus info 输出: {output}")
@@ -250,7 +252,8 @@ def get_container_ip(container_name):
 def index():
     """主页面，列出容器"""
     # Use JSON format for list, as it's generally supported and structured
-    success, containers_data = run_incus_command(['incus', 'list', '--format', 'json'])
+    # Corrected: Pass only args after 'incus'
+    success, containers_data = run_incus_command(['list', '--format', 'json'])
 
     listed_containers = []
     db_containers_dict = {}
@@ -373,7 +376,8 @@ def index():
 
 
     # Get available images (still using JSON format as it's generally supported for image list)
-    success_img, images_data = run_incus_command(['incus', 'image', 'list', '--format', 'json'])
+    # Corrected: Pass only args after 'incus'
+    success_img, images_data = run_incus_command(['image', 'list', '--format', 'json'])
     available_images = []
     image_error = False
     image_error_message = None
@@ -422,7 +426,8 @@ def create_container():
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
 
     # Incus launch command does not output JSON by default
-    success, output = run_incus_command(['incus', 'launch', image, name], parse_json=False, timeout=120) # Increased timeout for launch
+    # Corrected: Pass only args after 'incus'
+    success, output = run_incus_command(['launch', image, name], parse_json=False, timeout=120) # Increased timeout for launch
 
     if success:
         # Give Incus a moment to register the new container and start it
@@ -431,7 +436,8 @@ def create_container():
 
         # Try to get initial info via incus list (JSON is reliable here) to sync DB
         # Using list is often quicker and more reliable for basic status/created_at after launch
-        _, list_output = run_incus_command(['incus', 'list', name, '--format', 'json'])
+        # Corrected: Pass only args after 'incus'
+        _, list_output = run_incus_command(['list', name, '--format', 'json'])
 
         created_at = None # Default if list fails or no created_at
         image_source_desc = image # Default image source description from input
@@ -462,6 +468,7 @@ def create_container():
 @app.route('/container/<name>/action', methods=['POST'])
 def container_action(name):
     action = request.form.get('action')
+    # Corrected: commands dictionary now contains the full command including 'incus'
     commands = {
         'start': ['incus', 'start', name],
         'stop': ['incus', 'stop', name, '--force'],
@@ -476,12 +483,13 @@ def container_action(name):
     timeout_val = 60
     if action == 'delete': timeout_val = 120
 
-    success, output = run_incus_command(commands[action], parse_json=False, timeout=timeout_val)
+    # Corrected: Use run_command directly since the command list is complete
+    success, output = run_command(commands[action], parse_json=False, timeout=timeout_val)
 
     if success:
         message = f'容器 {name} {action} 操作提交成功。'
-        # Give the command some time to affect the state before querying list again
-        time.sleep(3) # Increased sleep slightly
+        # Give the command some time to affect the state
+        time.sleep(3) # Increased sleep
 
         if action == 'delete':
             remove_container_from_db(name)
@@ -489,7 +497,8 @@ def container_action(name):
         else:
             # After action, attempt to get updated status using incus list (JSON is reliable here)
             # Use a small timeout for the list command itself
-            _, list_output = run_incus_command(['incus', 'list', name, '--format', 'json'], timeout=10)
+            # Corrected: Pass only args after 'incus'
+            _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=10)
 
             new_status_val = 'Unknown' # Default status if list fails or container not found
             db_image_source = 'N/A' # Default
@@ -550,13 +559,13 @@ def exec_command(name):
 
 
     # Incus exec does not output JSON by default
-    # Use run_command directly
+    # Corrected: Pass only args after 'incus'
     success, output = run_incus_command(['exec', name, '--'] + command_parts, parse_json=False)
 
     if success:
         return jsonify({'status': 'success', 'output': output})
     else:
-        # Output contains stderr/stdout and error message from run_command
+        # output already contains stderr/stdout and error message from run_command
         return jsonify({'status': 'error', 'output': output, 'message': '命令执行失败'}), 500
 
 
@@ -611,6 +620,7 @@ def container_info(name):
 
 
     # 3. Attempt to execute incus info (plain text)
+    # Corrected: Pass only args after 'incus'
     success_text, text_data = run_incus_command(['info', name], parse_json=False)
 
 
@@ -817,16 +827,19 @@ def add_nat_rule(name):
          return jsonify({'status': 'error', 'message': '协议必须是 tcp 或 udp'}), 400
 
     # Check if the container is running to get its IP
-    db_info = query_db('SELECT status FROM containers WHERE incus_name = ?', [name], one=True)
-    if not db_info:
-        # Container not found in DB, try to get live status from Incus
-        _, list_output = run_incus_command(['incus', 'list', name, '--format', 'json'], timeout=5)
-        if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
-             container_status = list_output[0].get('status', 'Unknown')
-        else:
-             return jsonify({'status': 'error', 'message': f'容器 {name} 不存在或无法获取其状态。'}), 404
+    # Corrected: Pass only args after 'incus'
+    _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=5)
+
+    container_status = 'Unknown'
+    if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
+         container_status = list_output[0].get('status', 'Unknown')
     else:
-         container_status = db_info['status']
+         # Fallback to DB status if live list fails
+         db_info = query_db('SELECT status FROM containers WHERE incus_name = ?', [name], one=True)
+         if db_info:
+             container_status = db_info['status']
+         else:
+            return jsonify({'status': 'error', 'message': f'容器 {name} 不存在或无法获取其状态。'}), 404
 
     if container_status != 'Running':
          return jsonify({'status': 'error', 'message': f'容器 {name} 必须处于 Running 状态才能添加 NAT 规则 (当前状态: {container_status})。'}), 400
