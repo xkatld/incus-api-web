@@ -215,36 +215,61 @@ def get_container_ip(container_name):
         app.logger.warning(f"无法获取容器 {container_name} 的 incus info 输出: {output}")
         return None
 
-    # Parse the text output
     lines = output.splitlines()
-    current_section = None
-    ip_address = None
+    # Use state flags to track current parsing context
+    in_network_state_section = False
+    in_ip_addresses_subsection = False
+    ip_address = None # Initialize ip_address to None
 
     for line in lines:
-        line = line.strip()
-        if not line:
-            current_section = None
-            continue
+        line_stripped = line.strip()
 
-        if line == 'Network state:':
-            current_section = 'Network state'
-            continue # Move to the next line for content
+        # Detect main section start/end
+        if line_stripped == 'Network state:':
+            in_network_state_section = True
+            in_ip_addresses_subsection = False # Reset sub-section flag when entering new main section
+            continue # Move to the next line after the section header
 
-        if current_section == 'Network state':
-            # Look for lines like: - eth0 (inet): 192.168.4.123/24 (global)
-            # We prioritize global IPv4 addresses
-            network_match = re.match(r'^\s*-\s+[^ ]+\s+\(inet\):\s+([^ ]+)\s+\(global\)', line)
-            if network_match:
-                ip_with_mask = network_match.group(1)
+        # If we were in Network state and see a non-indented line ending in ':',
+        # it indicates the end of the Network state section and the start of a new main section.
+        # This is a heuristic to exit the network parsing state.
+        if in_network_state_section and not line.startswith(' ') and line_stripped.endswith(':'):
+             in_network_state_section = False
+             in_ip_addresses_subsection = False # Also exit sub-section state
+             continue # Process the new section header in the next iteration
+
+        # Detect subsection start within Network state
+        if in_network_state_section and line_stripped == 'IP addresses:':
+            in_ip_addresses_subsection = True
+            continue # Move to the next line after the subsection header
+
+        # If we are in the IP addresses subsection, try to match the IP address line
+        if in_ip_addresses_subsection:
+            # Look for lines that are indented, start with 'inet:', and contain '(global)'
+            # The line format is typically "      inet:  10.173.200.229/24 (global)" (indentation varies)
+            # Regex: Starts with one or more spaces (\s+), followed by 'inet:', optional spaces (\s*),
+            # captures the IP/mask group ([^ ]+), optional spaces (\s*), and ends with '(global)'.
+            ip_match = re.match(r'^\s+inet:\s*([^ ]+)\s+\(global\)', line)
+            if ip_match:
+                ip_with_mask = ip_match.group(1)
                 ip_address = ip_with_mask.split('/')[0]
-                app.logger.info(f"找到容器 {container_name} 的 IPv4 地址: {ip_address}")
+                app.logger.info(f"找到容器 {container_name} 的全局 IPv4 地址: {ip_address}")
                 return ip_address # Found a global IPv4, return it immediately
 
+            # If we are in the IP addresses subsection but the current line does not
+            # start with indentation followed by 'inet:' or 'inet6:', it likely means
+            # we've exited the IP addresses block within the Network state section.
+            # This is another heuristic for state transition.
+            if in_ip_addresses_subsection and not re.match(r'^\s+(inet|inet6):', line):
+                 in_ip_addresses_subsection = False
+                 # Continue the loop, we might still be in the main Network state section
+                 # processing hardware addresses or other info, or we might exit
+                 # the main Network state section in the next iteration.
 
-    # If loop finishes without finding a global IPv4
+
+    # If the loop finishes without finding a global IPv4 address
     app.logger.warning(f"无法找到容器 {container_name} 的全局 IPv4 地址。")
     return None
-
 
 # --- Flask 路由 ---
 
