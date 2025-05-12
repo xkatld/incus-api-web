@@ -61,6 +61,7 @@ def run_command(command_parts, parse_json=True, timeout=60):
                 app.logger.error(f"Failed to parse JSON from command output: {result.stdout}\nError: {e}")
                 return False, f"解析命令输出为 JSON 失败: {e}\n原始输出: {result.stdout.strip()}"
         else:
+            # For non-JSON output, return True and the stripped stdout on success
             return True, result.stdout.strip()
 
     except FileNotFoundError:
@@ -85,6 +86,7 @@ def sync_container_to_db(name, image_source, status, created_at_str):
         if created_at_to_db:
             original_created_at_to_db = created_at_to_db
             try:
+                # Attempt to parse various ISO 8601 formats
                 if created_at_to_db.endswith('Z'):
                    created_at_to_db = created_at_to_db[:-1] + '+00:00'
 
@@ -94,6 +96,7 @@ def sync_container_to_db(name, image_source, status, created_at_str):
                     hhmm = tz_match_hhmm.group(2)
                     created_at_to_db = created_at_to_db[:-4] + f"{sign}{hhmm[:2]}:{hhmm[2:]}"
 
+                # Truncate microseconds if more than 6 digits
                 parts = created_at_to_db.split('.')
                 if len(parts) > 1:
                     time_tz_part = parts[1]
@@ -104,45 +107,56 @@ def sync_container_to_db(name, image_source, status, created_at_str):
                          if len(micro_part) > 6:
                             micro_part = micro_part[:6]
                          time_tz_part = micro_part + tz_part
-                    else:
+                    else: # No timezone part after microseconds
                         if len(time_tz_part) > 6:
                             time_tz_part = time_tz_part[:6]
 
                     created_at_to_db = parts[0] + '.' + time_tz_part
+                # Add microseconds if missing but timezone is present (e.g., 2023-01-01T10:00:00+08:00)
                 elif re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db):
                      time_segment = created_at_to_db.split('T')[-1]
-                     if '.' not in time_segment.split(re.search(r'[+-]', time_segment).group(0))[0]:
+                     if '.' not in time_segment.split(re.search(r'[+-]', time_segment).group(0))[0]: # Check if '.' is missing before timezone
                            tz_part = re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db).group(0)
-                           if not '.' in created_at_to_db:
+                           if '.' not in created_at_to_db: # Ensure we don't double add if it had '.' already
                               created_at_to_db = created_at_to_db.replace(tz_part, '.000000' + tz_part)
 
 
+                # Validate the format by attempting to parse
                 datetime.datetime.fromisoformat(created_at_to_db)
 
             except (ValueError, AttributeError, TypeError) as ve:
+                # Fallback if parsing fails
                 app.logger.warning(f"无法精确解析 Incus 创建时间 '{original_created_at_to_db}' for {name} 为 ISO 格式 ({ve}). 将尝试使用数据库记录的原值或当前时间.")
                 old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
                 if old_db_entry and old_db_entry['created_at']:
                      try:
+                          # Try parsing the old DB value in case it was correct
                           datetime.datetime.fromisoformat(old_db_entry['created_at'])
                           created_at_to_db = old_db_entry['created_at']
+                          app.logger.info(f"使用数据库记录的创建时间 '{created_at_to_db}' for {name}.")
                      except (ValueError, TypeError):
                           app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式.")
-                          created_at_to_db = datetime.datetime.now().isoformat()
+                          created_at_to_db = datetime.datetime.now().isoformat() # Fallback to current time
+                          app.logger.info(f"使用当前时间作为创建时间 for {name}.")
                 else:
-                     created_at_to_db = datetime.datetime.now().isoformat()
+                     created_at_to_db = datetime.datetime.now().isoformat() # Fallback to current time
+                     app.logger.info(f"使用当前时间作为创建时间 for {name}.")
 
         else:
+             # Fallback if created_at_str is None
              old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
              if old_db_entry and old_db_entry['created_at']:
                  try:
                       datetime.datetime.fromisoformat(old_db_entry['created_at'])
                       created_at_to_db = old_db_entry['created_at']
+                      app.logger.info(f"使用数据库记录的创建时间 '{created_at_to_db}' for {name} (Incus did not provide created_at).")
                  except (ValueError, TypeError):
-                      app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式.")
-                      created_at_to_db = datetime.datetime.now().isoformat()
+                      app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式 (Incus did not provide created_at).")
+                      created_at_to_db = datetime.datetime.now().isoformat() # Fallback to current time
+                      app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
              else:
-                  created_at_to_db = datetime.datetime.now().isoformat()
+                  created_at_to_db = datetime.datetime.now().isoformat() # Fallback to current time
+                  app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
 
 
         query_db('''
@@ -210,20 +224,36 @@ def get_container_ip(container_name):
 
 # --- NAT Rule Database Functions ---
 
+def check_nat_rule_exists_in_db(container_name, host_port, protocol):
+    """Checks if a NAT rule record exists in the database."""
+    try:
+        rule = query_db('''
+            SELECT id FROM nat_rules
+            WHERE container_name = ? AND host_port = ? AND protocol = ?
+        ''', (container_name, host_port, protocol), one=True)
+        # Return True if rule exists (found a row), False otherwise
+        return True, rule is not None
+    except sqlite3.Error as e:
+        app.logger.error(f"数据库错误 check_nat_rule_exists_in_db for {container_name}, host={host_port}/{protocol}: {e}")
+        # Return False and the error message to indicate failure
+        return False, f"检查规则记录失败: {e}"
+
+
 def add_nat_rule_to_db(container_name, host_port, container_port, protocol, container_ip):
     """Adds a NAT rule record to the database."""
     try:
+        # Removed the UNIQUE constraint check here, as it's now done in the route handler
         query_db('''
             INSERT INTO nat_rules (container_name, host_port, container_port, protocol, ip_at_creation)
             VALUES (?, ?, ?, ?, ?)
         ''', (container_name, host_port, container_port, protocol, container_ip))
         app.logger.info(f"Added NAT rule to DB: {container_name}, host={host_port}/{protocol}, container={container_ip}:{container_port}")
         return True, "规则记录成功添加到数据库。"
-    except sqlite3.IntegrityError:
-         return False, f"数据库已存在容器 {container_name} 的主机端口 {host_port}/{protocol} 规则记录。"
     except sqlite3.Error as e:
+        # This catch is mainly for unexpected DB errors other than IntegrityError (which is checked upfront now)
         app.logger.error(f"数据库错误 add_nat_rule_to_db for {container_name}: {e}")
         return False, f"添加规则记录到数据库失败: {e}"
+
 
 def get_nat_rules_for_container(container_name):
     """Retrieves all NAT rules for a given container from the database."""
@@ -664,6 +694,20 @@ def add_nat_rule(name):
     if protocol not in ['tcp', 'udp']:
          return jsonify({'status': 'error', 'message': '协议必须是 tcp 或 udp'}), 400
 
+    # --- NEW: Check if rule already exists in DB *before* iptables ---
+    db_check_success, db_check_result = check_nat_rule_exists_in_db(name, host_port, protocol)
+    if not db_check_success:
+        app.logger.error(f"检查现有 NAT 规则记录失败: {db_check_result}")
+        return jsonify({'status': 'error', 'message': f"检查现有 NAT 规则记录失败: {db_check_result}"}), 500
+    if db_check_result is True: # Rule already exists in DB
+        # If it's in the DB, we assume it was successfully added to iptables previously.
+        # Don't attempt to add to iptables or DB again.
+        message = f'容器 {name} 的主机端口 {host_port}/{protocol} NAT 规则已存在记录，跳过添加。'
+        app.logger.warning(message)
+        # Return warning status so the frontend can show a different message
+        return jsonify({'status': 'warning', 'message': message, 'output': ''}), 200
+
+
     # Check if the container is running
     _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=5)
     container_status = 'Unknown'
@@ -701,20 +745,23 @@ def add_nat_rule(name):
     app.logger.info(f"Adding NAT rule via iptables: {' '.join(shlex.quote(part) for part in iptables_command)}")
 
     # Execute the iptables command
-    success, output = run_command(iptables_command, parse_json=False)
+    success_iptables, output = run_command(iptables_command, parse_json=False)
 
-    if success:
-        # Add the rule to the database record only if iptables command succeeded
+    if success_iptables:
+        # Add the rule to the database record ONLY if iptables command succeeded
         db_success, db_message = add_nat_rule_to_db(name, host_port, container_port, protocol, container_ip)
         message = f'已成功为容器 {name} 添加 NAT 规则: 主机端口 {host_port}/{protocol} 转发到容器 IP {container_ip} 端口 {container_port}。'
+
         if not db_success:
+             # This case should be rare with the DB check upfront, but possible in theory (e.g., concurrent adds without unique constraint)
+             # or if the check_nat_rule_exists_in_db had issues.
              message += f" 但记录规则到数据库失败: {db_message}"
              app.logger.error(f"Failed to record NAT rule for {name} in DB after successful iptables: {db_message}")
-             # Decide if you want to fail the request or just warn. Warning seems better.
-             # return jsonify({'status': 'warning', 'message': message, 'output': output}), 500 # Or 200?
-             return jsonify({'status': 'success', 'message': message, 'output': output}) # Treat iptables success as overall success
+             # Decide if you want to fail or warn. Warning is probably fine.
+             # Return 200 with warning status
+             return jsonify({'status': 'warning', 'message': message, 'output': output})
 
-
+        # Both iptables and DB insertion successful
         return jsonify({'status': 'success', 'message': message, 'output': output})
     else:
         # If iptables command failed, report the error and DO NOT add to DB
@@ -740,10 +787,12 @@ def delete_nat_rule(rule_id):
     success_db, rule = get_nat_rule_by_id(rule_id)
 
     if not success_db:
+         app.logger.error(f"Error fetching rule ID {rule_id} from DB: {rule}")
          return jsonify({'status': 'error', 'message': rule}), 500
 
     if not rule:
-        return jsonify({'status': 'error', 'message': f'数据库中找不到ID为 {rule_id} 的NAT规则记录。'}), 404
+        app.logger.warning(f"NAT rule ID {rule_id} not found in DB.")
+        return jsonify({'status': 'error', 'message': f'数据库中找不到ID为 {rule_id} 的NAT规则记录，可能已被删除。'}), 404
 
     container_name = rule.get('container_name', 'unknown')
     host_port = rule['host_port']
@@ -753,31 +802,10 @@ def delete_nat_rule(rule_id):
 
     # Construct the iptables command to delete the rule
     # Use the exact parameters used for insertion to match the rule precisely
-    # Note: If the rule was added with a specific interface (-i) or source IP (-s),
-    # the deletion command must also include those for an exact match.
-    # Our current ADD command only uses -p, --dport, -j DNAT, --to-destination.
-    # We must include the destination IP (container_ip) in the delete command
-    # because DNAT rules match on the destination IP/port/protocol in the PREROUTING chain.
-    # The IP at creation is needed because the container's IP might change.
-
-    # To delete, we need the *source* IP match of the *packet entering* the chain (any),
-    # and the *destination* IP match of the *packet entering* the chain (the host's IP Incus is mapping *to*),
-    # the protocol, and the destination port (host_port).
-    # However, the DNAT rule itself *changes* the destination IP/port.
-    # When listing rules (`iptables -t nat -L PREROUTING -n -v`), a rule added like:
-    # `iptables -t nat -A PREROUTING -p tcp --dport 8080 -j DNAT --to-destination 172.17.0.2:80`
-    # will often be listed showing the *original* match criteria (`-p tcp dpt:8080`)
-    # and the *target* (`to:172.17.0.2:80`).
-    # The `-D` command needs to match the criteria used in `-A`.
-    # Let's assume the rule definition using `-p`, `--dport`, `-j DNAT`, `--to-destination` is sufficient for `-D`.
-    # The container's IP (ip_at_creation) is part of the `--to-destination` *target*, not the match criteria in PREROUTING.
-    # The match criteria in PREROUTING are typically:
-    # -p protocol --dport host_port
-    # The target is -j DNAT --to-destination container_ip:container_port.
-    # So, the -D command should specify the match criteria that identifies the rule.
-    # A safer way might be to list rules by line number and delete by number, but line numbers change.
-    # Deleting by specification is standard but requires matching the -A args.
-    # Let's try deleting based on -p, --dport, and the target IP/port.
+    # Deleting a DNAT rule requires matching the parameters used when it was added (-p, --dport, -j DNAT, --to-destination).
+    # The --to-destination includes the target IP and port. We must use the IP recorded at creation time
+    # because the container's IP might have changed since the rule was added, but the iptables rule
+    # refers to the IP it was told to forward *to* at the time of creation.
 
     iptables_command = [
         'iptables',
@@ -789,7 +817,6 @@ def delete_nat_rule(rule_id):
         '--to-destination', f'{ip_at_creation}:{container_port}' # Use IP recorded at creation
     ]
 
-
     app.logger.info(f"Deleting NAT rule via iptables: {' '.join(shlex.quote(part) for part in iptables_command)}")
 
     # Execute the iptables command to delete the rule
@@ -798,7 +825,7 @@ def delete_nat_rule(rule_id):
     if success_iptables:
         # If iptables deletion was successful, remove the record from the database
         db_success, db_message = remove_nat_rule_from_db(rule_id)
-        message = f'已成功删除ID为 {rule_id} 的NAT规则。'
+        message = f'已成功删除ID为 {rule_id} 的NAT规则。IPTABLES 输出:\n{output}' # Include iptables output even on success
         if not db_success:
              message += f" 但从数据库移除记录失败: {db_message}"
              app.logger.error(f"Failed to remove NAT rule ID {rule_id} from DB after successful iptables: {db_message}")
@@ -850,21 +877,25 @@ def main():
             sys.exit(1)
 
         # Check for unique index on incus_name in containers
-        incus_name_cid = next((col[0] for col in columns_info if col[1] == 'incus_name'), None)
-        if incus_name_cid is not None:
-             cursor.execute(f"PRAGMA index_list(containers);")
-             indexes = cursor.fetchall()
-             is_unique = False
-             for index in indexes:
-                 if index[2] == 1:
-                     cursor.execute(f"PRAGMA index_info('{index[1]}');")
-                     index_cols = cursor.fetchall()
-                     if len(index_cols) == 1 and index_cols[0][2] == 'incus_name':
-                          is_unique = True
+        # incus_name_cid = next((col[0] for col in columns_info if col[1] == 'incus_name'), None)
+        # if incus_name_cid is not None: # Simplified check, PRAGMA index_list gives uniqueness directly
+        cursor.execute("PRAGMA index_list(containers);")
+        indexes = cursor.fetchall()
+        has_unique_incus_name = any(idx[2] == 1 and idx[1] == 'sqlite_autoindex_containers_1' for idx in indexes) # Default unique index name
+        if not has_unique_incus_name:
+             # More thorough check for any unique index on incus_name
+             for idx in indexes:
+                 if idx[2] == 1:
+                     cursor.execute(f"PRAGMA index_info('{idx[1]}');")
+                     idx_cols = [col[2] for col in cursor.fetchall()]
+                     if len(idx_cols) == 1 and idx_cols[0] == 'incus_name':
+                          has_unique_incus_name = True
                           break
-             if not is_unique:
-                 print("警告：数据库表 'containers' 的 'incus_name' 列没有 UNIQUE 约束。这可能导致同步问题。")
+
+             if not has_unique_incus_name:
+                 print("警告：数据库表 'containers' 的 'incus_name' 列可能没有 UNIQUE 约束。这可能导致同步问题。")
                  print("建议删除旧的 incus_manager.db 文件然后重新运行 init_db.py 创建正确的表结构。")
+
 
         # Check for nat_rules table and columns
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='nat_rules';")
@@ -892,13 +923,14 @@ def main():
             if index_info[2] == 1: # Check if it's unique
                 index_name = index_info[1]
                 cursor.execute(f"PRAGMA index_info('{index_name}');")
-                index_cols = sorted([col[2] for col in cursor.fetchall()]) # Sort column names
+                # Get column names involved in this unique index and sort them
+                index_cols = sorted([col[2] for col in cursor.fetchall()])
+                # Check if the sorted column list matches the required composite key
                 if index_cols == ['container_name', 'host_port', 'protocol']:
                      unique_composite_index_exists = True
                      break
         if not unique_composite_index_exists:
-             print("警告：数据库表 'nat_rules' 可能缺少 UNIQUE (container_name, host_port, protocol) 约束。这可能导致重复规则记录。")
-             print("建议删除旧的 incus_manager.db 文件然后重新运行 init_db.py 创建正确的表结构。")
+             print("警告：数据库表 'nat_rules' 可能缺少 UNIQUE (container_name, host_port, protocol) 约束。这可能导致重复规则记录。建议手动检查或重建表。")
 
 
     except sqlite3.Error as e:
@@ -944,6 +976,7 @@ def main():
 
 
     print("启动 Flask Web 服务器...")
+    # Change debug=False for production!
     app.run(debug=True, host='0.0.0.0', port=5000)
 
 if __name__ == '__main__':
