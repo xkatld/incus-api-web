@@ -1,3 +1,5 @@
+--- START OF FILE index.html (Optimized - Confirmed) ---
+
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -9,16 +11,16 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body { padding-top: 20px; }
-        .container-actions button, .container-actions form { margin-right: 5px; display: inline-block; vertical-align: middle; } /* Added vertical-align */
-        #execOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; } /* Added font styles */
-        #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; } /* Greenish background/border for success */
-        #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; } /* Reddish background/border for error */
+        .container-actions button, .container-actions form { margin-right: 5px; display: inline-block; vertical-align: middle; }
+        #execOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
+        #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
+        #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
 
-        #infoContent { white-space: pre-wrap; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.9em; } /* Added font styles */
+        #infoContent { white-space: pre-wrap; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
 
         /* Style for the processing state on buttons */
         .btn-processing {
-            pointer-events: none; /* Prevent clicks while processing */
+            pointer-events: none;
             opacity: 0.7;
         }
         .btn-processing .spinner-border {
@@ -30,7 +32,7 @@
             position: fixed;
             top: 20px;
             right: 20px;
-            z-index: 1050; /* Higher than modals */
+            z-index: 1050;
         }
     </style>
 </head>
@@ -110,7 +112,7 @@
                 {% endfor %}
             </tbody>
         </table>
-         <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button> <!-- Simple reload button -->
+         <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button>
     </div>
 
     <!-- Toast Container -->
@@ -186,10 +188,16 @@ function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
     if (isProcessing) {
         $button.data('original-text', $button.html()); // Store original content
-        $button.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...');
+        // Check if it's a delete button to use a different spinner color maybe, not strictly needed now
+        // const spinnerColor = $button.hasClass('btn-danger') ? 'text-danger' : 'text-light'; // Example
+        const spinnerHtml = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+        $button.html(spinnerHtml + ' 处理中...');
         $button.addClass('btn-processing').prop('disabled', true);
     } else {
-        $button.html($button.data('original-text')); // Restore original content
+        // Restore original content unless it was explicitly set otherwise (e.g., after delete might not exist)
+        if ($button.data('original-text')) {
+             $button.html($button.data('original-text'));
+        }
         $button.removeClass('btn-processing').prop('disabled', false);
     }
 }
@@ -206,7 +214,7 @@ $('#createContainerForm').submit(function(event) {
         showToast(data.message, data.status === 'success' ? 'success' : 'danger');
         if (data.status === 'success') {
             // Optional: Clear form or redirect. For simplicity, refresh for now.
-            // form[0].reset(); // Or location.reload();
+            form[0].reset(); // Reset form fields
              setTimeout(() => location.reload(), 1000); // Reload after a small delay
         }
     }).fail(function(jqXHR) {
@@ -239,7 +247,7 @@ function performAction(containerName, action, buttonElement) {
              setButtonProcessing(buttonElement, false); // Only restore button if reload doesn't happen
         }
     }).fail(function(jqXHR) {
-         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : `执行 ${action} 操作请求失败。`;
+         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
          showToast("操作失败: " + message, 'danger');
          setButtonProcessing(buttonElement, false); // Restore button on failure
     });
@@ -273,6 +281,8 @@ function openExecModal(containerName) {
     $('#commandInput').val(''); // Clear previous command
     $('#execOutput').text('');   // Clear previous output
     $('#execOutput').removeClass('success error'); // Clear state classes
+    // Ensure the exec button in the modal is not in processing state when opened
+    setButtonProcessing($('#execButton'), false);
     var execModal = new bootstrap.Modal(document.getElementById('execModal'));
     execModal.show();
 }
@@ -303,7 +313,8 @@ $('#execCommandForm').submit(function(event) {
             outputArea.addClass('success');
             showToast("命令执行成功。", 'success');
         } else {
-            outputArea.text('命令执行失败:\n' + (data.output || '无详细输出'));
+             // Assume 'output' contains stderr or error message on failure
+            outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出'));
             outputArea.addClass('error');
             showToast("命令执行失败。", 'danger');
         }
@@ -317,7 +328,7 @@ $('#execCommandForm').submit(function(event) {
     });
 });
 
-// Bootstrap modal events to clear content when hidden (optional but good practice)
+// Bootstrap modal events to clear content when hidden
 $('#infoModal').on('hidden.bs.modal', function () {
   $('#infoContent').text('正在加载...');
   $('#infoContent').removeClass('success error');
@@ -330,7 +341,7 @@ $('#execModal').on('hidden.bs.modal', function () {
   $('#execOutput').text('');
   $('#execOutput').removeClass('success error');
   $('#execModalLabel').text('在容器内执行命令');
-  setButtonProcessing($('#execButton'), false); // Ensure button state is reset if closed while processing
+  setButtonProcessing($('#execButton'), false); // Ensure button state is reset
 });
 
 
