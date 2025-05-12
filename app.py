@@ -360,30 +360,50 @@ def exec_command(name):
 
 @app.route('/container/<name>/info')
 def container_info(name):
-    success, data = run_incus_command(['incus', 'info', name, '--format', 'json'])
-    if success and isinstance(data, dict):
+    """获取容器详细信息"""
+    success, data = run_incus_command(['incus', 'info', name, '--format', 'json']) # 尝试用 JSON 格式
+
+    if success and isinstance(data, dict): # 如果成功获取并解析了 JSON
+        # 从 Incus 的 JSON 输出中提取关键信息并同步到数据库
         image_source = 'N/A'
         config_data = data.get('config')
         if isinstance(config_data, dict):
             image_source = config_data.get('image.description', 'N/A')
-            
+        
         created_at = data.get('created_at', datetime.datetime.now().isoformat())
         status = data.get('status', 'Unknown')
         sync_container_to_db(name, image_source, status, created_at)
-        return jsonify(data)
+        return jsonify(data) # 返回完整的 JSON 数据
     else:
+        # JSON 获取失败 (可能是 --format 不支持，或者其他错误)
+        # data 变量此时应该是 run_incus_command 返回的错误信息字符串
+        incus_error_detail = data if not success else "Incus 返回了无效的数据格式或不支持 JSON 输出"
+        app.logger.warning(f"无法从 Incus 获取容器 '{name}' 的 JSON info: {incus_error_detail}")
+
+        # 尝试获取纯文本的 incus info (可选，如果需要显示一些基本信息)
+        # success_text, text_data = run_incus_command(['incus', 'info', name], parse_json=False)
+        # text_info_to_display = text_data if success_text else "无法获取文本格式的 Incus info。"
+
+        # 主要依赖数据库快照
         db_info = query_db('SELECT * FROM containers WHERE incus_name = ?', [name], one=True)
-        error_detail_message = data if not success else "Incus 返回了无效的数据格式"
         if db_info:
-            return jsonify({
+            response_data = {
                 'name': db_info['incus_name'],
                 'status': db_info['status'],
                 'image_source': db_info['image_source'],
                 'created_at': db_info['created_at'],
-                'message': '数据来自数据库快照，可能不是最新的。无法从 Incus 获取实时信息。',
-                'error_details': error_detail_message
-            })
-        return jsonify({'status': 'error', 'message': f'获取容器 {name} 信息失败: {error_detail_message}'}), 404
+                'message': f"数据来自数据库快照。无法从 Incus 获取详细实时配置信息 (原因: {incus_error_detail}).",
+                # 'raw_text_info': text_info_to_display # 如果选择包含文本信息
+            }
+            # 如果JSON获取失败，但我们至少有数据库信息，我们就不再尝试同步数据库了，
+            # 因为我们没有从incus得到新的准确信息来同步。
+            return jsonify(response_data)
+        else:
+            # 连数据库信息都没有
+            return jsonify({
+                'status': 'error',
+                'message': f"获取容器 {name} 信息失败: 无法从 Incus 获取 ({incus_error_detail}) 且数据库中无记录。"
+            }), 404
 
 
 def main():
