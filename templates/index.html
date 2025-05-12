@@ -12,8 +12,7 @@
         #execOutput, #infoContent pre { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
         #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
         #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
-        #infoContent { background-color: #fff; border: none; padding: 0; } /* Adjust styling for structured info */
-        /* #natOutput Removed from HTML */
+        #infoContent { background-color: #fff; border: none; padding: 0; }
 
 
         .btn-processing {
@@ -68,7 +67,6 @@
              word-break: break-word;
          }
 
-        /* Styles for the NAT rules list in the info modal */
         #natRulesList {
             margin-top: 15px;
             border-top: 1px solid #eee;
@@ -90,16 +88,16 @@
             display: flex;
             justify-content: space-between;
             align-items: center;
-            flex-wrap: wrap; /* Allow wrapping on small screens */
+            flex-wrap: wrap;
         }
         #natRulesList li .rule-details {
             flex-grow: 1;
-            margin-right: 10px; /* Space between details and button */
-            word-break: break-word; /* Prevent long IPs/ports from overflowing */
+            margin-right: 10px;
+            word-break: break-word;
         }
          #natRulesList li .rule-actions {
             flex-shrink: 0;
-            margin-left: auto; /* Push button to the right */
+            margin-left: auto;
          }
 
 
@@ -171,7 +169,7 @@
                                 <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
                                 <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
                                 <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
-                                <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button> {# Pass container name only #}
+                                <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
                                 {% elif c.status == 'Stopped' %}
                                 <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
                                 {% endif %}
@@ -205,7 +203,7 @@
                         <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
                         <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
                         <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
-                         <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button> {# Pass container name only #}
+                         <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
                         {% elif c.status == 'Stopped' %}
                         <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
                         {% endif %}
@@ -234,18 +232,14 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- Container basic info will be loaded here -->
                     <div id="basicInfoContent">正在加载基础信息...</div>
 
-                    <!-- NAT Rules section -->
                     <div id="natRulesList">
                         <h6>NAT 规则 (本应用添加)</h6>
                         <ul id="natRulesContent">
-                            <!-- NAT rules will be loaded here -->
                             <li>正在加载 NAT 规则...</li>
                         </ul>
                          <div id="natRulesError" class="alert alert-warning mt-2 d-none"></div>
-                         <!-- #natOutput Removed from HTML -->
                     </div>
 
                      <div id="infoError" class="alert alert-danger mt-2 d-none"></div>
@@ -313,7 +307,6 @@
                         </div>
                         <button type="submit" class="btn btn-primary" id="addNatButton">添加规则</button>
                     </form>
-                    <!-- Output area removed from add modal -->
                 </div>
             </div>
         </div>
@@ -339,12 +332,11 @@
 
 <script>
 function showToast(message, type = 'info') {
-    // Map backend statuses to toast types
     let toastType = 'info';
     if (type === 'success') {
         toastType = 'success';
     } else if (type === 'error') {
-        toastType = 'danger'; // Bootstrap uses danger for errors
+        toastType = 'danger';
     } else if (type === 'warning') {
         toastType = 'warning';
     }
@@ -393,9 +385,9 @@ function setButtonProcessing(button, isProcessing) {
     }
 }
 
-let currentConfirmAction = null; // 'restart_container', 'delete_container', 'delete_nat_rule'
-let currentConfirmContainerName = null; // For container actions
-let currentConfirmRuleId = null; // For 'delete_nat_rule'
+let currentConfirmAction = null;
+let currentConfirmContainerName = null;
+let currentConfirmRuleId = null;
 let currentConfirmButtonElement = null;
 
 
@@ -421,18 +413,17 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
         currentConfirmContainerName = nameOrId;
          currentConfirmRuleId = null;
         modalTitle.text('确认删除容器');
-        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及其所有数据！<br>同时将删除通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
+        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及其所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
         buttonClass = 'btn-danger';
         buttonText = '删除容器';
      } else if (actionType === 'delete_nat_rule') {
-         currentConfirmContainerName = null; // Not needed for NAT rule deletion by ID
-         currentConfirmRuleId = nameOrId; // The rule ID
+         currentConfirmContainerName = null;
+         currentConfirmRuleId = nameOrId;
         modalTitle.text('确认删除 NAT 规则');
         message = `确定要删除 ID 为 <strong>${nameOrId}</strong> 的 NAT 规则吗？此操作将尝试移除对应的 iptables 规则记录 (仅针对通过本应用添加的规则)。`;
         buttonClass = 'btn-danger';
         buttonText = '删除规则';
     }
-    // Add other actions if needed
 
     modalBody.html(message);
     confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text(buttonText);
@@ -456,8 +447,6 @@ $('#confirmActionButton').click(function() {
     }
 
     setButtonProcessing(confirmButton, true);
-     // Only set processing on the original button if it's a container action (which reloads the page)
-     // For NAT delete, we handle refreshing the modal list instead
      if (actionType !== 'delete_nat_rule') {
         setButtonProcessing(buttonElement, true);
      }
@@ -469,18 +458,14 @@ $('#confirmActionButton').click(function() {
             url: `/container/nat_rule/${ruleId}`,
             type: 'DELETE',
             success: function(data) {
-                showToast(data.message, data.status); // Use status directly for toast type
+                showToast(data.message, data.status);
                 if (data.status === 'success' || data.status === 'warning') {
-                    // On success or warning (rule not found in DB), refresh the NAT rules list in the open info modal
-                    const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', ''); // Assuming info modal is the one to update
+                    const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', '');
                     if (containerNameInModalLabel) {
-                        loadNatRules(containerNameInModalLabel); // Reload the list for this container
+                        loadNatRules(containerNameInModalLabel);
                     } else {
-                         // If container name not found in label, force a full page reload (less ideal)
                          setTimeout(() => location.reload(), 1000);
                     }
-                } else { // status is 'error'
-                     // Error during deletion, rely on toast message
                 }
             },
             error: function(jqXHR) {
@@ -490,30 +475,28 @@ $('#confirmActionButton').click(function() {
             complete: function() {
                 const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
                 if (confirmModal) confirmModal.hide();
-                setButtonProcessing(buttonElement, false); // Stop processing on the delete button in the modal
+                setButtonProcessing(buttonElement, false);
             }
         });
 
-    } else { // Container actions like start, stop, restart, delete
+    } else {
         const containerName = currentConfirmContainerName;
-         // Map internal actionType to backend action string
-        let action = actionType.replace('_container', ''); // e.g., 'delete_container' -> 'delete'
+        let action = actionType.replace('_container', '');
 
         $.post(`/container/${containerName}/action`, { action: action }, function(data) {
-            showToast(data.message, data.status); // Use status directly for toast type
+            showToast(data.message, data.status);
             if (data.status === 'success') {
-                 setTimeout(() => location.reload(), 1000); // Reload page on success
+                 setTimeout(() => location.reload(), 1000);
             } else {
-                setButtonProcessing(buttonElement, false); // Stop processing on failure
+                setButtonProcessing(buttonElement, false);
             }
         }).fail(function(jqXHR) {
              const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
              showToast("操作失败: " + message, 'danger');
-             setButtonProcessing(buttonElement, false); // Stop processing on failure
+             setButtonProcessing(buttonElement, false);
         }).always(function() {
             const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
             if (confirmModal) confirmModal.hide();
-             // Button processing already handled
         });
     }
 });
@@ -537,10 +520,10 @@ $('#createContainerForm').submit(function(event) {
 
     var formData = form.serialize();
     $.post("{{ url_for('create_container') }}", formData, function(data) {
-        showToast(data.message, data.status); // Use status directly for toast type
+        showToast(data.message, data.status);
         if (data.status === 'success') {
             form[0].reset();
-             setTimeout(() => location.reload(), 1000); // Reload page on success
+             setTimeout(() => location.reload(), 1000);
         }
     }).fail(function(jqXHR) {
         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "创建容器请求失败。";
@@ -561,29 +544,28 @@ function performAction(containerName, action, buttonElement) {
         return;
     }
 
-    // For non-confirm actions (start, stop)
     setButtonProcessing(buttonElement, true);
 
     $.post(`/container/${containerName}/action`, { action: action }, function(data) {
-        showToast(data.message, data.status); // Use status directly for toast type
+        showToast(data.message, data.status);
         if (data.status === 'success') {
-             setTimeout(() => location.reload(), 1000); // Reload page on success
+             setTimeout(() => location.reload(), 1000);
         } else {
-             setButtonProcessing(buttonElement, false); // Stop processing on failure
+             setButtonProcessing(buttonElement, false);
         }
     }).fail(function(jqXHR) {
          const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
          showToast("操作失败: " + message, 'danger');
-         setButtonProcessing(buttonElement, false); // Stop processing on failure
+         setButtonProcessing(buttonElement, false);
     });
 }
 
 function showInfo(containerName, buttonElement) {
     const basicInfoContent = $('#basicInfoContent');
+    const natRulesListContainer = $('#natRulesList');
     const natRulesContent = $('#natRulesContent');
     const natRulesError = $('#natRulesError');
     const infoError = $('#infoError');
-    // #natOutput Removed from HTML
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
 
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
@@ -591,23 +573,23 @@ function showInfo(containerName, buttonElement) {
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
      infoError.addClass('d-none').text('');
-     // $('#natOutput').text('').removeClass('success error'); // Removed #natOutput
+
+    natRulesListContainer.show();
 
 
     setButtonProcessing(buttonElement, true);
 
-    // Fetch basic container info first
     $.get(`/container/${containerName}/info`, function(data) {
         if (data.status === 'NotFound') {
              basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
              infoError.removeClass('d-none').text(data.message);
              showToast("加载容器信息失败。", 'danger');
              setButtonProcessing(buttonElement, false);
-             infoModal.show(); // Show modal even on Not Found to show error
-             return; // Stop processing if container not found
+             infoModal.show();
+             natRulesListContainer.hide();
+             return;
         }
 
-        // Display basic info
         let infoHtml = `
             <p><strong>名称:</strong> ${data.name}</p>
             <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p>
@@ -627,8 +609,6 @@ function showInfo(containerName, buttonElement) {
              showToast(data.message, 'warning');
         }
 
-
-        // Then fetch and load NAT rules
         loadNatRules(containerName);
 
     }).fail(function(jqXHR) {
@@ -637,6 +617,7 @@ function showInfo(containerName, buttonElement) {
          infoError.removeClass('d-none').text(message);
          natRulesContent.html('<li>无法加载 NAT 规则。</li>');
          showToast("加载容器信息失败。", 'danger');
+         natRulesListContainer.hide();
     }).always(function() {
         setButtonProcessing(buttonElement, false);
         infoModal.show();
@@ -650,7 +631,7 @@ function loadNatRules(containerName) {
     natRulesError.addClass('d-none').text('');
 
      $.get(`/container/${containerName}/nat_rules`, function(data) {
-        natRulesContent.empty(); // Clear loading indicator
+        natRulesContent.empty();
 
         if (data.status === 'success' && data.rules && data.rules.length > 0) {
             data.rules.forEach(rule => {
@@ -670,7 +651,6 @@ function loadNatRules(containerName) {
         } else if (data.status === 'success' && data.rules && data.rules.length === 0) {
             natRulesContent.html('<li>没有通过本应用添加的 NAT 规则记录。</li>');
         } else {
-             // Handle API error listing rules
              natRulesContent.html('<li>加载 NAT 规则失败。</li>');
              natRulesError.removeClass('d-none').text(data.message || '未知错误获取规则列表。');
              showToast(data.message || "加载 NAT 规则失败。", 'danger');
@@ -684,7 +664,6 @@ function loadNatRules(containerName) {
 }
 
 function deleteNatRule(ruleId, buttonElement) {
-     // Use the generic confirmation modal for NAT rule deletion
     showConfirmationModal('delete_nat_rule', ruleId, buttonElement);
 }
 
@@ -745,13 +724,12 @@ function openNatModal(containerName) {
     $('#hostPort').val('');
     $('#containerPort').val('');
     $('#protocol').val('tcp');
-    $('#natContainerIP').val('正在获取 IP...'); // Indicate IP is loading
-    setButtonProcessing($('#addNatButton'), false); // Disable initially
+    $('#natContainerIP').val('正在获取 IP...');
+    setButtonProcessing($('#addNatButton'), false);
 
     var natModal = new bootstrap.Modal(document.getElementById('natModal'));
     natModal.show();
 
-    // Fetch container IP when modal opens
     $.get(`/container/${containerName}/info`, function(data) {
          if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
              const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
@@ -760,7 +738,7 @@ function openNatModal(containerName) {
              showToast("无法添加 NAT 规则: " + (data.status !== 'Running' ? '容器未运行' : '无法获取IP'), 'warning');
          } else {
             $('#natContainerIP').val(data.ip);
-            $('#addNatButton').prop('disabled', false).text('添加规则'); // Enable button
+            $('#addNatButton').prop('disabled', false).text('添加规则');
          }
     }).fail(function() {
          $('#natContainerIP').val('获取 IP 失败');
@@ -792,29 +770,20 @@ $('#addNatForm').submit(function(event) {
         container_port: containerPort,
         protocol: protocol
     }, function(data) {
-        // Handle success, warning (for duplicate), or error
-        showToast(data.message, data.status); // Use data.status for toast type
+        showToast(data.message, data.status);
 
         if (data.status === 'success' || data.status === 'warning') {
-            // On success or warning (duplicate detected), refresh the NAT rules list in the info modal
-            // Assuming the info modal is open and showing this container's rules
              const containerNameInInfoModal = $('#infoModalLabel').text().replace('容器信息: ', '');
              if (containerNameInInfoModal === containerName) {
-                 loadNatRules(containerName); // Reload the list if info modal is showing this container
-             } else {
-                 // If info modal is not open for this container, just rely on the toast and maybe suggest checking info modal
-                 // Or queue a refresh if the user opens the info modal? Simpler to just rely on toast.
+                 loadNatRules(containerName);
              }
 
-             // Optionally clear the form on success
              if (data.status === 'success') {
                  $('#hostPort').val('');
                  $('#containerPort').val('');
                  $('#protocol').val('tcp');
              }
 
-        } else { // status is 'error'
-            // Error message already in the toast
         }
     }).fail(function(jqXHR) {
         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "添加 NAT 规则请求失败。";
@@ -830,6 +799,7 @@ $('#infoModal').on('hidden.bs.modal', function () {
   $('#natRulesError').addClass('d-none').text('');
   $('#infoError').addClass('d-none').text('');
   $('#infoModalLabel').text('容器信息');
+   $('#natRulesList').hide();
 });
 
 $('#execModal').on('hidden.bs.modal', function () {
@@ -849,7 +819,7 @@ $('#natModal').on('hidden.bs.modal', function () {
     $('#protocol').val('tcp');
     $('#natModalLabel').text('为容器添加 NAT 规则');
     setButtonProcessing($('#addNatButton'), false);
-     $('#addNatButton').prop('disabled', false).text('添加规则'); // Reset button state and re-enable
+     $('#addNatButton').prop('disabled', false).text('添加规则');
 });
 
 
