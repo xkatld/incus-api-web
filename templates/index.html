@@ -9,7 +9,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body { padding-top: 20px; }
-        #execOutput, #infoContent, #natOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
+        #execOutput, #infoContent pre, #natOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
         #execOutput.success, #natOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
         #execOutput.error, #natOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
         #infoContent { background-color: #fff; border: none; padding: 0; } /* Adjust styling for structured info */
@@ -286,6 +286,7 @@
                 <div class="modal-body">
                     <div class="alert alert-warning" role="alert">
                         注意：这将在主机上添加一个临时的 iptables NAT 规则。规则在主机重启后会丢失，且需要此Web应用以足够权限(如 root 或 sudo)运行。
+                         成功添加规则时，iptables命令通常没有输出内容。
                     </div>
                     <form id="addNatForm">
                         <input type="hidden" id="natContainerName" name="container_name">
@@ -337,9 +338,19 @@
 
 <script>
 function showToast(message, type = 'info') {
+    // Map backend statuses to toast types
+    let toastType = 'info';
+    if (type === 'success') {
+        toastType = 'success';
+    } else if (type === 'error') {
+        toastType = 'danger'; // Bootstrap uses danger for errors
+    } else if (type === 'warning') {
+        toastType = 'warning';
+    }
+
     const toastContainer = $('#toastContainer');
     const toastHtml = `
-        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+        <div class="toast align-items-center text-bg-${toastType} border-0" role="alert" aria-live="assertive" aria-atomic="true">
             <div class="d-flex">
                 <div class="toast-body">
                     ${message}
@@ -381,9 +392,9 @@ function setButtonProcessing(button, isProcessing) {
     }
 }
 
-let currentConfirmAction = null; // 'action' or 'delete_nat'
-let currentConfirmContainerName = null; // For 'action'
-let currentConfirmRuleId = null; // For 'delete_nat'
+let currentConfirmAction = null; // 'restart_container', 'delete_container', 'delete_nat_rule'
+let currentConfirmContainerName = null; // For container actions
+let currentConfirmRuleId = null; // For 'delete_nat_rule'
 let currentConfirmButtonElement = null;
 
 
@@ -416,7 +427,7 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
          currentConfirmContainerName = null; // Not needed for NAT rule deletion by ID
          currentConfirmRuleId = nameOrId; // The rule ID
         modalTitle.text('确认删除 NAT 规则');
-        message = `确定要删除 ID 为 <strong>${nameOrId}</strong> 的 NAT 规则吗？此操作仅删除通过本应用添加的 iptables 规则记录。`;
+        message = `确定要删除 ID 为 <strong>${nameOrId}</strong> 的 NAT 规则吗？此操作将尝试移除对应的 iptables 规则记录 (仅针对通过本应用添加的规则)。`;
         buttonClass = 'btn-danger';
         buttonText = '删除规则';
     }
@@ -457,12 +468,12 @@ $('#confirmActionButton').click(function() {
             url: `/container/nat_rule/${ruleId}`,
             type: 'DELETE',
             success: function(data) {
-                showToast(data.message, data.status === 'success' ? 'success' : 'danger');
+                showToast(data.message, data.status); // Use status directly for toast type
                 if (data.status === 'success') {
                     // Refresh the NAT rules list in the open info modal
-                    const containerNameInModal = $('#infoModalLabel').text().replace('容器信息: ', ''); // Assuming label format
-                    if (containerNameInModal) {
-                        loadNatRules(containerNameInModal); // Reload the list for this container
+                    const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', ''); // Assuming label format
+                    if (containerNameInModalLabel) {
+                        loadNatRules(containerNameInModalLabel); // Reload the list for this container
                     } else {
                          // If container name not found in label, force a full page reload (less ideal)
                          setTimeout(() => location.reload(), 1000);
@@ -484,11 +495,9 @@ $('#confirmActionButton').click(function() {
         const containerName = currentConfirmContainerName;
          // Map internal actionType to backend action string
         let action = actionType.replace('_container', ''); // e.g., 'delete_container' -> 'delete'
-        action = action.replace('_container', ''); // remove it just in case
-        action = action.replace('_container', ''); // just being paranoid
 
         $.post(`/container/${containerName}/action`, { action: action }, function(data) {
-            showToast(data.message, data.status === 'success' ? 'success' : 'danger');
+            showToast(data.message, data.status); // Use status directly for toast type
             if (data.status === 'success') {
                  setTimeout(() => location.reload(), 1000); // Reload page on success
             } else {
@@ -525,7 +534,7 @@ $('#createContainerForm').submit(function(event) {
 
     var formData = form.serialize();
     $.post("{{ url_for('create_container') }}", formData, function(data) {
-        showToast(data.message, data.status === 'success' ? 'success' : 'danger');
+        showToast(data.message, data.status); // Use status directly for toast type
         if (data.status === 'success') {
             form[0].reset();
              setTimeout(() => location.reload(), 1000); // Reload page on success
@@ -553,7 +562,7 @@ function performAction(containerName, action, buttonElement) {
     setButtonProcessing(buttonElement, true);
 
     $.post(`/container/${containerName}/action`, { action: action }, function(data) {
-        showToast(data.message, data.status === 'success' ? 'success' : 'danger');
+        showToast(data.message, data.status); // Use status directly for toast type
         if (data.status === 'success') {
              setTimeout(() => location.reload(), 1000); // Reload page on success
         } else {
@@ -657,7 +666,7 @@ function loadNatRules(containerName) {
                     <li data-rule-id="${rule.id}">
                         <span class="rule-details">
                             <strong>ID ${rule.id}:</strong> 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}
-                            <br><small class="text-muted">创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
+                            <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
                         </span>
                         <span class="rule-actions">
                              <button class="btn btn-sm btn-danger" onclick="deleteNatRule(${rule.id}, this)">删除</button>
@@ -667,7 +676,7 @@ function loadNatRules(containerName) {
                 natRulesContent.append(ruleHtml);
             });
         } else if (data.status === 'success' && data.rules && data.rules.length === 0) {
-            natRulesContent.html('<li>没有通过本应用添加的 NAT 规则。</li>');
+            natRulesContent.html('<li>没有通过本应用添加的 NAT 规则记录。</li>');
         } else {
              // Handle API error listing rules
              natRulesContent.html('<li>加载 NAT 规则失败。</li>');
@@ -747,7 +756,7 @@ function openNatModal(containerName) {
     $('#natOutput').text('');
     $('#natOutput').removeClass('success error');
     $('#natContainerIP').val('正在获取 IP...'); // Indicate IP is loading
-    setButtonProcessing($('#addNatButton'), false);
+    setButtonProcessing($('#addNatButton'), false); // Disable initially
 
     var natModal = new bootstrap.Modal(document.getElementById('natModal'));
     natModal.show();
@@ -756,12 +765,12 @@ function openNatModal(containerName) {
     $.get(`/container/${containerName}/info`, function(data) {
          if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
              const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
-             $('#natContainerIP').val('获取 IP 失败: ' + (data.ip && data.ip === 'N/A' ? '未分配 IP' : ipError));
+             $('#natContainerIP').val('获取 IP 失败: ' + (data.ip && data.ip === 'N/A' ? '未分配 IP' : data.status !== 'Running' ? '容器未运行' : ipError));
              $('#addNatButton').prop('disabled', true).text('无法添加 (无IP)');
              showToast("无法添加 NAT 规则: " + (data.status !== 'Running' ? '容器未运行' : '无法获取IP'), 'warning');
          } else {
             $('#natContainerIP').val(data.ip);
-            $('#addNatButton').prop('disabled', false).text('添加规则');
+            $('#addNatButton').prop('disabled', false).text('添加规则'); // Enable button
          }
     }).fail(function() {
          $('#natContainerIP').val('获取 IP 失败');
@@ -797,18 +806,20 @@ $('#addNatForm').submit(function(event) {
         container_port: containerPort,
         protocol: protocol
     }, function(data) {
-        if (data.status === 'success' || data.status === 'warning') { // Allow warning status for DB record failure
+        // Handle success, warning (for duplicate), or error
+        showToast(data.message, data.status); // Use data.status for toast type
+
+        if (data.status === 'success' || data.status === 'warning') {
             outputArea.text('IPTABLES 输出:\n' + data.output);
             outputArea.addClass('success');
-            showToast(data.message, data.status); // Use data.status for toast type
-            if (data.status === 'success') {
-                // Consider closing modal or giving feedback after successful addition
-                // For now, leave modal open to see output
-            }
+            // On success or warning (duplicate detected), refresh the NAT rules list in the info modal
+             const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', ''); // Assuming info modal is the one to update
+             if (containerNameInModalLabel) {
+                 loadNatRules(containerNameInModalLabel); // Reload the list
+             }
         } else { // status is 'error'
             outputArea.text('添加规则失败:\n' + (data.output || data.message || '无详细输出'));
             outputArea.addClass('error');
-             showToast(data.message || "添加 NAT 规则失败。", 'danger');
         }
     }).fail(function(jqXHR) {
         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "添加 NAT 规则请求失败。";
@@ -847,7 +858,7 @@ $('#natModal').on('hidden.bs.modal', function () {
     $('#natOutput').removeClass('success error');
     $('#natModalLabel').text('为容器添加 NAT 规则');
     setButtonProcessing($('#addNatButton'), false);
-     $('#addNatButton').prop('disabled', false).text('添加规则'); // Reset button state
+     $('#addNatButton').prop('disabled', false).text('添加规则'); // Reset button state and re-enable
 });
 
 
