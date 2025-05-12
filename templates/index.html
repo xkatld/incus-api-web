@@ -9,9 +9,29 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body { padding-top: 20px; }
-        .container-actions button, .container-actions form { margin-right: 5px; display: inline-block; }
-        #execOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; }
-        #infoContent { white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+        .container-actions button, .container-actions form { margin-right: 5px; display: inline-block; vertical-align: middle; } /* Added vertical-align */
+        #execOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; } /* Added font styles */
+        #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; } /* Greenish background/border for success */
+        #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; } /* Reddish background/border for error */
+
+        #infoContent { white-space: pre-wrap; max-height: 400px; overflow-y: auto; font-family: monospace; font-size: 0.9em; } /* Added font styles */
+
+        /* Style for the processing state on buttons */
+        .btn-processing {
+            pointer-events: none; /* Prevent clicks while processing */
+            opacity: 0.7;
+        }
+        .btn-processing .spinner-border {
+             margin-right: 5px;
+        }
+
+        /* Toast container position */
+        #toastContainer {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050; /* Higher than modals */
+        }
     </style>
 </head>
 <body>
@@ -45,7 +65,7 @@
                             </select>
                         </div>
                         <div class="col-md-2 align-self-end">
-                            <button type="submit" class="btn btn-primary w-100">创建容器</button>
+                            <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
                         </div>
                     </div>
                 </form>
@@ -74,15 +94,15 @@
                     <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
                     <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td> <!-- 简化显示日期 -->
                     <td class="container-actions">
-                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}')">信息</button>
+                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
                         {% if c.status == 'Running' %}
-                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop')">停止</button>
-                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart')">重启</button>
-                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
+                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
+                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
+                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button> <!-- Exec doesn't disable the row button, handled in modal -->
                         {% elif c.status == 'Stopped' %}
-                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start')">启动</button>
+                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
                         {% endif %}
-                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete')">删除</button>
+                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
                     </td>
                 </tr>
                 {% else %}
@@ -90,7 +110,12 @@
                 {% endfor %}
             </tbody>
         </table>
-         <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button>
+         <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button> <!-- Simple reload button -->
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer">
+        <!-- Toasts will be appended here -->
     </div>
 
     <!-- 容器信息 Modal -->
@@ -123,37 +148,78 @@
                             <label for="commandInput" class="form-label">命令 (例如: ls -l / 或 apt update)</label>
                             <input type="text" class="form-control" id="commandInput" name="command" required>
                         </div>
-                        <button type="submit" class="btn btn-primary">执行</button>
+                        <button type="submit" class="btn btn-primary" id="execButton">执行</button>
                     </form>
                     <h6 class="mt-3">输出:</h6>
-                    <pre id="execOutput"></pre>
+                    <pre id="execOutput" class="mt-2"></pre>
                 </div>
             </div>
         </div>
     </div>
 
 <script>
-// 页面加载后尝试获取一次容器列表并更新（如果需要更动态的话）
-// $(document).ready(function() {
-//    // loadContainers(); // 可选：如果希望 JS 动态加载初始列表
-// });
+// Function to show Bootstrap Toast notifications
+function showToast(message, type = 'info') {
+    const toastContainer = $('#toastContainer');
+    const toastHtml = `
+        <div class="toast align-items-center text-bg-${type} border-0" role="alert" aria-live="assertive" aria-atomic="true">
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${message}
+                </div>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
+            </div>
+        </div>
+    `;
+    const toastElement = $(toastHtml);
+    toastContainer.append(toastElement);
+    const toast = new bootstrap.Toast(toastElement[0]);
+    toast.show();
+    // Remove toast from DOM after it's hidden
+    toastElement.on('hidden.bs.toast', function () {
+        $(this).remove();
+    });
+}
+
+// Function to set button to processing state
+function setButtonProcessing(button, isProcessing) {
+    const $button = $(button);
+    if (isProcessing) {
+        $button.data('original-text', $button.html()); // Store original content
+        $button.html('<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> 处理中...');
+        $button.addClass('btn-processing').prop('disabled', true);
+    } else {
+        $button.html($button.data('original-text')); // Restore original content
+        $button.removeClass('btn-processing').prop('disabled', false);
+    }
+}
 
 // 创建容器
 $('#createContainerForm').submit(function(event) {
     event.preventDefault();
-    var formData = $(this).serialize();
+    const form = $(this);
+    const submitButton = $('#createButton', form);
+    setButtonProcessing(submitButton, true);
+
+    var formData = form.serialize();
     $.post("{{ url_for('create_container') }}", formData, function(data) {
-        alert(data.message);
+        showToast(data.message, data.status === 'success' ? 'success' : 'danger');
         if (data.status === 'success') {
-            location.reload(); // 简单粗暴地刷新页面
+            // Optional: Clear form or redirect. For simplicity, refresh for now.
+            // form[0].reset(); // Or location.reload();
+             setTimeout(() => location.reload(), 1000); // Reload after a small delay
         }
     }).fail(function(jqXHR) {
-        alert("请求失败: " + jqXHR.responseJSON.message);
+        const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "创建容器请求失败。";
+        showToast("错误: " + message, 'danger');
+    }).always(function() {
+        setButtonProcessing(submitButton, false);
     });
 });
 
 // 执行操作 (启动/停止/重启/删除)
-function performAction(containerName, action) {
+// Added button element as the third argument
+function performAction(containerName, action, buttonElement) {
     let confirmMessage = `确定要 ${action} 容器 ${containerName} 吗?`;
     if (action === 'delete') {
         confirmMessage = `警告：这将永久删除容器 ${containerName} 及其所有数据！确定吗？`;
@@ -162,27 +228,41 @@ function performAction(containerName, action) {
         return;
     }
 
+    setButtonProcessing(buttonElement, true);
+
     $.post(`/container/${containerName}/action`, { action: action }, function(data) {
-        alert(data.message);
+        showToast(data.message, data.status === 'success' ? 'success' : 'danger');
         if (data.status === 'success') {
-            location.reload();
+             // Reload after a small delay if action was successful and likely changed state
+             setTimeout(() => location.reload(), 1000);
+        } else {
+             setButtonProcessing(buttonElement, false); // Only restore button if reload doesn't happen
         }
     }).fail(function(jqXHR) {
-         alert("操作失败: " + (jqXHR.responseJSON ? jqXHR.responseJSON.message : "未知错误"));
+         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : `执行 ${action} 操作请求失败。`;
+         showToast("操作失败: " + message, 'danger');
+         setButtonProcessing(buttonElement, false); // Restore button on failure
     });
 }
 
 // 显示容器信息
-function showInfo(containerName) {
-    $('#infoContent').text('正在加载...');
+// Added button element as the second argument, though not strictly necessary to disable it here
+function showInfo(containerName, buttonElement) {
+    $('#infoContent').text('正在加载...'); // Reset content
+    $('#infoContent').removeClass('success error'); // Remove previous state classes
     var infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
     infoModal.show();
 
+    // setButtonProcessing(buttonElement, true); // Optional: disable button while modal loads
+
     $.get(`/container/${containerName}/info`, function(data) {
         $('#infoContent').text(JSON.stringify(data, null, 2));
     }).fail(function() {
-        $('#infoContent').text('加载信息失败。');
+        $('#infoContent').text('加载信息失败。请检查容器状态或网络连接。');
+         $('#infoContent').addClass('error'); // Indicate error state
+    }).always(function() {
+        // setButtonProcessing(buttonElement, false); // Optional: restore button
     });
 }
 
@@ -190,8 +270,9 @@ function showInfo(containerName) {
 function openExecModal(containerName) {
     $('#execContainerName').val(containerName);
     $('#execModalLabel').text(`在 ${containerName} 内执行命令`);
-    $('#commandInput').val(''); // 清空上次的命令
-    $('#execOutput').text('');   // 清空上次的输出
+    $('#commandInput').val(''); // Clear previous command
+    $('#execOutput').text('');   // Clear previous output
+    $('#execOutput').removeClass('success error'); // Clear state classes
     var execModal = new bootstrap.Modal(document.getElementById('execModal'));
     execModal.show();
 }
@@ -199,20 +280,59 @@ function openExecModal(containerName) {
 // 执行容器内命令
 $('#execCommandForm').submit(function(event) {
     event.preventDefault();
+    const form = $(this);
+    const submitButton = $('#execButton', form);
+    const outputArea = $('#execOutput');
+
     var containerName = $('#execContainerName').val();
     var command = $('#commandInput').val();
-    $('#execOutput').text('正在执行...');
+
+    if (!command.trim()) {
+        showToast("请输入要执行的命令。", 'warning');
+        return;
+    }
+
+    outputArea.text('正在执行...');
+    outputArea.removeClass('success error'); // Remove any previous state classes
+
+    setButtonProcessing(submitButton, true);
 
     $.post(`/container/${containerName}/exec`, { command: command }, function(data) {
         if (data.status === 'success') {
-            $('#execOutput').text(data.output);
+            outputArea.text(data.output);
+            outputArea.addClass('success');
+            showToast("命令执行成功。", 'success');
         } else {
-            $('#execOutput').text('错误: \n' + data.output);
+            outputArea.text('命令执行失败:\n' + (data.output || '无详细输出'));
+            outputArea.addClass('error');
+            showToast("命令执行失败。", 'danger');
         }
     }).fail(function(jqXHR) {
-        $('#execOutput').text("请求失败: " + (jqXHR.responseJSON ? jqXHR.responseJSON.output : "未知错误"));
+        const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "执行命令请求失败。";
+        outputArea.text("请求失败:\n" + message);
+        outputArea.addClass('error');
+        showToast("请求失败。", 'danger');
+    }).always(function() {
+        setButtonProcessing(submitButton, false);
     });
 });
+
+// Bootstrap modal events to clear content when hidden (optional but good practice)
+$('#infoModal').on('hidden.bs.modal', function () {
+  $('#infoContent').text('正在加载...');
+  $('#infoContent').removeClass('success error');
+  $('#infoModalLabel').text('容器信息');
+});
+
+$('#execModal').on('hidden.bs.modal', function () {
+  $('#execContainerName').val('');
+  $('#commandInput').val('');
+  $('#execOutput').text('');
+  $('#execOutput').removeClass('success error');
+  $('#execModalLabel').text('在容器内执行命令');
+  setButtonProcessing($('#execButton'), false); // Ensure button state is reset if closed while processing
+});
+
 
 </script>
 </body>
