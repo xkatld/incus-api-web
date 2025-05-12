@@ -208,7 +208,7 @@ def get_container_ip(container_name):
     解析 incus info 的文本输出。
     返回 IP 地址字符串或 None。
     """
-    # Corrected: Pass only args after 'incus'
+    # Pass only args after 'incus'
     success, output = run_incus_command(['info', container_name], parse_json=False)
 
     if not success:
@@ -216,59 +216,54 @@ def get_container_ip(container_name):
         return None
 
     lines = output.splitlines()
-    # Use state flags to track current parsing context
+    ip_address = None
     in_network_state_section = False
-    in_ip_addresses_subsection = False
-    ip_address = None # Initialize ip_address to None
 
     for line in lines:
         line_stripped = line.strip()
 
-        # Detect main section start/end
+        # Step 1: Find the start of the "Network state:" section
         if line_stripped == 'Network state:':
             in_network_state_section = True
-            in_ip_addresses_subsection = False # Reset sub-section flag when entering new main section
-            continue # Move to the next line after the section header
+            continue # Skip the header line itself
 
-        # If we were in Network state and see a non-indented line ending in ':',
-        # it indicates the end of the Network state section and the start of a new main section.
-        # This is a heuristic to exit the network parsing state.
-        if in_network_state_section and not line.startswith(' ') and line_stripped.endswith(':'):
-             in_network_state_section = False
-             in_ip_addresses_subsection = False # Also exit sub-section state
-             continue # Process the new section header in the next iteration
+        # Step 2: If we are in the Network state section
+        if in_network_state_section:
+            # Step 3: Check if this line indicates the start of a new main section (end of Network state)
+            # A main section header is typically not indented and ends with a colon
+            # This acts as an exit condition for the Network state block parsing
+            if not line.startswith(' ') and line_stripped.endswith(':') and line_stripped != 'Network state:':
+                in_network_state_section = False # Exit network state parsing
+                # We found the start of a new section, no need to process this line for network info
+                continue # Move to processing the new section header or next line
 
-        # Detect subsection start within Network state
-        if in_network_state_section and line_stripped == 'IP addresses:':
-            in_ip_addresses_subsection = True
-            continue # Move to the next line after the subsection header
-
-        # If we are in the IP addresses subsection, try to match the IP address line
-        if in_ip_addresses_subsection:
-            # Look for lines that are indented, start with 'inet:', and contain '(global)'
-            # The line format is typically "      inet:  10.173.200.229/24 (global)" (indentation varies)
+            # Step 4: Within the Network state section, look for IP address lines
+            # IP address lines are indented and start with 'inet:' or 'inet6:'
+            # The specific target line is indented, starts with 'inet:', captures the address, and contains '(global)'
             # Regex: Starts with one or more spaces (\s+), followed by 'inet:', optional spaces (\s*),
             # captures the IP/mask group ([^ ]+), optional spaces (\s*), and ends with '(global)'.
+            # This regex is specifically for the IPv4 global address line format you provided.
             ip_match = re.match(r'^\s+inet:\s*([^ ]+)\s+\(global\)', line)
+
             if ip_match:
                 ip_with_mask = ip_match.group(1)
                 ip_address = ip_with_mask.split('/')[0]
-                app.logger.info(f"找到容器 {container_name} 的全局 IPv4 地址: {ip_address}")
-                return ip_address # Found a global IPv4, return it immediately
+                app.logger.info(f"成功找到容器 {container_name} 的全局 IPv4 地址: {ip_address}") # Log success explicitly
+                return ip_address # Found it, return immediately
 
-            # If we are in the IP addresses subsection but the current line does not
-            # start with indentation followed by 'inet:' or 'inet6:', it likely means
-            # we've exited the IP addresses block within the Network state section.
-            # This is another heuristic for state transition.
-            if in_ip_addresses_subsection and not re.match(r'^\s+(inet|inet6):', line):
-                 in_ip_addresses_subsection = False
-                 # Continue the loop, we might still be in the main Network state section
-                 # processing hardware addresses or other info, or we might exit
-                 # the main Network state section in the next iteration.
+            # If we are still in the Network state section but the current line
+            # is significantly less indented or doesn't look like interface/address info,
+            # we might have moved past the IP addresses subsection.
+            # However, the main section exit check above is usually sufficient.
+            # We continue looping within the network section until we find the IP or exit the section.
 
+
+        # If in_network_state_section is False, we just continue to the next line
+        # looking for the "Network state:" header again (though typically it appears only once)
+        pass # Do nothing if not in the network state section
 
     # If the loop finishes without finding a global IPv4 address
-    app.logger.warning(f"无法找到容器 {container_name} 的全局 IPv4 地址。")
+    app.logger.warning(f"在容器 {container_name} 的 incus info 输出中无法找到全局 IPv4 地址。")
     return None
 
 # --- Flask 路由 ---
