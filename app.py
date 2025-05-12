@@ -270,11 +270,11 @@ def remove_nat_rule_from_db(rule_id):
 
 def perform_iptables_delete_for_rule(rule_details):
     if not isinstance(rule_details, dict):
-        return False, "Invalid rule details provided for iptables deletion."
+        return False, "Invalid rule details provided for iptables deletion.", False
 
     required_keys = ['host_port', 'container_port', 'protocol', 'ip_at_creation']
     if not all(key in rule_details for key in required_keys):
-        return False, f"Missing required keys in rule details for iptables deletion. Requires: {required_keys}"
+        return False, f"Missing required keys in rule details for iptables deletion. Requires: {required_keys}", False
 
     try:
         host_port = rule_details['host_port']
@@ -297,15 +297,16 @@ def perform_iptables_delete_for_rule(rule_details):
         success, output = run_command(iptables_command, parse_json=False, timeout=10)
 
         if success:
-             app.logger.info(f"iptables delete successful for rule ID {rule_details.get('id', 'N/A')}. Output: '{output}'")
-             return True, f"成功从 iptables 移除规则 (主机端口 {host_port}/{protocol} 到容器端口 {container_port} @ {ip_at_creation})."
+             app.logger.info(f"iptables delete successful for rule ID {rule_details.get('id', 'N/A')}.")
+             return True, f"成功从 iptables 移除规则 (主机端口 {host_port}/{protocol} 到容器端口 {container_port} @ {ip_at_creation}).", False
         else:
-             app.logger.error(f"iptables delete failed for rule ID {rule_details.get('id', 'N/A')}: {output}")
-             return False, f"从 iptables 移除规则失败 (主机端口 {host_port}/{protocol} 到容器端口 {container_port} @ {ip_at_creation}): {output}"
+             is_bad_rule = "Bad rule" in output
+             app.logger.error(f"iptables delete failed for rule ID {rule_details.get('id', 'N/A')}: {output}. Is Bad Rule: {is_bad_rule}")
+             return False, f"从 iptables 移除规则失败 (主机端口 {host_port}/{protocol} 到容器端口 {container_port} @ {ip_at_creation}): {output}", is_bad_rule
 
     except Exception as e:
         app.logger.error(f"Exception during perform_iptables_delete_for_rule for rule ID {rule_details.get('id', 'N/A')}: {e}")
-        return False, f"执行 iptables 删除命令时发生异常: {str(e)}"
+        return False, f"执行 iptables 删除命令时发生异常: {str(e)}", False
 
 
 def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
@@ -553,6 +554,7 @@ def container_action(name):
              return jsonify({'status': 'error', 'message': f'删除容器前从数据库获取NAT规则失败: {rules}'}), 500
 
         failed_rule_deletions = []
+        warning_rule_deletions = [] # To track rules that failed with "Bad rule"
         if rules:
             app.logger.info(f"Found {len(rules)} associated NAT rules in DB for {name}. Attempting iptables delete...")
             for rule in rules:
@@ -561,33 +563,55 @@ def container_action(name):
                      failed_rule_deletions.append(f"Rule ID {rule.get('id', 'N/A')} (数据库记录不完整)")
                      continue
 
-                success_iptables_delete, iptables_message = perform_iptables_delete_for_rule(rule)
+                success_iptables_delete, iptables_message, is_bad_rule = perform_iptables_delete_for_rule(rule)
 
                 if not success_iptables_delete:
-                    failed_rule_deletions.append(f"规则 ID {rule['id']} (主机端口 {rule['host_port']}/{rule['protocol']} 到容器端口 {rule['container_port']} @ {rule['ip_at_creation']}): {iptables_message}")
-                    app.logger.error(f"Failed to delete iptables rule for container {name}, rule ID {rule['id']}: {iptables_message}")
+                    if is_bad_rule:
+                         warning_rule_deletions.append(iptables_message) # Store the specific warning message
+                         app.logger.warning(f"IPTables delete failed with 'Bad rule' for rule ID {rule.get('id', 'N/A')}: {iptables_message}. Proceeding with DB delete.")
+                         # If it's a "Bad rule" error, treat it as successful for the container delete flow
+                         # Remove the rule record from the database anyway as it doesn't exist in iptables
+                         db_success, db_msg = remove_nat_rule_from_db(rule['id'])
+                         if not db_success:
+                              app.logger.error(f"IPTables rule deletion reported 'Bad rule' for ID {rule['id']}, but failed to remove record from DB: {db_msg}")
+                              # If DB delete fails even here, maybe add to failed_rule_deletions?
+                              # For now, just log and let the orphan cleanup handle it later if necessary.
+                    else:
+                         # Other iptables deletion errors are treated as fatal for this rule
+                         failed_rule_deletions.append(iptables_message) # Store the specific error message
+                         app.logger.error(f"IPTables delete failed (not Bad rule) for rule ID {rule.get('id', 'N/A')}: {iptables_message}. Aborting container delete attempt for this rule.")
+
                 else:
+                    # iptables deletion succeeded for this rule, remove from DB record
                     db_success, db_msg = remove_nat_rule_from_db(rule['id'])
                     if not db_success:
                         app.logger.error(f"IPTables rule deleted for ID {rule['id']}, but failed to remove record from DB: {db_msg}")
+                        # Log this but don't fail container delete
 
-
+        # 3. Check if any iptables deletions failed (excluding "Bad rule")
         if failed_rule_deletions:
-            error_message = f"删除容器 {name} 前，未能移除所有关联的 NAT 规则 ({len(failed_rule_deletions)}/{len(rules) if rules else 0} 条)。请手动检查 iptables。<br>失败详情: " + "; ".join(failed_rule_deletions)
+            error_message = f"删除容器 {name} 前，未能移除所有关联的 NAT 规则 ({len(failed_rule_deletions)}/{len(rules) if rules else 0} 条 iptables 删除失败)。请手动检查 iptables。<br>失败详情: " + "; ".join(failed_rule_deletions)
+            if warning_rule_deletions:
+                 error_message += "<br>跳过的规则 (iptables 未找到): " + "; ".join(warning_rule_deletions)
             app.logger.error(error_message)
             return jsonify({'status': 'error', 'message': error_message}), 500
 
-        app.logger.info(f"All {len(rules) if rules else 0} associated NAT rules for {name} successfully removed from iptables (or none existed). Proceeding with Incus container deletion.")
+        # 4. If all NAT rules successfully removed from iptables (or reported 'Bad rule'), proceed with Incus container deletion
+        # We rely on the DB delete after 'Bad rule' or success to track state.
+        app.logger.info(f"All {len(rules) if rules else 0} associated NAT rules for {name} successfully handled for iptables delete (or none existed). Proceeding with Incus container deletion.")
         success_incus_delete, incus_output = run_incus_command(['delete', name, '--force'], parse_json=False, timeout=120)
 
         if success_incus_delete:
-            remove_container_from_db(name)
-            message = f'容器 {name} 及其关联的 {len(rules) if rules else 0} 条 NAT 规则已成功删除。'
+            remove_container_from_db(name) # This will also clean up any remaining DB NAT rules for this container
+            message = f'容器 {name} 及其关联的 {len(rules) if rules else 0} 条 NAT 规则记录已成功删除。'
+            if warning_rule_deletions:
+                 message += "<br>注意: 部分 iptables 规则在删除时已不存在。"
             app.logger.info(message)
             return jsonify({'status': 'success', 'message': message}), 200
         else:
             error_message = f'删除容器 {name} 失败: {incus_output}'
             app.logger.error(error_message)
+            # NAT rules were attempted to be removed from iptables. DB records might still exist.
             return jsonify({'status': 'error', 'message': error_message}), 500
 
     if action not in commands:
@@ -856,15 +880,18 @@ def delete_nat_rule(rule_id):
          'ip_at_creation': ip_at_creation
     }
 
-    success_iptables, iptables_message = perform_iptables_delete_for_rule(rule_details_for_iptables)
+    success_iptables, iptables_message, is_bad_rule = perform_iptables_delete_for_rule(rule_details_for_iptables)
 
-    if success_iptables:
+    if success_iptables or is_bad_rule:
         db_success, db_message = remove_nat_rule_from_db(rule_id)
 
         message = f'已成功删除ID为 {rule_id} 的NAT规则记录。'
+        if is_bad_rule:
+             message = f'数据库记录已删除 (ID {rule_id})。注意：该规则在 iptables 中未找到或已不存在。'
+
         if not db_success:
              message += f" 但从数据库移除记录失败: {db_message}"
-             app.logger.error(f"IPTables rule deleted for ID {rule_id}, but failed to remove record from DB: {db_message}")
+             app.logger.error(f"IPTables rule deletion succeeded or was 'Bad rule' for ID {rule_id}, but failed to remove record from DB: {db_message}")
              return jsonify({'status': 'warning', 'message': message}), 200
 
         return jsonify({'status': 'success', 'message': message}), 200
