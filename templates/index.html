@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Incus Web 管理器</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        body { padding-top: 20px; }
+        .container-actions button, .container-actions form { margin-right: 5px; display: inline-block; }
+        #execOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; }
+        #infoContent { white-space: pre-wrap; max-height: 400px; overflow-y: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Incus Web 管理器</h1>
+
+        {% if incus_error[0] %}
+        <div class="alert alert-danger" role="alert">
+            <strong>错误:</strong> 无法连接到 Incus 或执行命令失败。显示的数据可能来自数据库缓存。 <br>
+            详细信息: {{ incus_error[1] }}
+        </div>
+        {% endif %}
+
+        <!-- 创建容器区域 -->
+        <div class="card mb-4">
+            <div class="card-header">创建新容器</div>
+            <div class="card-body">
+                <form id="createContainerForm">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label for="containerName" class="form-label">容器名称</label>
+                            <input type="text" class="form-control" id="containerName" name="name" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="containerImage" class="form-label">选择镜像</label>
+                            <select class="form-select" id="containerImage" name="image" required>
+                                <option value="" selected disabled>请选择一个镜像</option>
+                                {% for image in images %}
+                                <option value="{{ image.name }}">{{ image.description }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-md-2 align-self-end">
+                            <button type="submit" class="btn btn-primary w-100">创建容器</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- 容器列表 -->
+        <h2>容器列表</h2>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>名称</th>
+                    <th>状态</th>
+                    <th>IP 地址</th>
+                    <th>镜像来源</th>
+                    <th>创建时间</th>
+                    <th>操作</th>
+                </tr>
+            </thead>
+            <tbody id="containerList">
+                {% for c in containers %}
+                <tr>
+                    <td>{{ c.name }}</td>
+                    <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
+                    <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
+                    <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
+                    <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td> <!-- 简化显示日期 -->
+                    <td class="container-actions">
+                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}')">信息</button>
+                        {% if c.status == 'Running' %}
+                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop')">停止</button>
+                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart')">重启</button>
+                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
+                        {% elif c.status == 'Stopped' %}
+                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start')">启动</button>
+                        {% endif %}
+                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete')">删除</button>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="6" class="text-center">没有找到容器或无法连接到 Incus。</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+         <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button>
+    </div>
+
+    <!-- 容器信息 Modal -->
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="infoModalLabel">容器信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <pre id="infoContent">正在加载...</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 执行命令 Modal -->
+    <div class="modal fade" id="execModal" tabindex="-1" aria-labelledby="execModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="execModalLabel">在容器内执行命令</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="execCommandForm">
+                        <input type="hidden" id="execContainerName" name="container_name">
+                        <div class="mb-3">
+                            <label for="commandInput" class="form-label">命令 (例如: ls -l / 或 apt update)</label>
+                            <input type="text" class="form-control" id="commandInput" name="command" required>
+                        </div>
+                        <button type="submit" class="btn btn-primary">执行</button>
+                    </form>
+                    <h6 class="mt-3">输出:</h6>
+                    <pre id="execOutput"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<script>
+// 页面加载后尝试获取一次容器列表并更新（如果需要更动态的话）
+// $(document).ready(function() {
+//    // loadContainers(); // 可选：如果希望 JS 动态加载初始列表
+// });
+
+// 创建容器
+$('#createContainerForm').submit(function(event) {
+    event.preventDefault();
+    var formData = $(this).serialize();
+    $.post("{{ url_for('create_container') }}", formData, function(data) {
+        alert(data.message);
+        if (data.status === 'success') {
+            location.reload(); // 简单粗暴地刷新页面
+        }
+    }).fail(function(jqXHR) {
+        alert("请求失败: " + jqXHR.responseJSON.message);
+    });
+});
+
+// 执行操作 (启动/停止/重启/删除)
+function performAction(containerName, action) {
+    let confirmMessage = `确定要 ${action} 容器 ${containerName} 吗?`;
+    if (action === 'delete') {
+        confirmMessage = `警告：这将永久删除容器 ${containerName} 及其所有数据！确定吗？`;
+    }
+    if (!confirm(confirmMessage)) {
+        return;
+    }
+
+    $.post(`/container/${containerName}/action`, { action: action }, function(data) {
+        alert(data.message);
+        if (data.status === 'success') {
+            location.reload();
+        }
+    }).fail(function(jqXHR) {
+         alert("操作失败: " + (jqXHR.responseJSON ? jqXHR.responseJSON.message : "未知错误"));
+    });
+}
+
+// 显示容器信息
+function showInfo(containerName) {
+    $('#infoContent').text('正在加载...');
+    var infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
+    $('#infoModalLabel').text(`容器信息: ${containerName}`);
+    infoModal.show();
+
+    $.get(`/container/${containerName}/info`, function(data) {
+        $('#infoContent').text(JSON.stringify(data, null, 2));
+    }).fail(function() {
+        $('#infoContent').text('加载信息失败。');
+    });
+}
+
+// 打开执行命令模态框
+function openExecModal(containerName) {
+    $('#execContainerName').val(containerName);
+    $('#execModalLabel').text(`在 ${containerName} 内执行命令`);
+    $('#commandInput').val(''); // 清空上次的命令
+    $('#execOutput').text('');   // 清空上次的输出
+    var execModal = new bootstrap.Modal(document.getElementById('execModal'));
+    execModal.show();
+}
+
+// 执行容器内命令
+$('#execCommandForm').submit(function(event) {
+    event.preventDefault();
+    var containerName = $('#execContainerName').val();
+    var command = $('#commandInput').val();
+    $('#execOutput').text('正在执行...');
+
+    $.post(`/container/${containerName}/exec`, { command: command }, function(data) {
+        if (data.status === 'success') {
+            $('#execOutput').text(data.output);
+        } else {
+            $('#execOutput').text('错误: \n' + data.output);
+        }
+    }).fail(function(jqXHR) {
+        $('#execOutput').text("请求失败: " + (jqXHR.responseJSON ? jqXHR.responseJSON.output : "未知错误"));
+    });
+});
+
+</script>
+</body>
+</html>
