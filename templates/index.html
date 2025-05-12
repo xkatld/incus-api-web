@@ -9,7 +9,7 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
         body { padding-top: 20px; }
-        .container-actions button, .container-actions form { margin-right: 5px; display: inline-block; vertical-align: middle; }
+        /* Removed custom styles for container-actions buttons as flexbox will handle layout */
         #execOutput { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
         #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
         #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
@@ -36,6 +36,10 @@
         .modal { z-index: 1040; }
         .modal-backdrop { z-index: 1039; }
 
+        /* Adjust vertical alignment for flex container within table cell */
+        .container-actions .d-flex {
+            align-items: center; /* Vertically center items if they have different heights */
+        }
     </style>
 </head>
 <body>
@@ -78,42 +82,50 @@
 
         <!-- 容器列表 -->
         <h2>容器列表</h2>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>名称</th>
-                    <th>状态</th>
-                    <th>IP 地址</th>
-                    <th>镜像来源</th>
-                    <th>创建时间</th>
-                    <th>操作</th>
-                </tr>
-            </thead>
-            <tbody id="containerList">
-                {% for c in containers %}
-                <tr>
-                    <td>{{ c.name }}</td>
-                    <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
-                    <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
-                    <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
-                    <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td> <!-- 简化显示日期 -->
-                    <td class="container-actions">
-                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
-                        {% if c.status == 'Running' %}
-                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
-                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
-                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
-                        {% elif c.status == 'Stopped' %}
-                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
-                        {% endif %}
-                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
-                    </td>
-                </tr>
-                {% else %}
-                <tr><td colspan="6" class="text-center">没有找到容器或无法连接到 Incus。</td></tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <!-- Add table-responsive wrapper -->
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>名称</th>
+                        <th>状态</th>
+                        <th>IP 地址</th>
+                        <th>镜像来源</th>
+                        <th>创建时间</th>
+                        <th>操作</th>
+                    </tr>
+                </thead>
+                <tbody id="containerList">
+                    {% for c in containers %}
+                    <tr>
+                        <td>{{ c.name }}</td>
+                        <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
+                        <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
+                        <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
+                        <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td> <!-- 简化显示日期 -->
+                        <td class="container-actions">
+                            <!-- Wrap buttons in a flex container -->
+                            <!-- Stack vertically on small screens (flex-column), horizontal on medium+ (flex-md-row) -->
+                            <!-- Use gap-1 for spacing between stacked buttons, gap-md-1 for horizontal spacing on medium+ -->
+                            <div class="d-flex flex-column flex-md-row gap-1 gap-md-1">
+                                <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
+                                {% if c.status == 'Running' %}
+                                <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
+                                <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
+                                <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
+                                {% elif c.status == 'Stopped' %}
+                                <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
+                                {% endif %}
+                                <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="6" class="text-center">没有找到容器或无法连接到 Incus。</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
          <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button>
     </div>
 
@@ -208,15 +220,24 @@ function showToast(message, type = 'info') {
 // Function to set button to processing state
 function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
+    // Check if the button element still exists in the DOM before trying to modify it
+    if (!$button.length) {
+         console.warn("Button element not found for processing state update.");
+         return;
+    }
+
     if (isProcessing) {
         $button.data('original-text', $button.html()); // Store original content
         const spinnerHtml = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
-        $button.html(spinnerHtml + ' 处理中...');
+        // Check if button text exists before adding spinner text
+        const buttonText = $button.text().trim();
+        $button.html(spinnerHtml + (buttonText ? ' 处理中...' : '')); // Add '处理中...' only if button had text
         $button.addClass('btn-processing').prop('disabled', true);
     } else {
         // Restore original content unless it was explicitly set otherwise (e.g., after delete might not exist)
         if ($button.data('original-text')) {
              $button.html($button.data('original-text'));
+             $button.data('original-text', null); // Clear stored data
         }
         $button.removeClass('btn-processing').prop('disabled', false);
     }
@@ -239,24 +260,28 @@ function showConfirmationModal(containerName, action, buttonElement) {
 
     let message = '';
     let buttonClass = 'btn-primary'; // Default class for confirm button
+    let buttonText = '确认';
 
     if (action === 'restart') {
         modalTitle.text('确认重启');
-        message = `确定要重启容器 ${containerName} 吗？`;
+        message = `确定要重启容器 <strong>${containerName}</strong> 吗？`; // Use strong for name
         buttonClass = 'btn-warning'; // Use warning style for restart confirmation
+        buttonText = '重启';
     } else if (action === 'delete') {
         modalTitle.text('确认删除');
         message = `<strong>警告：</strong> 这将永久删除容器 <strong>${containerName}</strong> 及其所有数据！确定吗？`;
         buttonClass = 'btn-danger'; // Use danger style for delete confirmation
+        buttonText = '删除';
     } else {
         // Fallback or handle other actions if needed
         modalTitle.text('确认操作');
-        message = `确定要对容器 ${containerName} 执行 ${action} 操作吗？`;
+        message = `确定要对容器 <strong>${containerName}</strong> 执行 ${action} 操作吗？`;
         buttonClass = 'btn-primary';
+        buttonText = '确认';
     }
 
     modalBody.html(message); // Use html to allow bold tags in warning message
-    confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text('确认'); // Set button text and style
+    confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text(buttonText); // Set button text and style
     setButtonProcessing(confirmButton, false); // Ensure confirm button is not processing when shown
 
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
@@ -268,8 +293,8 @@ function showConfirmationModal(containerName, action, buttonElement) {
 $('#confirmActionButton').click(function() {
     const containerName = currentConfirmContainerName;
     const action = currentConfirmAction;
-    const buttonElement = currentConfirmButtonElement;
-    const confirmButton = $(this);
+    const buttonElement = currentConfirmButtonElement; // The original button in the table row
+    const confirmButton = $(this); // The button in the confirmation modal
 
     if (!containerName || !action || !buttonElement) {
         showToast("确认信息丢失，无法执行操作。", 'danger');
@@ -281,8 +306,8 @@ $('#confirmActionButton').click(function() {
 
     // Disable the CONFIRM button in the modal while processing
     setButtonProcessing(confirmButton, true);
-    // Disable the ORIGINAL button in the row while processing (already done by performAction logic below, but keep for clarity if logic changes)
-    // setButtonProcessing(buttonElement, true);
+    // Also set the ORIGINAL button in the row to processing state
+    setButtonProcessing(buttonElement, true);
 
 
     $.post(`/container/${containerName}/action`, { action: action }, function(data) {
@@ -309,6 +334,8 @@ $('#confirmActionButton').click(function() {
 
 // Clear confirmation context and reset modal button when modal is hidden
 $('#confirmModal').on('hidden.bs.modal', function () {
+    // We specifically DO NOT reset the original button's processing state here,
+    // as that is handled by the AJAX .done/.fail/.always callbacks based on reload logic.
     currentConfirmAction = null;
     currentConfirmContainerName = null;
     currentConfirmButtonElement = null;
@@ -347,14 +374,18 @@ function performAction(containerName, action, buttonElement) {
 
     // Handle actions that require confirmation modal
     if (action === 'restart' || action === 'delete') {
+        // Immediately set the original button to processing state before showing the modal
+        // This provides faster feedback that the click was registered,
+        // even though the main action is pending confirmation.
+        // It will be fully disabled again by setButtonProcessing when the modal confirmation triggers the AJAX.
+        // setButtonProcessing(buttonElement, true); // Decided against this - better to only disable when AJAX starts
         showConfirmationModal(containerName, action, buttonElement);
         // DO NOT proceed with AJAX here. The AJAX will be triggered by the modal's confirm button click handler.
-        // Optionally disable the original button IMMEDIATELY when modal is opened, but waiting for confirm click is better UX.
         return; // Stop execution here
     }
 
     // Handle actions that DO NOT require confirmation modal (e.g., start, stop)
-    // (These actions already use the spinner and toast from the previous optimization)
+    // (These actions already use the spinner and toast)
     // For consistency and immediate feedback, we apply processing state now
     setButtonProcessing(buttonElement, true);
 
