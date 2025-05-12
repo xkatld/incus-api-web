@@ -167,37 +167,44 @@ def remove_container_from_db(name):
 
 
 def get_container_ip(container_name):
-    success, output = run_incus_command(['info', container_name], parse_json=False)
+    success, data = run_incus_command(['list', container_name, '--format', 'json'])
 
     if not success:
-        app.logger.warning(f"无法获取容器 {container_name} 的 incus info 输出: {output}")
+        app.logger.warning(f"无法获取容器 {container_name} 的列表信息以解析IP: {data}")
         return None
 
-    lines = output.splitlines()
-    ip_address = None
-    in_network_state_section = False
+    if not isinstance(data, list) or not data:
+        app.logger.warning(f"incus list for {container_name} returned unexpected data format or empty: {data}")
+        return None
 
-    for line in lines:
-        line_stripped = line.strip()
+    container_data = data[0]
 
-        if line_stripped == 'Network state:':
-            in_network_state_section = True
-            continue
+    if not isinstance(container_data, dict) or 'state' not in container_data or not isinstance(container_data['state'], dict):
+         app.logger.warning(f"incus list data for {container_name} missing 'state' or 'state' not a dict: {container_data}")
+         return None
 
-        if in_network_state_section:
-            if not line.startswith(' ') and line_stripped.endswith(':') and line_stripped != 'Network state:':
-                in_network_state_section = False
-                continue
+    container_state = container_data['state']
+    network_info = container_state.get('network')
 
-            ip_match = re.match(r'^\s+inet:\s*([^ ]+)\s+\(global\)', line)
+    if not isinstance(network_info, dict):
+        app.logger.warning(f"Container {container_name} 'state' does not contain network info or it's not a dict.")
+        return None
 
-            if ip_match:
-                ip_with_mask = ip_match.group(1)
-                ip_address = ip_with_mask.split('/')[0]
-                app.logger.info(f"成功从 incus info 解析出容器 {container_name} 的全局 IPv4 地址: {ip_address}")
-                return ip_address
+    for iface_name, iface_data in network_info.items():
+        if (iface_name.startswith('eth') or iface_name.startswith('enp') or iface_name.startswith('ens')) and isinstance(iface_data, dict):
+            addresses = iface_data.get('addresses')
+            if isinstance(addresses, list):
+                for addr_entry in addresses:
+                    if isinstance(addr_entry, dict):
+                        addr = addr_entry.get('address')
+                        family = addr_entry.get('family')
+                        scope = addr_entry.get('scope')
+                        if addr and family == 'inet' and scope == 'global':
+                            ip_address = addr.split('/')[0]
+                            app.logger.info(f"成功从 incus list JSON 解析出容器 {container_name} 的全局 IPv4 地址: {ip_address}")
+                            return ip_address
 
-    app.logger.warning(f"在容器 {container_name} 的 incus info 输出中无法找到全局 IPv4 地址 (用于NAT等功能)。")
+    app.logger.warning(f"在容器 {container_name} 的 incus list JSON 输出中无法找到全局 IPv4 地址 (用于NAT等功能)。请确保容器正在运行且已分配IP。")
     return None
 
 
