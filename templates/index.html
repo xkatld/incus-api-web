@@ -519,7 +519,7 @@ $('#createContainerForm').submit(function(event) {
     setButtonProcessing(submitButton, true);
 
     var formData = form.serialize();
-    $.post("{{ url_for('create_container') }}", formData, function(data) {
+    $.post("{{ url_for('create_container_web') }}", formData, function(data) {
         showToast(data.message, data.status);
         if (data.status === 'success') {
             form[0].reset();
