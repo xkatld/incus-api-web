@@ -721,7 +721,9 @@ def index():
         flash(f"镜像错误: {image_error[1]} 镜像列表可能无法加载。", 'warning')
     return render_template('index.html',
                            containers=containers,
-                           images=images_list)
+                           images=images_list,
+                           incus_error=incus_error,
+                           image_error=image_error)
 
 @app.route('/container/create', methods=['POST'])
 def create_container_web():
