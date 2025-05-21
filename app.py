@@ -10,7 +10,7 @@ import shlex
 import sys
 
 app = Flask(__name__)
-app.secret_key = 'your_secret_key_here' # Add a secret key for flashing messages
+app.secret_key = '请在这里替换成一个随机的、安全的字符串' # Flash 消息需要设置 secret key
 DATABASE_NAME = 'incus_manager.db'
 
 def get_db_connection():
@@ -219,19 +219,19 @@ def _get_container_raw_info(name):
     elif db_info:
         info_output = {
             'name': db_info['incus_name'],
-            'status': db_info.get('status', 'Unknown (from DB)'),
+            'status': db_info.get('status', '未知 (来自数据库)'),
             'status_code': 0,
             'type': 'container',
             'architecture': db_info.get('architecture', 'N/A'),
             'ephemeral': False,
-            'created_at': db_info.get('created_at', 'N/A (from DB)'),
+            'created_at': db_info.get('created_at', 'N/A (来自数据库)'),
             'profiles': [],
             'config': {},
             'devices': {},
             'snapshots': [],
-             'state': {'status': db_info.get('status', 'Unknown (from DB)'), 'status_code': 0, 'network': {}},
-            'description': db_info.get('image_source', 'N/A (from DB)'),
-            'ip': 'N/A (DB info)',
+             'state': {'status': db_info.get('status', '未知 (来自数据库)'), 'status_code': 0, 'network': {}},
+            'description': db_info.get('image_source', 'N/A (来自数据库)'),
+            'ip': 'N/A (数据库信息)',
             'live_data_available': False,
             'message': '无法从 Incus 获取实时信息，数据主要来自数据库快照。',
         }
@@ -821,6 +821,9 @@ def delete_nat_rule_logic(rule_id):
         app.logger.error(f"iptables delete command failed for rule ID {rule_id}: {iptables_message}")
         return False, message, 500
 
+
+# --- Web Endpoints ---
+
 @app.route('/')
 def index():
     containers, incus_error = get_containers_list_data()
@@ -833,7 +836,7 @@ def index():
 
     return render_template('index.html',
                            containers=containers,
-                           images=images)
+                           images=available_images) # Should use available_images from get_images_list_data
 
 @app.route('/container/create', methods=['POST'])
 def create_container_web():
@@ -847,6 +850,7 @@ def create_container_web():
 def container_action_web(name):
     action = request.form.get('action')
     if action == 'delete':
+        # Web delete action is handled by delete_container_logic and redirects
         success, message, status_code = delete_container_logic(name)
     else:
         success, message, status_code = perform_container_action_logic(name, action)
@@ -859,7 +863,13 @@ def exec_command_web(name):
     command_to_exec = request.form.get('command')
     success, message, output, status_code = execute_container_command_logic(name, command_to_exec)
 
-    flash_message = f"命令执行结果 ({'成功' if success else '失败'}): {message}\n---\n{output}" if output is not None else f"命令执行结果 ({'成功' if success else '失败'}): {message}"
+    flash_message = f"命令执行结果 ({'成功' if success else '失败'}): {message}"
+    # Avoid flashing large output directly, maybe just log it or indicate it's available
+    if output is not None:
+        flash_message += "\n--- 输出 ---\n" + output[:500] + ("..." if len(output) > 500 else "") # Limit output in flash
+        app.logger.info(f"Command output for {name} exec: {output}") # Log full output
+        flash_message += "\n(完整输出已记录到日志或可通过 API 获取)" # Inform user
+
     flash(flash_message, 'success' if success else 'danger')
 
     return redirect(url_for('index'))
@@ -871,24 +881,18 @@ def add_nat_rule_web(name):
     protocol = request.form.get('protocol')
     success, message, data, status_code = add_nat_rule_logic(name, host_port, container_port, protocol)
 
-    flash(message, 'success' if success else ('warning' if status_code == 200 else 'danger'))
+    # Flash category based on success and status code
+    flash_category = 'success' if success else ('warning' if status_code == 200 else 'danger')
+    flash(message, flash_category)
 
     return redirect(url_for('index'))
 
-
-@app.route('/container/nat_rule/<int:rule_id>', methods=['POST', 'DELETE'])
+@app.route('/container/nat_rule/<int:rule_id>', methods=['POST']) # Web forms usually use POST
 def delete_nat_rule_web(rule_id):
-    if request.method == 'POST': # Handle POST from form button
-        success, message, status_code = delete_nat_rule_logic(rule_id)
-    elif request.method == 'DELETE': # Handle DELETE from API or JS
-        success, message, status_code = delete_nat_rule_logic(rule_id)
-        # For API DELETE, return JSON instead of redirect
-        if success:
-            return jsonify({'status': 'success', 'message': message}), status_code
-        else:
-            return jsonify({'status': 'error', 'message': message}), status_code
-
-    flash(message, 'success' if success else ('warning' if status_code == 200 else 'danger'))
+    # This web endpoint only handles POST requests for deletion via a form button
+    success, message, status_code = delete_nat_rule_logic(rule_id)
+    flash_category = 'success' if success else ('warning' if status_code == 200 else 'danger')
+    flash(message, flash_category)
     return redirect(url_for('index'))
 
 
@@ -926,10 +930,8 @@ def api_create_container():
     image = data.get('image')
 
     success, message, status_code = create_container_logic(name, image)
-    if success:
-        return jsonify({'status': 'success', 'message': message}), status_code
-    else:
-        return jsonify({'status': 'error', 'message': message}), status_code
+    # API responses don't use flash or redirect, they return JSON
+    return jsonify({'status': 'success' if success else 'error', 'message': message}), status_code
 
 @app.route('/api/containers/<name>/action', methods=['POST'])
 def api_container_action(name):
@@ -942,18 +944,14 @@ def api_container_action(name):
         return jsonify({'status': 'error', 'message': '删除操作请使用 DELETE /api/containers/<name> 端点。'}), 400
 
     success, message, status_code = perform_container_action_logic(name, action)
-    if success:
-        return jsonify({'status': 'success', 'message': message}), status_code
-    else:
-        return jsonify({'status': 'error', 'message': message}), status_code
+    # API responses don't use flash or redirect, they return JSON
+    return jsonify({'status': 'success' if success else 'error', 'message': message}), status_code
 
 @app.route('/api/containers/<name>', methods=['DELETE'])
 def api_delete_container(name):
     success, message, status_code = delete_container_logic(name)
-    if success:
-        return jsonify({'status': 'success', 'message': message}), status_code
-    else:
-        return jsonify({'status': 'error', 'message': message}), status_code
+    # API responses don't use flash or redirect, they return JSON
+    return jsonify({'status': 'success' if success else 'error', 'message': message}), status_code
 
 @app.route('/api/containers/<name>/exec', methods=['POST'])
 def api_exec_command(name):
@@ -966,8 +964,9 @@ def api_exec_command(name):
 
     response_data = {'status': 'success' if success else 'error', 'message': message}
     if output is not None:
-        response_data['output'] = output
+        response_data['output'] = output # API can return full output
 
+    # API responses don't use flash or redirect, they return JSON
     return jsonify(response_data), status_code
 
 @app.route('/api/containers/<name>/nat_rules', methods=['GET'])
@@ -976,6 +975,7 @@ def api_list_nat_rules(name):
     if success:
         return jsonify({'status': 'success', 'message': 'NAT 规则列表获取成功。', 'data': rules}), 200
     else:
+        # get_nat_rules_for_container returns the error message on failure
         return jsonify({'status': 'error', 'message': rules}), 500
 
 @app.route('/api/containers/<name>/nat_rules', methods=['POST'])
@@ -989,6 +989,7 @@ def api_add_nat_rule(name):
 
     success, message, rule_data, status_code = add_nat_rule_logic(name, host_port, container_port, protocol)
 
+    # API responses don't use flash or redirect, they return JSON
     response_data = {'status': 'success' if success else ('warning' if status_code == 200 else 'error'), 'message': message}
     if rule_data is not None:
          response_data.update(rule_data)
@@ -998,10 +999,8 @@ def api_add_nat_rule(name):
 @app.route('/api/nat_rules/<int:rule_id>', methods=['DELETE'])
 def api_delete_nat_rule(rule_id):
     success, message, status_code = delete_nat_rule_logic(rule_id)
-    if success:
-        return jsonify({'status': 'success', 'message': message}), status_code
-    else:
-        return jsonify({'status': 'error', 'message': message}), status_code
+    # API responses don't use flash or redirect, they return JSON
+    return jsonify({'status': 'success' if success else ('warning' if status_code == 200 else 'error'), 'message': message}), status_code
 
 
 def check_permissions():
