@@ -31,7 +31,7 @@ python3 app.py
 
 ## 拉取镜像
 ~~~
-#Debian12 ssh root 123456
+# Debian12 ssh root 123456
 bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/image/debian12.sh)"
 ~~~
 
