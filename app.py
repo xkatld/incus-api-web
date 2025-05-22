@@ -972,7 +972,7 @@ def delete_nat_rule(rule_id):
         return jsonify({'status': 'error', 'message': message}), 500
 
 
-def main():
+def initialize_and_run():
     print("\n============================================")
     print(" Incus Web 管理器启动信息")
     print("============================================")
@@ -1113,5 +1113,6 @@ def main():
     print("启动 Flask Web 服务器...")
     app.run(debug=True, host='0.0.0.0', port=5000)
 
+
 if __name__ == '__main__':
-    main()
+    initialize_and_run()
