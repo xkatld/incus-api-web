@@ -14,11 +14,25 @@ from functools import wraps
 
 app = Flask(__name__)
 
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
+# --- 安全配置 ---
+# ⚠️ 警告: 硬编码敏感信息不安全，生产环境请使用环境变量或配置文件
+#
+# 将下面的 DEFAULT_FLASK_SECRET_KEY 和 DEFAULT_API_KEY 的值
+# 替换为你自己生成的一段固定、随机性强的字符串。
+# 例如，你可以运行 secrets.token_hex(16) 生成一个32字符的字符串作为 SECRET_KEY 的默认值
+# 和运行 secrets.token_hex(32) 生成一个64字符的字符串作为 API_SECRET_KEY 的默认值。
+# 硬编码默认值仍然不安全，强烈建议在生产环境通过环境变量设置覆盖它们！
+
+# --- 示例默认值 (请务必替换为你自己的随机字符串!) ---
+DEFAULT_FLASK_SECRET_KEY = "d7e3f8b1a5c9e0d6f2a4c8b0e6d1f9a3" # 示例 Flask Session 密钥 (32字符hex)
+DEFAULT_API_KEY = "f9e1d8c0b7a6f5e4d3c2b1a0f9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b3a2f1e0" # 示例 API 密钥 (64字符hex)
+# ---------------------------------------------
+
+app.secret_key = os.environ.get('SECRET_KEY', DEFAULT_FLASK_SECRET_KEY) # Flask Session密钥
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpassword')
-API_SECRET_KEY = os.environ.get('API_SECRET_KEY', secrets.token_hex(32))
-API_SECRET_HASH = hashlib.sha256(API_SECRET_KEY.encode('utf-8')).hexdigest()
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpassword') # ⚠️ 请修改此默认密码
+API_SECRET_KEY = os.environ.get('API_SECRET_KEY', DEFAULT_API_KEY) # ⚠️ 请修改此默认密钥
+API_SECRET_HASH = hashlib.sha256(API_SECRET_KEY.encode('utf-8')).hexdigest() # 服务器端存储哈希用于比较
 
 DATABASE_NAME = 'incus_manager.db'
 
