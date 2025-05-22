@@ -28,21 +28,12 @@
         }
         .modal { z-index: 1050; }
         .modal-backdrop { z-index: 1049; }
-        /* .container-actions .d-flex-desktop { */ /* No longer directly used due to dropdown */
-            /* align-items: center; */
-            /* display: none !important; */
-        /* } */
         @media (min-width: 768px) {
-            /* .container-actions .d-flex-desktop { */ /* No longer directly used */
-                /* display: flex !important; */
-                /* flex-direction: row; */
-                /* gap: 0.25rem; */
-            /* } */
              .container-list-mobile {
                 display: none;
              }
-             .container-list-desktop { /* This class is now on the table */
-                 /* display: block; */ /* Bootstrap d-md-block handles this */
+             .container-list-desktop {
+                 display: block;
              }
         }
          .container-list-mobile {
@@ -96,31 +87,42 @@
             padding: 20px;
         }
         .main-content-wrapper {
-            min-height: calc(100vh - 56px - 48px); /* Adjust based on header/footer height if any */
+            min-height: calc(100vh - 56px - 48px);
         }
         .create-container-card {
             background-color: transparent !important;
-            border: 1px solid #dee2e6 !important; /* Light border */
+            border: 1px solid #dee2e6 !important;
         }
         .create-container-card .card-header {
             background-color: transparent !important;
-            border-bottom: 1px solid #dee2e6 !important; /* Light border for header separation */
-            color: inherit !important; /* Inherit text color */
+            border-bottom: 1px solid #dee2e6 !important;
+            color: inherit !important;
             font-weight: bold;
         }
         .truncate-text {
-            max-width: 180px; /* Adjust this width as needed */
+            max-width: 180px; 
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
             display: inline-block;
-            vertical-align: middle; /* Helps align if text is shorter than max-width */
+            vertical-align: middle; 
         }
-        .table-actions-dropdown .dropdown-menu {
-            min-width: auto; /* Allow dropdown to be as wide as its content */
+        .actions-dropdown .dropdown-menu {
+            min-width: auto; 
         }
-        .table-actions-dropdown .dropdown-item {
-            padding: .25rem 1rem; /* Adjust padding for dropdown items */
+        .actions-dropdown .dropdown-item {
+            padding: .25rem 1rem; 
+        }
+        .desktop-list-header {
+            font-weight: bold;
+            background-color: #f8f9fa; /* Light background for header */
+            border-bottom: 2px solid #dee2e6;
+        }
+        .desktop-list-row {
+            border-bottom: 1px solid #eee;
+        }
+        .desktop-list-row:last-child {
+            border-bottom: none;
         }
 
     </style>
@@ -153,36 +155,34 @@
                     </button>
                 </div>
 
-                <div class="table-responsive">
-                    <table class="table table-striped table-hover align-middle container-list-desktop d-none d-md-block">
-                        <thead class="table-light">
-                            <tr>
-                                <th>名称</th>
-                                <th>状态</th>
-                                <th>IP 地址</th>
-                                <th>镜像来源</th>
-                                <th>创建时间</th>
-                                <th class="text-center">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="containerListDesktop">
+                <div class="container-list-desktop d-none d-md-block">
+                    <div class="row gx-3 py-2 desktop-list-header">
+                        <div class="col-md-2">名称</div>
+                        <div class="col-md-1">状态</div>
+                        <div class="col-md-2">IP 地址</div>
+                        <div class="col-md-3">镜像来源</div>
+                        <div class="col-md-2">创建时间</div>
+                        <div class="col-md-2 text-center">操作</div>
+                    </div>
+                    <div id="containerListDesktopItems">
+                        {% if containers %}
                             {% for c in containers %}
-                            <tr>
-                                <td>{{ c.name }}</td>
-                                <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
-                                <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
-                                <td>
+                            <div class="row gx-3 py-2 align-items-center desktop-list-row">
+                                <div class="col-md-2">{{ c.name }}</div>
+                                <div class="col-md-1"><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></div>
+                                <div class="col-md-2">{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</div>
+                                <div class="col-md-3">
                                     <div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">
                                         {{ c.image_source if c.image_source else 'N/A' }}
                                     </div>
-                                </td>
-                                <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td>
-                                <td class="text-center container-actions">
-                                    <div class="dropdown table-actions-dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="actionsDropdown-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
+                                </div>
+                                <div class="col-md-2">{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</div>
+                                <div class="col-md-2 text-center">
+                                    <div class="dropdown actions-dropdown">
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="actionsDropdownDesktop-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
                                             操作
                                         </button>
-                                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdown-{{ loop.index }}">
+                                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdownDesktop-{{ loop.index }}">
                                             <li><button class="dropdown-item" type="button" onclick="showInfo('{{ c.name }}', this)">信息</button></li>
                                             {% if c.status == 'Running' %}
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button></li>
@@ -196,14 +196,15 @@
                                             <li><button class="dropdown-item text-danger" type="button" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button></li>
                                         </ul>
                                     </div>
-                                </td>
-                            </tr>
-                            {% else %}
-                            <tr><td colspan="6" class="text-center">没有找到容器或无法连接到 Incus。</td></tr>
+                                </div>
+                            </div>
                             {% endfor %}
-                        </tbody>
-                    </table>
+                        {% else %}
+                            <div class="py-3 text-center">没有找到容器或无法连接到 Incus。</div>
+                        {% endif %}
+                    </div>
                 </div>
+
 
                 <div class="container-list-mobile d-block d-md-none mt-3">
                     {% for c in containers %}
@@ -221,7 +222,7 @@
                             </p>
                             <p class="card-text mb-3"><small class="text-muted">创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
                             <div class="card-actions">
-                                <div class="dropdown table-actions-dropdown w-100">
+                                <div class="dropdown actions-dropdown w-100">
                                     <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" id="mobileActionsDropdown-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
                                         操作
                                     </button>
