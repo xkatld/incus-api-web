@@ -943,6 +943,28 @@ def delete_nat_rule(rule_id):
 
 
 def main():
+    print("\n============================================")
+    print(" Incus Web 管理器启动信息")
+    print("============================================")
+    print(f"默认管理用户名: {ADMIN_USERNAME}")
+    print(f"默认管理密码: {ADMIN_PASSWORD}")
+    print("--------------------------------------------")
+    print("API 认证信息:")
+    print(f"API 密钥 (用于生成签名): {API_SECRET_KEY}")
+    print(f"时间戳容忍度: {TIMESTAMP_TOLERANCE} 秒")
+    print("--------------------------------------------")
+    print("API 调用方法示例 (使用 Headers):")
+    example_timestamp = int(time.time())
+    example_timestamp_str = str(example_timestamp)
+    example_signature = hashlib.sha256((API_SECRET_KEY + example_timestamp_str).encode('utf-8')).hexdigest()
+    print(f"示例时间戳 (当前时刻): {example_timestamp_str}")
+    print(f"对应的示例签名: {example_signature}")
+    print("API 请求 Headers 应包含:")
+    print(f"  X-API-Timestamp: [当前 Unix 时间戳 (秒)]")
+    print(f"  X-API-Signature: SHA256(API_SECRET_KEY + X-API-Timestamp) 的十六进制表示")
+    print("============================================\n")
+
+
     if not os.path.exists(DATABASE_NAME):
         print(f"错误：数据库文件 '{DATABASE_NAME}' 未找到。")
         print("请先运行 'python init_db.py' 来初始化数据库。")
