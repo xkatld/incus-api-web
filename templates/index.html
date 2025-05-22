@@ -12,11 +12,17 @@
             background-color: #f8f9fa;
             color: #3c4043;
         }
+        body.login-page {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            min-height: 100vh;
+        }
         .main-content { padding-top: 1.5rem; padding-bottom: 2rem; }
         h1.page-title { font-size: 1.75rem; color: #1a73e8; }
         h2.section-title { font-size: 1.3rem; margin-top: 0; margin-bottom: 1rem; padding-bottom: 0.5rem; color: #202124; }
-        /* .left-column h2.section-title { border-bottom: 1px solid #e0e0e0; } */ /* Style removed as column structure changed */
-        /* .right-column .section-title { padding-bottom: 0.25rem; margin-bottom: 0.75rem; } */ /* Style removed as column structure changed */
+        .left-column h2.section-title { border-bottom: 1px solid #e0e0e0; }
+        .right-column .section-title { padding-bottom: 0.25rem; margin-bottom: 0.75rem; }
 
         .btn {
             border-radius: 4px; font-weight: 500; padding: 0.5rem 1rem;
@@ -85,8 +91,12 @@
             overflow: visible; 
         }
 
-
-        #loginFormContainer { max-width: 400px; margin: 0 auto; padding: 2rem 0; }
+        #loginFormContainer { 
+            max-width: 400px; 
+            margin-left: auto;
+            margin-right: auto;
+            /* padding: 2rem 0; original padding */
+        }
         #loginFormContainer .form-title { text-align: center; font-size: 1.75rem; color: #202124; margin-bottom: 1.5rem; }
 
         #execOutput { white-space: pre-wrap; background-color: #f1f3f4; border:1px solid #dadce0; padding:1rem; max-height:350px; overflow-y:auto; font-family:'Roboto Mono',monospace; font-size:.85em; border-radius:4px;}
@@ -105,17 +115,16 @@
         #natRulesList li { background-color:#fff; border:1px solid #e0e0e0; margin-bottom:.75rem; padding:.75rem 1rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:.85rem; }
         #natRulesList li:hover { background-color:#f1f3f4; }
 
-        /* .sticky-top-form-container { position: sticky; top: 20px; } */ /* Removed stickiness for now */
+        .sticky-top-form-container { 
+            position: sticky; 
+            top: 20px; 
+        }
         .create-form-panel { background-color: #fff; padding: 1.25rem; border-radius: 8px; border: 1px solid #e0e0e0; }
         .offcanvas-header { border-bottom:1px solid #e0e0e0; }
-        .pagination .page-link { color:#1a73e8; border-radius:4px; margin:0 2px; border:1px solid #dadce0; background-color:#fff; }
-        .pagination .page-item.active .page-link { z-index:3; color:#fff; background-color:#1a73e8; border-color:#1a73e8; }
-        .pagination .page-item.disabled .page-link { color:#70757a; pointer-events:none; background-color:#fff; border-color:#dadce0; }
-        .pagination .page-link:hover { z-index:2; color:#1765cc; background-color:#f1f3f4; border-color:#c8cbcf; }
-
+      
     </style>
 </head>
-<body>
+<body {% if not session.logged_in %}class="login-page"{% endif %}>
     {% if session.logged_in %}
     <div class="container main-content">
         <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
@@ -129,55 +138,57 @@
         </div>
         {% endif %}
 
-        <div class="mb-4"> 
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h2 class="section-title mb-0">容器列表</h2>
-                <div>
-                    <button class="btn btn-sm btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCreateContainer" aria-controls="offcanvasCreateContainer">创建容器</button>
-                    <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新列表</button>
+        <div class="row g-lg-4">
+            <div class="col-lg-7 order-lg-1 left-column">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="section-title mb-0">容器列表</h2>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCreateContainer" aria-controls="offcanvasCreateContainer">创建容器</button>
+                        <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新列表</button>
+                    </div>
+                </div>
+
+                <div class="container-list-desktop d-none d-lg-block">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th class="col-name">名称</th>
+                                <th class="col-status">状态</th>
+                                <th class="col-ip">IP 地址</th>
+                                <th class="col-image">镜像来源</th>
+                                <th class="col-created">创建时间</th>
+                                <th class="col-actions">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="containerListDesktop">
+                        </tbody>
+                    </table>
+                </div>
+                
+                <div class="container-list-mobile d-block d-lg-none mt-3">
                 </div>
             </div>
 
-            <div class="container-list-desktop d-none d-lg-block">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th class="col-name">名称</th>
-                            <th class="col-status">状态</th>
-                            <th class="col-ip">IP 地址</th>
-                            <th class="col-image">镜像来源</th>
-                            <th class="col-created">创建时间</th>
-                            <th class="col-actions">操作</th>
-                        </tr>
-                    </thead>
-                    <tbody id="containerListDesktop">
-                    </tbody>
-                </table>
-            </div>
-            <nav id="paginationDesktop" aria-label="Desktop pagination" class="mt-3 d-none d-lg-block"></nav>
-
-            <div class="container-list-mobile d-block d-lg-none mt-3">
-            </div>
-            <nav id="paginationMobile" aria-label="Mobile pagination" class="mt-3 d-block d-lg-none"></nav>
-        </div>
-
-        <div class="d-none d-lg-block mb-4"> 
-            <h2 class="section-title">创建新容器</h2>
-            <div class="create-form-panel">
-                <form id="createContainerForm">
-                    <div class="row g-3">
-                        <div class="col-12"><label for="containerName" class="form-label">容器名称</label><input type="text" class="form-control" id="containerName" name="name" required></div>
-                        <div class="col-12">
-                            <label for="containerImage" class="form-label">选择镜像</label>
-                            <select class="form-select" id="containerImage" name="image" required>
-                                <option value="" selected disabled>请选择镜像</option>
-                                {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
-                            </select>
-                            {% if image_error[0] %}<div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>{% endif %}
-                        </div>
-                        <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button></div>
+            <div class="col-lg-5 order-lg-2 d-none d-lg-block right-column">
+                <div class="sticky-top-form-container">
+                    <h2 class="section-title">创建新容器</h2>
+                    <div class="create-form-panel">
+                        <form id="createContainerForm">
+                            <div class="row g-3">
+                                <div class="col-12"><label for="containerName" class="form-label">容器名称</label><input type="text" class="form-control" id="containerName" name="name" required></div>
+                                <div class="col-12">
+                                    <label for="containerImage" class="form-label">选择镜像</label>
+                                    <select class="form-select" id="containerImage" name="image" required>
+                                        <option value="" selected disabled>请选择镜像</option>
+                                        {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
+                                    </select>
+                                    {% if image_error[0] %}<div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>{% endif %}
+                                </div>
+                                <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button></div>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
         </div>
     </div>
@@ -203,7 +214,7 @@
     </div>
     {% else %}
     <div class="container">
-        <div id="loginFormContainer" class="my-5">
+        <div id="loginFormContainer" class="py-5">
              <h2 class="form-title">管理员登录</h2>
              <form method="POST" action="{{ url_for('login') }}">
                  <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
@@ -226,25 +237,19 @@
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     let allContainers = [];
-    let currentPage = 1;
-    const itemsPerPage = 5; 
 
-    function initContainersAndPagination(containersData) {
+    function initializeContainerData(containersData) {
         allContainers = Array.isArray(containersData) ? containersData : [];
-        currentPage = 1;
-        renderPaginatedContainers();
+        renderAllContainers();
     }
 
-    function renderPaginatedContainers() {
-        const startIndex = (currentPage - 1) * itemsPerPage;
-        const paginatedContainers = allContainers.slice(startIndex, startIndex + itemsPerPage);
-        renderContainerListDesktop(paginatedContainers, startIndex);
-        renderContainerListMobile(paginatedContainers, startIndex); 
-        renderPaginationControls();
+    function renderAllContainers() {
+        renderContainerListDesktop(allContainers);
+        renderContainerListMobile(allContainers);
     }
 
-    function buildActionDropdown(c, indexSuffix, isMobile = false) {
-        const dropdownId = `actionsDropdown${isMobile ? 'Mobile' : 'Desktop'}${indexSuffix}`;
+    function buildActionDropdown(c, index, isMobile = false) {
+        const dropdownId = `actionsDropdown${isMobile ? 'Mobile' : 'Desktop'}${index}`;
         let actionsHtml = `<div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="${dropdownId}" data-bs-toggle="dropdown" aria-expanded="false">操作</button>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="${dropdownId}">
@@ -263,10 +268,12 @@
         return actionsHtml;
     }
 
-    function renderContainerListDesktop(containers, startIndex) {
+    function renderContainerListDesktop(containers) {
         const tbody = $('#containerListDesktop').empty();
-        if (!allContainers.length) { tbody.html('<tr><td colspan="6" class="text-center py-4">没有找到容器。</td></tr>'); return; }
-        if (!containers.length) { tbody.html('<tr><td colspan="6" class="text-center py-4">当前页没有容器。</td></tr>'); return; }
+        if (!containers.length) { 
+            tbody.html('<tr><td colspan="6" class="text-center py-4">没有找到容器。</td></tr>'); 
+            return; 
+        }
         containers.forEach((c, i) => {
             const statusBadge = c.status === 'Running' ? 'success' : c.status === 'Stopped' ? 'danger' : 'secondary';
             const createdDate = c.created_at ? c.created_at.split('T')[0] : 'N/A';
@@ -280,15 +287,17 @@
                 <td class="col-ip" title="${containerIp}">${containerIp}</td>
                 <td class="col-image" title="${containerImage}">${containerImage}</td>
                 <td class="col-created" title="${createdDate}">${createdDate}</td>
-                <td class="col-actions">${buildActionDropdown(c, startIndex + i)}</td>
+                <td class="col-actions">${buildActionDropdown(c, i)}</td>
             </tr>`);
         });
     }
 
-    function renderContainerListMobile(containers, startIndex) {
+    function renderContainerListMobile(containers) {
         const mobileList = $('.container-list-mobile').empty();
-        if (!allContainers.length) { mobileList.html('<div class="alert alert-info text-center">没有找到容器。</div>'); return; }
-        if (!containers.length) { mobileList.html('<div class="alert alert-info text-center">当前页没有容器。</div>'); return; }
+        if (!containers.length) { 
+            mobileList.html('<div class="alert alert-info text-center">没有找到容器。</div>'); 
+            return; 
+        }
         containers.forEach((c, i) => {
             const statusBadge = c.status === 'Running' ? 'success' : c.status === 'Stopped' ? 'danger' : 'secondary';
             mobileList.append(`<div class="card mb-3">
@@ -300,43 +309,13 @@
                     <p class="card-text mb-1"><small>镜像:</small> ${c.image_source || 'N/A'}</p>
                     <p class="card-text mb-2"><small>创建时间:</small> ${c.created_at ? c.created_at.split('T')[0] : 'N/A'}</p>
                 </div>
-                <div class="card-footer card-actions-dropdown">${buildActionDropdown(c, startIndex + i, true)}</div>
+                <div class="card-footer card-actions-dropdown">${buildActionDropdown(c, i, true)}</div>
             </div>`);
         });
     }
 
-    function renderPaginationControls() {
-        const pagDesktop = $('#paginationDesktop'), pagMobile = $('#paginationMobile').empty(); pagDesktop.empty();
-        const totalPages = Math.ceil(allContainers.length / itemsPerPage);
-        if (totalPages <= 1) return;
-        let html = '<ul class="pagination justify-content-center">';
-        html += `<li class="page-item ${currentPage===1?'disabled':''}"><a class="page-link" href="#" data-page="${currentPage-1}">上一页</a></li>`;
-        let startP = Math.max(1, currentPage - 2), endP = Math.min(totalPages, currentPage + 2);
-        if (totalPages > 5) {
-            if (currentPage <= 3) endP = 5;
-            else if (currentPage + 2 >= totalPages) startP = totalPages - 4;
-        } else {
-             startP = 1; endP = totalPages;
-        }
-        if (startP > 1) { html += `<li class="page-item"><a class="page-link" data-page="1">1</a></li>`; if (startP > 2) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`; }
-        for (let i = startP; i <= endP; i++) html += `<li class="page-item ${i===currentPage?'active':''}"><a class="page-link" data-page="${i}">${i}</a></li>`;
-        if (endP < totalPages) { if (endP < totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`; html += `<li class="page-item"><a class="page-link" data-page="${totalPages}">${totalPages}</a></li>`; }
-        html += `<li class="page-item ${currentPage===totalPages?'disabled':''}"><a class="page-link" data-page="${currentPage+1}">下一页</a></li></ul>`;
-        pagDesktop.html(html); pagMobile.html(html);
-        $('.page-link').off('click').on('click', function(e) {
-            e.preventDefault(); const page = parseInt($(this).data('page'));
-            if (page && page !== currentPage && page >= 1 && page <= totalPages) {
-                currentPage = page; renderPaginatedContainers();
-                const listTopElement = $('.container-list-desktop').length ? $('.container-list-desktop') : $('.container-list-mobile');
-                if (listTopElement.length) {
-                    $('html, body').animate({ scrollTop: listTopElement.offset().top - 20 }, 300);
-                }
-            }
-        });
-    }
-
     $(document).ready(function() {
-        initContainersAndPagination({{ containers|tojson|safe if session.logged_in else [] }});
+        initializeContainerData({{ containers|tojson|safe if session.logged_in else [] }});
         $('#confirmModal').on('hidden.bs.modal', function(){ currentConfirmAction=null; currentConfirmContainerName=null; currentConfirmRuleId=null; currentConfirmButtonElement=null;});
         $('#infoModal').on('hidden.bs.modal', function(){ $('#basicInfoContent').html('加载中...'); $('#natRulesContent').html('<li>加载中...</li>'); $('#natRulesError,#infoError').addClass('d-none').text(''); $('#infoModalLabel').text('容器信息'); $('#natRulesList').hide(); });
         $('#execModal').on('hidden.bs.modal', function(){ $('#execContainerName,#commandInput').val(''); $('#execOutput').text('').removeClass('success error'); $('#execModalLabel').text('执行命令'); setButtonProcessing($('#execButton'),false); });
