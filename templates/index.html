@@ -29,25 +29,22 @@
         }
         h2.section-title {
             font-size: 1.3rem;
-            margin-top: 0; /* Adjusted for new layout */
+            margin-top: 0;
             margin-bottom: 1rem;
             padding-bottom: 0.5rem;
             color: #202124;
         }
         .left-column h2.section-title {
             border-bottom: 1px solid #e0e0e0;
-             margin-top: 0; /* Override for left column title */
         }
-        .right-column .section-title {
-            padding-bottom: 0; /* No border needed for right form title */
-        }
+         .right-column .section-title {
+             padding-bottom: 0.25rem; /* Less padding for title above form panel */
+             margin-bottom: 0.75rem;
+         }
 
         .btn {
-            border-radius: 4px;
-            font-weight: 500;
-            padding: 0.5rem 1rem;
-            font-size: 0.875rem;
-            transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            border-radius: 4px; font-weight: 500; padding: 0.5rem 1rem;
+            font-size: 0.875rem; transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
             text-transform: none;
         }
         .btn-primary { background-color: #1a73e8; border-color: #1a73e8; }
@@ -66,33 +63,21 @@
         .btn-dark:hover { background-color: #4e5155; border-color: #4e5155;}
 
         .form-control, .form-select {
-            border-radius: 4px;
-            border: 1px solid #dadce0;
-            padding: 0.6rem 0.75rem;
-            font-size: 0.9rem;
-            background-color: #fff;
+            border-radius: 4px; border: 1px solid #dadce0; padding: 0.6rem 0.75rem;
+            font-size: 0.9rem; background-color: #fff;
         }
-        .form-control:focus, .form-select:focus {
-            border-color: #1a73e8;
-            box-shadow: 0 0 0 1px #1a73e8;
-            background-color: #fff;
-        }
+        .form-control:focus, .form-select:focus { border-color: #1a73e8; box-shadow: 0 0 0 1px #1a73e8; background-color: #fff; }
         .form-label { font-weight: 500; color: #5f6368; font-size: 0.875rem; margin-bottom: 0.3rem; }
 
         .table { background-color: #fff; }
         .table th, .table td { padding: 0.75rem 1rem; vertical-align: middle; border-top: 1px solid #e0e0e0; font-size: 0.875rem; }
         .table thead th { font-weight: 500; color: #5f6368; border-bottom: 2px solid #d1d3d6; background-color: #f8f9fa; border-top: 0; }
-        .table-striped > tbody > tr:nth-of-type(odd) > * { background-color: rgba(0,0,0,.02); }
         .table-hover > tbody > tr:hover > * { background-color: rgba(26,115,232,.05); }
-        .table-responsive { border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; }
+        .table-responsive { border: 1px solid #dadce0; border-radius: 8px; overflow: hidden; background-color: #fff; }
 
         #loginContainer {
-            max-width: 420px;
-            padding: 2.5rem;
-            background-color: #fff;
-            border: 1px solid #dadce0;
-            border-radius: 8px;
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15);
+            max-width: 420px; padding: 2.5rem; background-color: #fff; border: 1px solid #dadce0;
+            border-radius: 8px; box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15);
         }
         #loginContainer h2.form-title { border-bottom: none; font-size: 1.5rem; color: #202124; margin-bottom: 1.5rem; }
 
@@ -110,10 +95,9 @@
 
         #toastContainer { position: fixed; top: 20px; right: 20px; z-index: 1090; }
         .toast { border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.18); font-size: 0.9rem; }
-        .text-bg-danger, .text-bg-success, .text-bg-info, .text-bg-warning { color: #fff !important; }
-        .text-bg-danger { background-color: #d93025 !important; }
-        .text-bg-success { background-color: #1e8e3e !important; }
-        .text-bg-info { background-color: #1a73e8 !important; }
+        .text-bg-danger { background-color: #d93025 !important; color: #fff !important;}
+        .text-bg-success { background-color: #1e8e3e !important; color: #fff !important;}
+        .text-bg-info { background-color: #1a73e8 !important; color: #fff !important;}
         .text-bg-warning { background-color: #f9ab00 !important; color: #202124 !important; }
 
         .modal-content { border-radius: 8px; border: 1px solid #dadce0; box-shadow: 0 4px 8px 0 rgba(60,64,67,.3),0 6px 20px 0 rgba(60,64,67,.15); }
@@ -127,7 +111,12 @@
         .container-actions .d-flex-desktop { align-items: center; display: none !important; }
         @media (min-width: 992px) { .container-actions .d-flex-desktop { display: flex !important; flex-direction: row; gap: 0.35rem; } }
 
-        .container-list-mobile .card { box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15); border-radius: 8px; }
+        .container-list-mobile .card {
+             background-color: #fff;
+             border: 1px solid #e0e0e0;
+             box-shadow: 0 1px 2px 0 rgba(60,64,67,.08),0 1px 3px 1px rgba(60,64,67,.05);
+             border-radius: 8px;
+        }
         .container-list-mobile .card-actions { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
         .container-list-mobile .card-text small { font-weight: 500; color: #5f6368; margin-right: 0.25rem; }
         .container-list-mobile .card-title { word-break: break-word; font-size: 1.1rem; margin-bottom: 0.25rem !important; }
@@ -149,14 +138,16 @@
         .alert-warning { background-color: #feedcf; border-color: #fde293; color: #795508; }
 
         .sticky-top-form-container {
-            top: 20px; /* Adjust if you have a fixed top navbar */
+            position: -webkit-sticky; /* Safari */
+            position: sticky;
+            top: 20px; /* Adjust based on your navbar height or desired spacing */
         }
-        .create-form-wrapper {
+        .create-form-panel {
             background-color: #fff;
             padding: 1.25rem;
             border-radius: 8px;
-            border: 1px solid #dadce0; /* Subtle border like a Material card */
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);
+            border: 1px solid #e0e0e0; /* Subtle border */
+            /* box-shadow: 0 1px 2px rgba(60,64,67,0.1); */ /* Optional: very subtle shadow if needed */
         }
 
         .offcanvas-header { border-bottom: 1px solid #e0e0e0; }
@@ -266,9 +257,9 @@
             </div>
 
             <div class="col-lg-5 order-lg-2 d-none d-lg-block right-column">
-                <div class="sticky-top sticky-top-form-container">
-                    <h2 class="section-title mb-3">创建新容器</h2>
-                    <div class="create-form-wrapper">
+                <div class="sticky-top-form-container">
+                    <h2 class="section-title">创建新容器</h2>
+                    <div class="create-form-panel">
                         <form id="createContainerForm">
                             <div class="row g-3">
                                 <div class="col-12">
@@ -329,6 +320,7 @@
             </form>
         </div>
     </div>
+
 
     {% else %}
     <div class="container">
