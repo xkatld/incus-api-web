@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, redirect, url_for
+from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
 import subprocess
 import json
 import sqlite3
@@ -8,10 +8,66 @@ import time
 import re
 import shlex
 import sys
+import secrets
+import hashlib
+from functools import wraps
 
 app = Flask(__name__)
+
+# --- 安全配置 ---
+# ⚠️ 警告: 硬编码敏感信息不安全，生产环境请使用环境变量或配置文件
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16)) # Flask Session密钥
+ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpassword') # ⚠️ 请修改此默认密码
+API_SECRET_KEY = os.environ.get('API_SECRET_KEY', secrets.token_hex(32)) # ⚠️ 请修改此默认密钥
+API_SECRET_HASH = hashlib.sha256(API_SECRET_KEY.encode('utf-8')).hexdigest() # 服务器端存储哈希用于比较
+
+# --- 数据库配置 ---
 DATABASE_NAME = 'incus_manager.db'
 
+# --- 认证装饰器 ---
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('logged_in') is not True:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def verify_api_hash():
+    api_hash = request.headers.get('X-API-Hash')
+    if not api_hash:
+        return False
+    try:
+         client_hash = hashlib.sha256(f"{api_hash}{API_SECRET_KEY}".encode('utf-8')).hexdigest() # Assuming client sends hash(input + key) - NO, client sends hash(key), server hashes input+key... this is confusing. Let's simplify: client sends hash(key), server hashes key and compares.
+         client_hash = api_hash # Revert: client sends the raw hash
+         # For security, use compare_digest to prevent timing attacks
+         if hashlib.compare_digest(client_hash, API_SECRET_HASH):
+             return True
+         else:
+             app.logger.warning(f"API Hash mismatch from {request.remote_addr}")
+             return False
+    except Exception as e:
+         app.logger.error(f"API hash verification failed: {e}")
+         return False
+
+
+def web_or_api_authentication_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        is_authenticated_via_session = session.get('logged_in') is True
+        is_authenticated_via_api = verify_api_hash()
+
+        if is_authenticated_via_session or is_authenticated_via_api:
+            return f(*args, **kwargs)
+        else:
+            if request.method == 'GET':
+                return redirect(url_for('login', next=request.url))
+            else:
+                return jsonify({'status': 'error', 'message': '需要认证'}), 401
+    return decorated_function
+
+# --- 数据库和命令执行函数 (与原代码相同，仅为完整性保留) ---
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_NAME)
     conn.row_factory = sqlite3.Row
@@ -76,7 +132,6 @@ def run_command(command_parts, parse_json=True, timeout=60):
 
 def run_incus_command(command_args, parse_json=True, timeout=60):
     return run_command(['incus'] + command_args, parse_json, timeout)
-
 
 def sync_container_to_db(name, image_source, status, created_at_str):
     try:
@@ -254,7 +309,6 @@ def check_nat_rule_exists_in_db(container_name, host_port, protocol):
         app.logger.error(f"数据库错误 check_nat_rule_exists_in_db for {container_name}, host={host_port}/{protocol}: {e}")
         return False, f"检查规则记录失败: {e}"
 
-
 def add_nat_rule_to_db(rule_details):
     try:
         query_db('''
@@ -286,7 +340,6 @@ def get_nat_rule_by_id(rule_id):
     except sqlite3.Error as e:
         app.logger.error(f"数据库错误 get_nat_rule_by_id for id {rule_id}: {e}")
         return False, f"从数据库获取规则 (ID {rule_id}) 失败: {e}"
-
 
 def remove_nat_rule_from_db(rule_id):
     try:
@@ -337,7 +390,6 @@ def perform_iptables_delete_for_rule(rule_details):
         app.logger.error(f"Exception during perform_iptables_delete_for_rule for rule ID {rule_details.get('id', 'N/A')}: {e}")
         return False, f"执行 iptables 删除命令时发生异常: {str(e)}", False
 
-
 def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
     try:
         db_rule_container_names_rows = query_db('SELECT DISTINCT container_name FROM nat_rules')
@@ -365,7 +417,33 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
         app.logger.error(f"清理孤立NAT规则时发生异常: {e}")
 
 
+# --- 认证路由 ---
+@app.route('/login', methods=['GET', 'POST'])
+def login():
+    if request.method == 'POST':
+        username = request.form.get('username')
+        password = request.form.get('password')
+        # ⚠️ 这里的密码比较不安全，生产环境应该使用哈希比较
+        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['logged_in'] = True
+            app.logger.info(f"用户 '{username}' 登录成功。")
+            next_url = request.args.get('next')
+            return redirect(next_url or url_for('index'))
+        else:
+            app.logger.warning(f"用户 '{username}' 登录失败。")
+            return render_template('index.html', login_error="用户名或密码错误。", containers=[], images=[]) # Render index with error
+    return render_template('index.html', login_form=True, containers=[], images=[]) # Render index with login form
+
+@app.route('/logout')
+def logout():
+    session.pop('logged_in', None)
+    app.logger.info("用户已退出登录。")
+    return redirect(url_for('index'))
+
+# --- Web/API 路由 (应用认证装饰器) ---
+
 @app.route('/')
+@login_required # 只有登录用户才能访问首页
 def index():
     success_list, containers_data = run_incus_command(['list', '--format', 'json'])
 
@@ -380,6 +458,7 @@ def index():
         app.logger.error(f"数据库表 'containers' 可能不存在: {e}. 请运行 init_db.py.")
         incus_error = True
         incus_error_message = f"数据库错误：容器表未找到，请运行 init_db.py。原始错误: {e}"
+        # Return the index page with login form or error depending on login state
         return render_template('index.html',
                                containers=[],
                                images=[],
@@ -513,7 +592,6 @@ def index():
         image_error_message = images_data if not success_img else 'Invalid image data format from Incus.'
         app.logger.error(f"获取镜像列表失败: {image_error_message}")
 
-
     return render_template('index.html',
                            containers=listed_containers,
                            images=available_images,
@@ -522,6 +600,7 @@ def index():
 
 
 @app.route('/container/create', methods=['POST'])
+@web_or_api_authentication_required
 def create_container():
     name = request.form.get('name')
     image = request.form.get('image')
@@ -566,6 +645,7 @@ def create_container():
 
 
 @app.route('/container/<name>/action', methods=['POST'])
+@web_or_api_authentication_required
 def container_action(name):
     action = request.form.get('action')
     commands = {
@@ -683,6 +763,7 @@ def container_action(name):
 
 
 @app.route('/container/<name>/exec', methods=['POST'])
+@web_or_api_authentication_required
 def exec_command(name):
     command_to_exec = request.form.get('command')
     if not command_to_exec:
@@ -705,16 +786,20 @@ def exec_command(name):
 
 
 @app.route('/container/<name>/info')
+@web_or_api_authentication_required
 def container_info(name):
     info_output, error_message = _get_container_raw_info(name)
 
     if info_output is None:
         return jsonify({'status': 'NotFound', 'message': error_message}), 404
     else:
-        return jsonify(info_output), 200
+        # Include live_data_available status for UI hint
+        response_data = info_output
+        return jsonify(response_data), 200
 
 
 @app.route('/container/<name>/add_nat_rule', methods=['POST'])
+@web_or_api_authentication_required
 def add_nat_rule(name):
     host_port = request.form.get('host_port')
     container_port = request.form.get('container_port')
@@ -746,7 +831,6 @@ def add_nat_rule(name):
 
     if container_info_data is None:
          return jsonify({'status': 'error', 'message': f'无法获取容器 {name} 信息: {info_error_message}'}), 404
-
 
     if container_info_data.get('status') != 'Running':
          status_msg = container_info_data.get('status', 'Unknown')
@@ -796,6 +880,7 @@ def add_nat_rule(name):
         return jsonify({'status': 'error', 'message': message}), 500
 
 @app.route('/container/<name>/nat_rules', methods=['GET'])
+@web_or_api_authentication_required
 def list_nat_rules(name):
     success, rules = get_nat_rules_for_container(name)
     if success:
@@ -804,6 +889,7 @@ def list_nat_rules(name):
         return jsonify({'status': 'error', 'message': rules}), 500
 
 @app.route('/container/nat_rule/<int:rule_id>', methods=['DELETE'])
+@web_or_api_authentication_required
 def delete_nat_rule(rule_id):
     app.logger.info(f"Attempting to delete NAT rule ID {rule_id}.")
     success_db, rule = get_nat_rule_by_id(rule_id)
@@ -858,8 +944,22 @@ def check_permissions():
     else:
         print("当前用户是 root。可以执行 iptables 等需要权限的命令。")
 
+def print_security_warnings():
+    print("\n--- 安全警告 ---")
+    if os.environ.get('ADMIN_PASSWORD') is None:
+        print("警告: 正在使用硬编码的默认管理员密码。请尽快设置环境变量 ADMIN_PASSWORD 来覆盖默认值。")
+    if os.environ.get('API_SECRET_KEY') is None:
+        print("警告: 正在使用硬编码的默认 API Secret Key。请尽快设置环境变量 API_SECRET_KEY 来覆盖默认值。")
+        print(f"当前的 API Secret Key (用于生成 Hash) 是: {API_SECRET_KEY}")
+        print(f"用于 API 验证的 SHA256 Hash 是: {API_SECRET_HASH}")
+    if os.environ.get('SECRET_KEY') is None:
+         print("警告: 正在使用硬编码的默认 Flask Session Secret Key。请尽快设置环境变量 SECRET_KEY 来覆盖默认值。")
+    print("--- 警告结束 ---\n")
+
 
 def main():
+    print_security_warnings()
+
     if not os.path.exists(DATABASE_NAME):
         print(f"错误：数据库文件 '{DATABASE_NAME}' 未找到。")
         print("请先运行 'python init_db.py' 来初始化数据库。")
