@@ -4,37 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Incus Web 管理器</title>
-    <!-- 移除 Bootstrap CSS -->
-    <!-- <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"> -->
 
-    <!-- 引入 Ant Design CSS -->
-    <!-- 注意: 生产环境通常通过构建工具引入 -->
-    <link rel="stylesheet" href="https://unpkg.com/antd@5.11.0/dist/reset.css"> <!-- 引入 reset 样式，可选 -->
+    <link rel="stylesheet" href="https://unpkg.com/antd@5.11.0/dist/reset.css">
     <link rel="stylesheet" href="https://unpkg.com/antd@5.11.0/dist/antd.min.css">
 
-    <!-- 保留 jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <!-- 移除 Bootstrap JS -->
-    <!-- <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script> -->
-
-    <!-- 引入 Ant Design 组件 JS (重要且复杂) -->
-    <!-- 这部分是关键，你需要找到如何引入 Ant Design Modal, message 等组件的独立 JS 文件 -->
-    <!-- 通常这需要通过 Webpack, Vite 等构建工具来按需打包 -->
-    <!-- 概念性引入，实际可能需要更复杂的模块加载配置 -->
     <script src="https://unpkg.com/antd@5.11.0/dist/antd.min.js"></script>
-    <!-- 如果上面的全局 antd.min.js 不包含组件的独立 API，你需要找到对应的引入方式 -->
-    <!-- 例如：<script src="path/to/antd/modal.js"></script> 等 -->
-    <!-- 假设 antd.min.js 已经将 Modal, message, notification 等挂载到全局对象（例如 window.antd） -->
 
 
     <style>
-        body { padding-top: 20px; background-color: #f0f2f5; } /* Ant Design 默认背景色 */
+        body { padding-top: 20px; background-color: #f0f2f5; }
         .container {
-             max-width: 1200px; /* 模仿 Bootstrap container max-width */
+             max-width: 1200px;
              margin: 0 auto;
              padding: 0 15px;
         }
-         .site-layout-content { /* 用于包裹主要内容的区域 */
+         .site-layout-content {
              background: #fff;
              padding: 24px;
              min-height: 280px;
@@ -42,7 +27,6 @@
          }
 
 
-        /* 替换 Bootstrap pre 样式 */
         #execOutput, .info-pre {
             white-space: pre-wrap;
             background-color: #f5f5f5;
@@ -52,24 +36,22 @@
             overflow-y: auto;
             font-family: monospace;
             font-size: 0.9em;
-             margin-top: 8px; /* Adjust spacing */
+            margin-top: 8px;
         }
-        #execOutput.success { border-color: #b7eb8f; background-color: #f6ffed; color: #237804; } /* Ant Design success color */
-        #execOutput.error { border-color: #ffccc7; background-color: #fff1f0; color: #cf1322; } /* Ant Design error color */
-        /* infoContent was used for pre, now replaced with .info-pre */
+        #execOutput.success { border-color: #b7eb8f; background-color: #f6ffed; color: #237804; }
+        #execOutput.error { border-color: #ffccc7; background-color: #fff1f0; color: #cf1322; }
         #infoContent { background-color: transparent; border: none; padding: 0; }
 
 
-        /* Replicate Bootstrap responsive classes visually */
-        .d-flex-desktop { display: none !important; } /* Default hidden */
-        .container-list-mobile { display: block; } /* Default shown */
-        .container-list-desktop { display: none; } /* Default hidden */
+        .d-flex-desktop { display: none !important; }
+        .container-list-mobile { display: block; }
+        .container-list-desktop { display: none; }
 
         @media (min-width: 768px) {
             .d-flex-desktop {
                 display: flex !important;
                 flex-direction: row;
-                gap: 8px; /* Ant Design default spacing */
+                gap: 8px;
                 align-items: center;
             }
              .container-list-mobile {
@@ -78,21 +60,20 @@
              .container-list-desktop {
                  display: block !important;
              }
-             /* Adjust table column width on desktop if needed */
-             .ant-table-thead > tr > th:nth-child(1) { width: 15%; } /* Name */
-             .ant-table-thead > tr > th:nth-child(2) { width: 10%; } /* Status */
-             .ant-table-thead > tr > th:nth-child(3) { width: 15%; } /* IP */
-             .ant-table-thead > tr > th:nth-child(4) { width: 20%; } /* Image */
-             .ant-table-thead > tr > th:nth-child(5) { width: 15%; } /* Created */
-             .ant-table-thead > tr > th:nth-child(6) { width: 25%; } /* Actions */
+             .ant-table-thead > tr > th:nth-child(1) { width: 15%; }
+             .ant-table-thead > tr > th:nth-child(2) { width: 10%; }
+             .ant-table-thead > tr > th:nth-child(3) { width: 15%; }
+             .ant-table-thead > tr > th:nth-child(4) { width: 20%; }
+             .ant-table-thead > tr > th:nth-child(5) { width: 15%; }
+             .ant-table-thead > tr > th:nth-child(6) { width: 25%; }
         }
 
          .ant-list-item {
-             background-color: #fff; /* List item background */
-             border: 1px solid #f0f0f0; /* Ant Design border */
+             background-color: #fff;
+             border: 1px solid #f0f0f0;
              margin-bottom: 8px;
-             padding: 12px; /* Ant Design default padding */
-             border-radius: 2px; /* Ant Design default border radius */
+             padding: 12px;
+             border-radius: 2px;
          }
           .ant-list-item .ant-list-item-meta-title {
               word-break: break-word;
@@ -100,42 +81,36 @@
           .ant-list-item .ant-list-item-meta-description small strong {
               font-weight: bold;
               margin-right: 5px;
-              color: rgba(0, 0, 0, 0.85); /* Ant Design default text color */
+              color: rgba(0, 0, 0, 0.85);
           }
           .ant-list-item-action {
-              margin-left: 12px !important; /* Adjust action spacing */
-               flex-wrap: wrap; /* Allow actions to wrap on mobile */
-               gap: 4px; /* Space between action buttons */
+              margin-left: 12px !important;
+               flex-wrap: wrap;
+               gap: 4px;
           }
 
 
-        /* Login Form Styling - Use Card */
-        #loginContainer {
+         #loginContainer {
              max-width: 400px;
              margin: 50px auto;
-             padding: 24px; /* Ant Design Card padding */
-             border: none; /* Ant Design Card has shadow/border built-in */
-             border-radius: 2px; /* Ant Design default */
-             background-color: #fff; /* Ant Design Card background */
-             box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12), 0 5px 12px 4px rgba(0, 0, 0, 0.09); /* Ant Design Card shadow */
+             padding: 24px;
+             border: none;
+             border-radius: 2px;
+             background-color: #fff;
+             box-shadow: 0 1px 2px -2px rgba(0, 0, 0, 0.16), 0 3px 6px 0 rgba(0, 0, 0, 0.12), 0 5px 12px 4px rgba(0, 0, 0, 0.09);
          }
          #loginContainer h2 {
              text-align: center;
-             margin-bottom: 24px; /* Ant Design spacing */
-             font-size: 24px; /* Ant Design H2 */
+             margin-bottom: 24px;
+             font-size: 24px;
              color: rgba(0, 0, 0, 0.85);
          }
 
-
-         /* Custom button styles to match Bootstrap colors if needed */
-         /* Ant Design has 'primary', 'danger', 'default', 'dashed', 'link', 'text' */
-         /* We might need custom classes for info, warning, secondary, dark */
-         .ant-btn-info { /* Mimic Bootstrap btn-info */
+         .ant-btn-info {
              color: #0dcaf0;
              border-color: #0dcaf0;
          }
          .ant-btn-info:hover { color: #0aa2c0; border-color: #0aa2c0; }
-         /* Add styles for .ant-btn-warning, .ant-btn-secondary, .ant-btn-success, .ant-btn-dark if you want matching colors */
 
 
     </style>
@@ -143,18 +118,14 @@
 <body>
     {% if session.logged_in %}
     <div class="container">
-         <!-- Header / Title Area -->
          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; padding-top: 20px;">
              <h1 style="font-size: 30px; margin: 0;">Incus Web 管理器</h1>
-              <!-- Use Ant Design Button -->
              <button type="button" class="ant-btn ant-btn-danger ant-btn-sm" onclick="location.href='{{ url_for('logout') }}'">
                   <span>退出登录</span>
              </button>
         </div>
 
-        <!-- Incus Error Alert -->
         {% if incus_error[0] %}
-         <!-- Use Ant Design Alert -->
         <div class="ant-alert ant-alert-error ant-alert-with-description" role="alert" style="margin-bottom: 24px;">
             <div class="ant-alert-icon"><span role="img" aria-label="close-circle" class="anticon anticon-close-circle"><svg viewbox="64 64 896 896" focusable="false" data-icon="close-circle" width="1em" height="1em" fill="currentColor" aria-hidden="true"><path d="M512 64C264.6 64 64 264.6 64 512s200.6 448 448 448 448-200.6 448-448S759.4 64 512 64zm165.4 336.6V280.8c0-6.7-7.7-10.4-12.9-6.3L512 423.6l-152.2-149.1c-5.2-4.1-12.9-0.4-12.9 6.3v121.8c0 4.6 2.1 8.9 5.6 11.6L512 603l148.2-146.4c3.5-2.7 5.6-7.1 5.6-11.7z"></path></svg></span></div>
             <div class="ant-alert-content">
@@ -164,18 +135,14 @@
         </div>
         {% endif %}
 
-        <!-- Create Container Card -->
-         <!-- Use Ant Design Card -->
         <div class="ant-card ant-card-bordered" style="margin-bottom: 24px;">
             <div class="ant-card-head">
                 <div class="ant-card-head-wrapper"><div class="ant-card-head-title">创建新容器</div></div>
             </div>
             <div class="ant-card-body">
-                 <!-- Use Ant Design Form styles (mostly via CSS) -->
                 <form id="createContainerForm" class="ant-form ant-form-vertical">
                     <div class="ant-row ant-row-no-wrap" style="margin-left: -8px; margin-right: -8px;">
                         <div class="ant-col ant-col-md-8 ant-col-xs-24" style="padding-left: 8px; padding-right: 8px;">
-                             <!-- Use Ant Design Form Item & Input styles -->
                             <div class="ant-form-item ant-form-item-vertical">
                                 <div class="ant-form-item-label"><label for="containerName" class="" title="">容器名称</label></div>
                                 <div class="ant-form-item-control">
@@ -188,14 +155,11 @@
                             </div>
                         </div>
                         <div class="ant-col ant-col-md-10 ant-col-xs-24" style="padding-left: 8px; padding-right: 8px;">
-                             <!-- Use Ant Design Form Item & Select styles -->
                             <div class="ant-form-item ant-form-item-vertical {% if image_error[0] %}ant-form-item-has-error{% endif %}">
                                 <div class="ant-form-item-label"><label for="containerImage" class="" title="">选择镜像</label></div>
                                 <div class="ant-form-item-control">
                                     <div class="ant-form-item-control-input">
                                         <div class="ant-form-item-control-input-content">
-                                             <!-- Note: Ant Design Select requires JS to initialize its dropdown -->
-                                             <!-- We will just use standard select with Ant Design styles here -->
                                             <select class="ant-select ant-select-single ant-select-allow-clear ant-select-show-arrow ant-select-bordered" id="containerImage" name="image" required>
                                                 <option value="" selected disabled>请选择一个镜像</option>
                                                 {% for image in images %}
@@ -213,7 +177,6 @@
                             </div>
                         </div>
                         <div class="ant-col ant-col-md-6 ant-col-xs-24" style="padding-left: 8px; padding-right: 8px; display: flex; align-items: flex-end;">
-                             <!-- Use Ant Design Button -->
                             <div class="ant-form-item" style="width: 100%; margin-bottom: 0;">
                                 <div class="ant-form-item-control">
                                      <button type="submit" class="ant-btn ant-btn-primary" id="createButton">
@@ -229,9 +192,7 @@
 
         <h2 style="font-size: 24px; margin-bottom: 16px;">容器列表</h2>
 
-        <!-- Desktop Table View -->
         <div class="container-list-desktop">
-             <!-- Use Ant Design Table styles (need to manually construct HTML table) -->
             <table class="ant-table">
                  <thead class="ant-table-thead">
                      <tr>
@@ -248,7 +209,6 @@
                      <tr class="ant-table-row ant-table-row-level-0">
                         <td class="ant-table-cell">{{ c.name }}</td>
                         <td class="ant-table-cell">
-                             <!-- Use Ant Design Tag -->
                             <span class="ant-tag ant-tag-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}error{% else %}default{% endif %}">{{ c.status }}</span>
                          </td>
                         <td class="ant-table-cell">{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
@@ -256,7 +216,6 @@
                         <td class="ant-table-cell">{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td>
                         <td class="ant-table-cell container-actions">
                             <div class="d-flex-desktop">
-                                <!-- Use Ant Design Buttons, apply custom classes for Bootstrap colors -->
                                 <button type="button" class="ant-btn ant-btn-sm ant-btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
                                 {% if c.status == 'Running' %}
                                 <button type="button" class="ant-btn ant-btn-sm ant-btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
@@ -279,16 +238,12 @@
             </table>
         </div>
 
-        <!-- Mobile Card View -->
         <div class="container-list-mobile">
             {% for c in containers %}
-             <!-- Use Ant Design Card -->
             <div class="ant-card ant-card-bordered" style="margin-bottom: 16px;">
                 <div class="ant-card-body">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                         <!-- Use Ant Design Typography for title -->
                         <h5 style="font-size: 16px; margin: 0; word-break: break-word;">{{ c.name }}</h5>
-                         <!-- Use Ant Design Tag -->
                         <span class="ant-tag ant-tag-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}error{% else %}default{% endif %}">{{ c.status }}</span>
                     </div>
 
@@ -297,13 +252,12 @@
                     <p style="margin-bottom: 16px;"><small style="font-weight: bold; margin-right: 5px; color: rgba(0, 0, 0, 0.65);">创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
 
                     <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                        <!-- Use Ant Design Buttons, apply custom classes for Bootstrap colors -->
                         <button type="button" class="ant-btn ant-btn-sm ant-btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
                         {% if c.status == 'Running' %}
                         <button type="button" class="ant-btn ant-btn-sm ant-btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
                         <button type="button" class="ant-btn ant-btn-sm ant-btn-default" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
                         <button type="button" class="ant-btn ant-btn-sm ant-btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
-                        <button type="button" class="ant-btn ant-btn-sm ant-btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
+                         <button type="button" class="ant-btn ant-btn-sm ant-btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
                         {% elif c.status == 'Stopped' %}
                         <button type="button" class="ant-btn ant-btn-sm ant-btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
                         {% endif %}
@@ -312,17 +266,14 @@
                 </div>
             </div>
             {% else %}
-             <!-- Use Ant Design Alert -->
             <div class="ant-alert ant-alert-info ant-alert-no-icon" role="alert" style="text-align: center;">没有找到容器或无法连接到 Incus。</div>
             {% endfor %}
         </div>
 
-         <!-- Use Ant Design Button -->
          <button type="button" class="ant-btn ant-btn-default" style="margin-top: 16px;" onclick="location.reload()">刷新列表</button>
     </div>
     {% else %}
     <div class="container">
-         <!-- Login Form (styled as Card) -->
         <div id="loginContainer">
              <h2 style="text-align: center; margin-bottom: 24px;">管理员登录</h2>
              <form method="POST" action="{{ url_for('login') }}" class="ant-form ant-form-vertical">
@@ -332,7 +283,6 @@
                     <div class="ant-form-item-control">
                         <div class="ant-form-item-control-input">
                             <div class="ant-form-item-control-input-content">
-                                 <!-- Use Ant Design Input -->
                                 <input type="text" class="ant-input" id="username" name="username" required autofocus>
                             </div>
                         </div>
@@ -343,52 +293,30 @@
                     <div class="ant-form-item-control">
                          <div class="ant-form-item-control-input">
                             <div class="ant-form-item-control-input-content">
-                                <!-- Use Ant Design Password Input -->
                                 <input type="password" class="ant-input" id="password" name="password" required>
                             </div>
                         </div>
                     </div>
                  </div>
                  {% if login_error %}
-                 <!-- Use Ant Design Alert -->
                  <div class="ant-alert ant-alert-error ant-alert-no-icon" role="alert" style="margin-bottom: 24px;">{{ login_error }}</div>
                  {% endif %}
-                  <!-- Use Ant Design Button -->
                  <button type="submit" class="ant-btn ant-btn-primary" style="width: 100%;">登录</button>
              </form>
         </div>
     </div>
     {% endif %}
 
-     <!-- Ant Design does NOT use a fixed container for messages/notifications -->
-     <!-- It manages them in JS. The old toastContainer is removed. -->
-     <!-- <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer"></div> -->
-
-
-    <!-- Modals will be managed by Ant Design JS, not HTML structure -->
-    <!-- Remove all Bootstrap modal HTML structures -->
-    <!-- <div class="modal fade" id="infoModal" ...>...</div> -->
-    <!-- <div class="modal fade" id="execModal" ...>...</div> -->
-    <!-- <div class="modal fade" id="natModal" ...>...</div> -->
-    <!-- <div class="modal fade" id="confirmModal" ...>...</div> -->
 
     <script>
-        // --- Global Ant Design JS Components ---
-        // Assume Ant Design JS components like Modal, message, notification are available globally
-        // E.g., if using <script src="https://unpkg.com/antd@5.11.0/dist/antd.min.js"></script>
-        // They might be available under window.antd or directly as Modal, message etc.
-        // We will assume `window.antd.Modal`, `window.antd.message`, `window.antd.notification` exist.
-        // You might need to adjust the script tags and how you access these based on your actual setup.
         const AntdModal = window.antd ? window.antd.Modal : null;
         const AntdMessage = window.antd ? window.antd.message : null;
-        const AntdNotification = window.antd ? window.antd.notification : null; // Notification is an alternative to message
+        const AntdNotification = window.antd ? window.antd.notification : null;
 
 
         function showToast(message, type = 'info') {
-             // Replace Bootstrap toast with Ant Design message
              if (!AntdMessage) {
                  console.error("Ant Design message component not available.");
-                 // Fallback or do nothing
                  alert(message);
                  return;
              }
@@ -409,38 +337,28 @@
                  return;
             }
 
-             // Ant Design buttons have a built-in loading state
-             // We can add/remove the .ant-btn-loading class
             if (isProcessing) {
                 $button.addClass('ant-btn-loading').prop('disabled', true);
-                // Store original text if needed, but Antd often handles spinner visually
                  const originalText = $button.find('span').text();
                  if (originalText && !$button.data('original-text')) {
                       $button.data('original-text', originalText);
                  }
-                 // Antd spinner is added by CSS via :before/:after or a specific span
-                 // We don't need to manually add spinner HTML
-                 $button.find('span:not(.ant-btn-loading-icon)').hide(); // Hide original text while loading
+                 $button.find('span:not(.ant-btn-loading-icon)').hide();
             } else {
                 $button.removeClass('ant-btn-loading').prop('disabled', false);
-                 // Restore original text if stored
                  if ($button.data('original-text')) {
                      $button.find('span:not(.ant-btn-loading-icon)').text($button.data('original-text')).show();
                      $button.removeData('original-text');
                  } else {
-                      // If text wasn't hidden/stored, just ensure spans are visible
                        $button.find('span').show();
                  }
             }
         }
 
-
-        // --- Confirmation Modal Logic using Ant Design Modal ---
         let currentConfirmAction = null;
-        let currentConfirmContainerName = null;
-        let currentConfirmRuleId = null;
-        let currentConfirmButtonElement = null; // Keep track of the original button clicked
-        let confirmModalInstance = null; // To manage the Ant Design Modal instance
+        let currentConfirmTarget = null;
+        let currentConfirmButtonElement = null;
+        let confirmModalInstance = null;
 
 
         function showConfirmationModal(actionType, nameOrId, buttonElement) {
@@ -450,24 +368,24 @@
             }
 
             currentConfirmAction = actionType;
-            currentConfirmTarget = nameOrId; // Renamed from nameOrId for clarity
+            currentConfirmTarget = nameOrId;
             currentConfirmButtonElement = buttonElement;
 
             let title = '';
             let content = '';
             let okText = '确认';
-            let okType = 'primary'; // Ant Design Button type for OK
+            let okType = 'primary';
 
             if (actionType === 'restart_container') {
                 title = '确认重启';
                 content = `确定要重启容器 <strong>${nameOrId}</strong> 吗？`;
                 okText = '重启';
-                okType = 'default'; // Ant Design default button color is greyish, often used for secondary actions, though Bootstrap warning is yellow. We map restart to default.
+                okType = 'default';
             } else if (actionType === 'delete_container') {
                 title = '确认删除容器';
                 content = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及其所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
                 okText = '删除容器';
-                okType = 'danger'; // Ant Design danger is red
+                okType = 'danger';
             } else if (actionType === 'delete_nat_rule') {
                 title = '确认删除 NAT 规则';
                 content = `确定要删除 ID 为 <strong>${nameOrId}</strong> 的 NAT 规则吗？此操作将尝试移除对应的 iptables 规则记录 (仅针对通过本应用添加的规则)。`;
@@ -475,80 +393,53 @@
                 okType = 'danger';
             }
 
-            // Create or reuse the modal instance
-            if (confirmModalInstance) {
-                confirmModalInstance.update({
-                     title: title,
-                     content: content,
-                     okText: okText,
-                     okType: okType,
-                     onOk: handleConfirmAction, // Bind the action handler
-                     onCancel: handleConfirmCancel,
-                     confirmLoading: false, // Reset loading state
-                     maskClosable: true, // Enable mask close
-                });
-                 confirmModalInstance.open(); // Use open() in newer Antd versions
-            } else {
-                 confirmModalInstance = AntdModal.confirm({
-                     title: title,
-                     content: content,
-                     icon: AntdModal.warning ? <window.antd.ExclamationCircleOutlined /> : null, // Use Ant Design Icon if available
-                     okText: okText,
-                     okType: okType,
-                     cancelText: '取消',
-                     onOk: handleConfirmAction, // Bind the action handler
-                     onCancel: handleConfirmCancel,
-                     centered: true, // Center the modal
-                      maskClosable: true,
-                 });
-                 // For versions using modal.show() or similar, you might need a different pattern
-                 // If using Antd versions that return a control object with .update() and .destroy()/.close()
-                 // The variable `confirmModalInstance` should hold this control object.
-            }
-             // If the modal is already open or being created, its loading state is managed internally by Antd's confirm.
-             // We don't need to call setButtonProcessing on the modal's OK button here.
+             confirmModalInstance = AntdModal.confirm({
+                 title: title,
+                 content: content,
+                 icon: AntdModal.warning ? window.antd.ExclamationCircleOutlined : null,
+                 okText: okText,
+                 okType: okType,
+                 cancelText: '取消',
+                 onOk: handleConfirmAction,
+                 onCancel: handleConfirmCancel,
+                 centered: true,
+                 maskClosable: true,
+             });
         }
 
-        // Handle the OK action on the Ant Design Confirm Modal
         const handleConfirmAction = () => {
-            // Ant Design Modal's OK button will handle its own loading state if needed
             const actionType = currentConfirmAction;
             const target = currentConfirmTarget;
-            const buttonElement = currentConfirmButtonElement; // The original button
+            const buttonElement = currentConfirmButtonElement;
 
             if (!actionType || !buttonElement) {
                 showToast("确认信息丢失，无法执行操作。", 'danger');
-                 // Close modal if needed
                  if (confirmModalInstance) {
-                     confirmModalInstance.destroy(); // Use destroy() for confirm dialogs
-                     confirmModalInstance = null; // Reset instance
+                     confirmModalInstance.destroy();
+                     confirmModalInstance = null;
                  }
-                return Promise.reject(); // Stop the action flow
+                return Promise.reject();
             }
 
-            // Set the original button processing state if it's a container action
             if (actionType !== 'delete_nat_rule') {
                  setButtonProcessing(buttonElement, true);
             }
-             // Antd confirm modal handles its OK button loading state automatically
-             // We don't need to explicitly set its processing state here.
 
             let url = '';
             let method = '';
             let postData = null;
 
             if (actionType === 'delete_nat_rule') {
-                url = `/container/nat_rule/${target}`; // target is ruleId
+                url = `/container/nat_rule/${target}`;
                 method = 'DELETE';
             } else if (actionType === 'restart_container' || actionType === 'delete_container') {
-                url = `/container/${target}/action`; // target is containerName
+                url = `/container/${target}/action`;
                 method = 'POST';
                 postData = { action: actionType.replace('_container', '') };
             } else {
                  console.error("Unknown confirm action type:", actionType);
                  showToast("未知确认操作类型。", 'danger');
-                 setButtonProcessing(buttonElement, false); // Reset original button
-                 // Close modal if needed
+                 setButtonProcessing(buttonElement, false);
                   if (confirmModalInstance) {
                      confirmModalInstance.destroy();
                      confirmModalInstance = null;
@@ -556,76 +447,50 @@
                  return Promise.reject();
             }
 
-             // Return the promise from the AJAX call so Ant Design Modal can manage loading state
              return $.ajax({
                 url: url,
                 type: method,
                 data: postData,
-                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash for API calls
+                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                 success: function(data) {
                     showToast(data.message, data.status);
                     if (data.status === 'success' || data.status === 'warning') {
                         if (actionType === 'delete_nat_rule') {
-                            // Reload NAT rules in the info modal if open
-                             if (infoModalVisible && selectedContainerName) { // Check if info modal is open and container selected
-                                loadNatRules(selectedContainerName); // selectedContainerName is global from showInfoModal/openNatModal
+                             if (infoModalInstance && selectedContainerName) {
+                                loadNatRules(selectedContainerName);
                              }
-                        } else { // container action
-                             // Simulate page reload for container list update
+                        } else {
                             setTimeout(() => location.reload(), 1000);
                         }
                     }
-                    // Antd confirm modal will close automatically on success or failure unless you return Promise.reject
-                     return Promise.resolve(); // Indicate success to Antd modal
+                    return Promise.resolve();
                 },
                 error: function(jqXHR) {
-                    // Check for 401 Unauthorized
-                    if (jqXHR.status === 401) {
-                         showToast("操作需要认证，请重新登录。", 'danger');
-                         // Antd confirm modal should be closed implicitly by the redirect
+                     if (jqXHR.status === 401) {
+                        showToast("操作需要认证，请重新登录。", 'danger');
                          setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
                     } else {
                         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || jqXHR.responseText || "未知错误") : `执行操作请求失败。`;
                         showToast("操作失败: " + message, 'danger');
                     }
-                     // Reset original button if it wasn't a delete rule action (which is handled by loadNatRules completion or reload)
                     if (actionType !== 'delete_nat_rule') {
                          setButtonProcessing(buttonElement, false);
                     }
-                     // Returning Promise.reject will prevent the modal from closing automatically and often shows the error in the modal itself (depending on Antd version/usage)
-                     // For this setup, we rely on showToast and manual closing or reload.
-                    // Let's just return a resolved promise so the modal closes, and show error in toast.
                     return Promise.resolve();
-                },
-                complete: function() {
-                    // setConfirmLoading(false); // Not needed, Antd handles this
-                    // setConfirmModalVisible(false); // Not needed, Antd handles this if promise resolves
-                    // Original button processing is reset in success/error callbacks for container actions
                 }
             });
         };
 
-        // Handle the Cancel action on the Ant Design Confirm Modal
         const handleConfirmCancel = () => {
-            // No action needed on cancel, just close the modal
              console.log('Confirm cancelled');
-            // The modal will close automatically
-            // Reset global state vars if needed, although they are overwritten next time
         };
-
-        // Reset global state vars when any Antd Modal is closed
-        // Antd Modals don't trigger a single global 'hidden' event easily like Bootstrap
-        // Resetting happens within specific success/error/cancel callbacks or when reopening
-        // For Confirm Modal specifically, reset can happen in the onOk/onCancel handlers if needed.
-        // Let's keep them simple and assume state is managed via the specific modal functions.
 
 
         $('#createContainerForm').submit(function(event) {
             event.preventDefault();
             const form = $(this);
-            const submitButton = $('#createButton', form); // Ant Design Button
+            const submitButton = $('#createButton', form);
 
-            // Basic client-side validation check (Ant Design Form component handles this better)
             const containerName = $('#containerName').val().trim();
             const containerImage = $('#containerImage').val();
              if (!containerName || !containerImage) {
@@ -633,23 +498,20 @@
                  return;
              }
 
+            setButtonProcessing(submitButton, true);
 
-            setButtonProcessing(submitButton, true); // Use the adapted setButtonProcessing
-
-            var formData = form.serialize(); // Keep original form data serialization
+            var formData = form.serialize();
             $.ajax({
                 url: "{{ url_for('create_container') }}",
                 type: "POST",
                 data: formData,
-                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                 success: function(data) {
                     showToast(data.message, data.status);
                     if (data.status === 'success') {
                         form[0].reset();
-                         // Simulate page reload to update container list
                          setTimeout(() => location.reload(), 1000);
                     } else {
-                         // Reset button state on failure if no reload
                          setButtonProcessing(submitButton, false);
                     }
                 },
@@ -660,33 +522,31 @@
                      } else {
                         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "创建容器请求失败。";
                         showToast("错误: " + message, 'danger');
-                        setButtonProcessing(submitButton, false); // Reset button on failure
+                        setButtonProcessing(submitButton, false);
                      }
                 }
             });
         });
 
         function performAction(containerName, action, buttonElement) {
-             // Confirmation actions are handled via showConfirmationModal
             if (action === 'restart' || action === 'delete') {
                 showConfirmationModal(`${action}_container`, containerName, buttonElement);
                 return;
             }
 
-            setButtonProcessing(buttonElement, true); // Use the adapted setButtonProcessing
+            setButtonProcessing(buttonElement, true);
 
             $.ajax({
                 url: `/container/${containerName}/action`,
                 type: "POST",
                 data: { action: action },
-                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                 success: function(data) {
                     showToast(data.message, data.status);
                     if (data.status === 'success') {
-                        // Simulate page reload to update container list
                          setTimeout(() => location.reload(), 1000);
                     } else {
-                         setButtonProcessing(buttonElement, false); // Reset button if not reloading
+                         setButtonProcessing(buttonElement, false);
                     }
                 },
                 error: function(jqXHR) {
@@ -696,16 +556,14 @@
                      } else {
                         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
                         showToast("操作失败: " + message, 'danger');
-                        setButtonProcessing(buttonElement, false); // Reset button on failure
+                        setButtonProcessing(buttonElement, false);
                      }
                 }
             });
         }
 
-
-        // --- Info Modal Logic using Ant Design Modal ---
-        let infoModalInstance = null; // To manage the Ant Design Modal instance
-        let selectedContainerName = null; // Keep track of container in info modal
+        let infoModalInstance = null;
+        let selectedContainerName = null;
 
         function showInfo(containerName, buttonElement) {
             if (!AntdModal) {
@@ -713,62 +571,33 @@
                  return;
             }
 
-            selectedContainerName = containerName; // Set global state for currently viewed container
+            selectedContainerName = containerName;
 
-            // Initial modal content while loading
              let initialContent = `
                  <p>正在加载基础信息...</p>
                  <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
                      <h6 style="margin-bottom: 10px;">NAT 规则 (本应用添加)</h6>
-                      <ul><li>正在加载 NAT 规则...</li></ul>
+                      <ul id="natRulesContent"><li>正在加载 NAT 规则...</li></ul>
                       <div id="natRulesError" class="ant-alert ant-alert-warning ant-alert-no-icon d-none" role="alert" style="margin-top: 8px;"></div>
                  </div>
                  <div id="infoError" class="ant-alert ant-alert-danger ant-alert-no-icon d-none" role="alert" style="margin-top: 8px;"></div>
             `;
 
-            // Create or update the modal instance
-             if (infoModalInstance) {
-                infoModalInstance.update({
-                    title: `容器信息: ${containerName}`,
-                    content: initialContent,
-                    footer: null,
-                     width: 800,
-                    onCancel: () => { infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null; }, // Reset state on close
-                });
-                infoModalInstance.open();
-             } else {
-                  infoModalInstance = AntdModal.info({ // Using AntdModal.info for simpler structure, but could use AntdModal directly
-                     title: `容器信息: ${containerName}`,
-                     content: initialContent,
-                     okText: '关闭', // info modal has an OK button by default
-                     width: 800,
-                     centered: true,
-                     onOk: () => { infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null; }, // Reset state on close
-                     onCancel: () => { infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null; }, // Also handle escape/mask click
-                  });
-                 // AntdModal.info doesn't return an update/destroy object easily in simple use.
-                 // Let's switch to using AntdModal directly for better control.
+             infoModalInstance = AntdModal.modal({
+                 title: `容器信息: ${containerName}`,
+                 content: initialContent,
+                 footer: null,
+                 width: 800,
+                 centered: true,
+                 onCancel: () => { if(infoModalInstance) infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null; },
+             });
 
-                 infoModalInstance = AntdModal.modal({ // Use modal() or just Modal component in React, raw JS is tricky
-                     title: `容器信息: ${containerName}`,
-                     content: initialContent,
-                     footer: null, // Hide footer
-                     width: 800,
-                     centered: true,
-                     onCancel: () => { infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null; },
-                 });
-                 // The instance might not have update/destroy methods depending on how antd.min.js exposes them.
-                 // If not, manual DOM cleanup or state management (if using a framework) is needed.
-                 // Assuming for this concept that `infoModalInstance.update` and `infoModalInstance.destroy` work.
-             }
-
-
-            setButtonProcessing(buttonElement, true); // Set loading on the trigger button
+            setButtonProcessing(buttonElement, true);
 
             $.ajax({
                 url: `/container/${containerName}/info`,
                 type: "GET",
-                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                 success: function(data) {
                      let infoHtml = '';
                      let currentInfoError = null;
@@ -795,10 +624,8 @@
                          }
                      }
 
-                     // Update modal content
-                     // This manual DOM update is needed because we are not using React/declarative UI
-                     const modalBody = infoModalInstance.$().find('.ant-modal-body'); // Get the modal body element (jQuery object)
-                     const basicInfoArea = $('<div>').html(infoHtml); // Create a new div for basic info
+                     const modalBody = infoModalInstance.$().find('.ant-modal-body');
+                     const basicInfoArea = $('<div>').html(infoHtml);
 
                       const natRulesSection = $(`
                          <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
@@ -813,10 +640,9 @@
                      modalBody.empty().append(basicInfoArea).append(natRulesSection).append(infoErrorAlert);
 
                      if (data.status !== 'NotFound') {
-                        loadNatRules(containerName); // Load NAT rules
+                        loadNatRules(containerName);
                      } else {
-                         // If container not found, hide NAT section or show error
-                         natRulesSection.hide(); // Or update its content to indicate error
+                         natRulesSection.hide();
                          modalBody.find('#natRulesContent').html('<li>无法加载 NAT 规则。</li>');
                      }
 
@@ -824,32 +650,22 @@
                 error: function(jqXHR) {
                      if (jqXHR.status === 401) {
                         showToast("加载容器信息需要认证，请重新登录。", 'danger');
-                        // Close modal before redirecting
                         if (infoModalInstance) { infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null;}
                         setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
                      } else {
                         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
                         const modalBody = infoModalInstance.$().find('.ant-modal-body');
                          modalBody.empty().html(`<strong>错误:</strong> ${message}<div id="infoError" class="ant-alert ant-alert-danger ant-alert-no-icon" role="alert" style="margin-top: 8px;">${message}</div>`);
-                         modalBody.find('#natRulesList').hide(); // Hide NAT section
+                         modalBody.find('#natRulesList').hide();
                         showToast("加载容器信息失败。", 'danger');
                      }
                 },
                 complete: function() {
                     setButtonProcessing(buttonElement, false);
-                    // Modal was already shown initially
                 }
             });
-
-            // Show the modal immediately with loading content
-            // infoModalInstance.open() or similar would be called here after creating/updating
-            // In the .modal() usage above, it's often shown immediately.
-            // If using AntdModal.confirm/info, it manages its own lifecycle.
-            // With the manual DOM manipulation approach above, you'd show it first.
-             // Assuming `infoModalInstance = AntdModal.modal({...})` automatically shows it.
         }
 
-        // --- Load NAT Rules Function ---
         function loadNatRules(containerName) {
             const modalBody = infoModalInstance.$().find('.ant-modal-body');
             const natRulesContent = modalBody.find('#natRulesContent');
@@ -861,13 +677,12 @@
              $.ajax({
                 url: `/container/${containerName}/nat_rules`,
                 type: "GET",
-                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+                headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                 success: function(data) {
                     natRulesContent.empty();
 
                     if (data.status === 'success' && data.rules && data.rules.length > 0) {
                         data.rules.forEach(rule => {
-                             // Manual list item HTML for NAT rules
                             const ruleHtml = `
                                 <li data-rule-id="${rule.id}" style="background-color: #f9f9f9; border: 1px solid #eee; margin-bottom: 8px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
                                     <span class="rule-details" style="flex-grow: 1; margin-right: 10px; word-break: break-word;">
@@ -875,7 +690,6 @@
                                         <br><small style="color: rgba(0, 0, 0, 0.65);">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
                                     </span>
                                     <span class="rule-actions" style="flex-shrink: 0; margin-left: auto;">
-                                         <!-- Use Ant Design Button for delete rule -->
                                          <button type="button" class="ant-btn ant-btn-sm ant-btn-danger" onclick="deleteNatRule(${rule.id}, this)">删除</button>
                                     </span>
                                 </li>
@@ -893,7 +707,6 @@
                 error: function(jqXHR) {
                      if (jqXHR.status === 401) {
                         showToast("加载 NAT 规则需要认证，请重新登录。", 'danger');
-                         // Close NAT modal before redirecting (info modal is open)
                          if (infoModalInstance) { infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null;}
                          setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
                      } else {
@@ -912,8 +725,7 @@
         }
 
 
-        // --- Exec Modal Logic using Ant Design Modal ---
-        let execModalInstance = null; // To manage the Ant Design Modal instance
+        let execModalInstance = null;
 
         function openExecModal(containerName) {
              if (!AntdModal) {
@@ -921,7 +733,7 @@
                  return;
             }
 
-            selectedContainerName = containerName; // Set global state for container name
+            selectedContainerName = containerName;
 
              const execContent = `
                   <form id="execCommandForm" class="ant-form ant-form-vertical">
@@ -946,34 +758,15 @@
                   <pre id="execOutput" class="mt-2"></pre>
              `;
 
-             // Create or update modal
-             if (execModalInstance) {
-                execModalInstance.update({
-                    title: `在容器 ${containerName} 内执行命令`,
-                    content: execContent,
-                    footer: null,
-                    width: 700,
-                     onCancel: () => { execModalInstance.destroy(); execModalInstance = null; selectedContainerName = null;},
-                });
-                execModalInstance.open();
-             } else {
-                 execModalInstance = AntdModal.modal({
-                     title: `在容器 ${containerName} 内执行命令`,
-                     content: execContent,
-                     footer: null,
-                     width: 700,
-                     centered: true,
-                      onCancel: () => { execModalInstance.destroy(); execModalInstance = null; selectedContainerName = null;},
-                 });
-             }
+             execModalInstance = AntdModal.modal({
+                 title: `在容器 ${containerName} 内执行命令`,
+                 content: execContent,
+                 footer: null,
+                 width: 700,
+                 centered: true,
+                 onCancel: () => { if(execModalInstance) execModalInstance.destroy(); execModalInstance = null; selectedContainerName = null;},
+             });
 
-
-            // Attach submit handler AFTER the modal content is added to the DOM
-            // Use delegation if possible, or wait for modal shown event
-            // Since Antd Modal content is often dynamic, direct binding is tricky.
-            // A simpler approach for this jQuery context is to bind after a short delay or when the modal's DOM is known to exist.
-            // Or bind using delegation on the modal container itself.
-             // Let's bind using delegation on the modal's root element
              $(document).off('submit', '#execCommandForm').on('submit', '#execCommandForm', function(event) {
                   event.preventDefault();
                   const form = $(this);
@@ -989,7 +782,7 @@
                   }
 
                   outputArea.text('正在执行...');
-                  outputArea.removeClass('success error').css({ // Remove dynamic styles
+                  outputArea.removeClass('success error').css({
                      'border-color': '#ccc', 'background-color': '#f5f5f5', 'color': 'rgba(0, 0, 0, 0.85)'
                   });
 
@@ -1000,17 +793,17 @@
                       url: `/container/${containerName}/exec`,
                       type: "POST",
                       data: { command: command },
-                      headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+                      headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                       success: function(data) {
                           if (data.status === 'success') {
                               outputArea.text(data.output);
-                              outputArea.addClass('success').css({ // Add dynamic styles
+                              outputArea.addClass('success').css({
                                  'border-color': '#b7eb8f', 'background-color': '#f6ffed', 'color': '#237804'
                               });
                               showToast("命令执行成功。", 'success');
                           } else {
                               outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出'));
-                              outputArea.addClass('error').css({ // Add dynamic styles
+                              outputArea.addClass('error').css({
                                   'border-color': '#ffccc7', 'background-color': '#fff1f0', 'color': '#cf1322'
                               });
                               showToast(data.message || "命令执行失败。", 'danger');
@@ -1019,13 +812,12 @@
                       error: function(jqXHR) {
                            if (jqXHR.status === 401) {
                               showToast("操作需要认证，请重新登录。", 'danger');
-                               // Close modal before redirecting
                               if (execModalInstance) { execModalInstance.destroy(); execModalInstance = null; selectedContainerName = null;}
                               setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
                            } else {
                               const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "执行命令请求失败。";
                               outputArea.text("请求失败:\n" + message);
-                               outputArea.addClass('error').css({ // Add dynamic styles
+                               outputArea.addClass('error').css({
                                   'border-color': '#ffccc7', 'background-color': '#fff1f0', 'color': '#cf1322'
                               });
                               showToast("请求失败。", 'danger');
@@ -1038,9 +830,8 @@
              });
         }
 
-        // --- NAT Modal Logic using Ant Design Modal ---
-        let natModalInstance = null; // To manage the Ant Design Modal instance
-        let currentNatContainerIP = null; // Store fetched IP
+        let natModalInstance = null;
+        let currentNatContainerIP = null;
 
 
         function openNatModal(containerName) {
@@ -1049,8 +840,8 @@
                  return;
             }
 
-            selectedContainerName = containerName; // Set global state for container name
-            currentNatContainerIP = null; // Reset IP state
+            selectedContainerName = containerName;
+            currentNatContainerIP = null;
 
              const natContent = `
                  <div class="ant-alert ant-alert-warning ant-alert-no-icon" role="alert" style="margin-bottom: 20px;">
@@ -1096,7 +887,6 @@
                          <div class="ant-form-item-control">
                               <div class="ant-form-item-control-input">
                                   <div class="ant-form-item-control-input-content">
-                                      <!-- Use Ant Design Select styles -->
                                      <select class="ant-select ant-select-single ant-select-allow-clear ant-select-show-arrow ant-select-bordered" id="protocol" name="protocol" required>
                                          <option value="tcp">TCP</option>
                                          <option value="udp">UDP</option>
@@ -1113,63 +903,49 @@
                  </form>
              `;
 
-             // Create or update modal
-            if (natModalInstance) {
-                natModalInstance.update({
-                    title: `为容器 ${containerName} 添加 NAT 规则`,
-                    content: natContent,
-                    footer: null,
-                     onCancel: () => { natModalInstance.destroy(); natModalInstance = null; selectedContainerName = null; currentNatContainerIP = null;},
-                });
-                natModalInstance.open();
-             } else {
-                 natModalInstance = AntdModal.modal({
-                     title: `为容器 ${containerName} 添加 NAT 规则`,
-                     content: natContent,
-                     footer: null,
-                     centered: true,
-                     onCancel: () => { natModalInstance.destroy(); natModalInstance = null; selectedContainerName = null; currentNatContainerIP = null;},
-                 });
-             }
+            natModalInstance = AntdModal.modal({
+                 title: `为容器 ${containerName} 添加 NAT 规则`,
+                 content: natContent,
+                 footer: null,
+                 centered: true,
+                 onCancel: () => { if(natModalInstance) natModalInstance.destroy(); natModalInstance = null; selectedContainerName = null; currentNatContainerIP = null;},
+             });
 
-             // Fetch IP and update the input field + button state
-             const natContainerIPInput = natModalInstance.$().find('#natContainerIP'); // Get the input element
-             const addNatButton = natModalInstance.$().find('#addNatButton'); // Get the button
+             const natContainerIPInput = natModalInstance.$().find('#natContainerIP');
+             const addNatButton = natModalInstance.$().find('#addNatButton');
 
-             addNatButton.prop('disabled', true); // Disable button initially
+             addNatButton.prop('disabled', true);
 
              $.ajax({
                  url: `/container/${containerName}/info`,
                  type: "GET",
-                 headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+                 headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                  success: function(data) {
                       if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
                           const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
                           natContainerIPInput.val('获取 IP 失败: ' + (data.ip && data.ip === 'N/A' ? '未分配 IP' : data.status !== 'Running' ? '容器未运行' : ipError));
-                          addNatButton.prop('disabled', true).find('span').text('无法添加 (无IP)'); // Update button text
+                          addNatButton.prop('disabled', true).find('span').text('无法添加 (无IP)');
                           showToast("无法添加 NAT 规则: " + (data.status !== 'Running' ? '容器未运行' : '无法获取IP'), 'warning');
                       } else {
                          natContainerIPInput.val(data.ip);
-                         currentNatContainerIP = data.ip; // Store the valid IP
-                         addNatButton.prop('disabled', false).find('span').text('添加规则'); // Re-enable and reset text
+                         currentNatContainerIP = data.ip;
+                         addNatButton.prop('disabled', false).find('span').text('添加规则');
                       }
                  },
                  error: function(jqXHR) {
                       if (jqXHR.status === 401) {
                           showToast("获取容器信息需要认证，请重新登录。", 'danger');
-                          // Close NAT modal before redirecting
                           if (natModalInstance) { natModalInstance.destroy(); natModalInstance = null; selectedContainerName = null; currentNatContainerIP = null;}
                           setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
                       } else {
                           natContainerIPInput.val('获取 IP 失败');
-                          addNatButton.prop('disabled', true).find('span').text('无法添加 (无IP)'); // Disable and update text
+                          addNatButton.prop('disabled', true).find('span').text('无法添加 (无IP)');
                           const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "获取容器 IP 地址失败。";
                           showToast(message, 'danger');
                       }
                  }
              });
 
-             // Attach submit handler AFTER the modal content is added to the DOM
              $(document).off('submit', '#addNatForm').on('submit', '#addNatForm', function(event) {
                  event.preventDefault();
                  const form = $(this);
@@ -1179,7 +955,7 @@
                  const hostPort = $('#hostPort').val();
                  const containerPort = $('#containerPort').val();
                  const protocol = $('#protocol').val();
-                 const containerIP = $('#natContainerIP').val(); // Get the displayed IP
+                 const containerIP = $('#natContainerIP').val();
 
                  if (!hostPort || !containerPort || !protocol) {
                      showToast("请填写所有 NAT 规则信息。", 'warning');
@@ -1201,28 +977,26 @@
                          container_port: containerPort,
                          protocol: protocol
                      },
-                      headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+                      headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
                      success: function(data) {
                          showToast(data.message, data.status);
 
                          if (data.status === 'success' || data.status === 'warning') {
-                              // If info modal is open for the same container, reload its NAT rules
-                              if (infoModalInstance && selectedContainerName === containerName) { // Check using modal instance state
-                                  loadNatRules(containerName); // Reload NAT rules in the info modal
+                              if (infoModalInstance && selectedContainerName === containerName) {
+                                  loadNatRules(containerName);
                               }
 
                               if (data.status === 'success') {
-                                  // Clear form fields on successful add
                                   $('#hostPort').val('');
                                   $('#containerPort').val('');
                                   $('#protocol').val('tcp');
+                                  $('#natContainerIP').val(currentNatContainerIP); // Keep the fetched IP
                               }
                          }
                      },
                      error: function(jqXHR) {
                          if (jqXHR.status === 401) {
                               showToast("操作需要认证，请重新登录。", 'danger');
-                              // Close NAT modal before redirecting
                               if (natModalInstance) { natModalInstance.destroy(); natModalInstance = null; selectedContainerName = null; currentNatContainerIP = null;}
                               setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
                           } else {
@@ -1236,12 +1010,6 @@
                  });
              });
         }
-
-        // --- Modal Reset Logic ---
-        // Handled within each modal's onCancel or onOk/onConfirm destroy callback
-        // e.g., `onCancel: () => { infoModalInstance.destroy(); infoModalInstance = null; selectedContainerName = null; }`
-        // This is the Ant Design way of managing modal lifecycle.
-
     </script>
 </body>
 </html>
