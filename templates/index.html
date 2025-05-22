@@ -41,7 +41,7 @@
             border-radius: 4px;
             box-shadow: 0 2px 5px 0 rgba(0,0,0,.1), 0 2px 10px 0 rgba(0,0,0,.08);
             border: 1px solid #e0e0e0;
-            z-index: 1021;
+            z-index: 1021; /* Ensure dropdown is above table content */
         }
         .dropdown-toggle::after { margin-left: .355em; }
 
@@ -52,18 +52,18 @@
         .form-control:focus, .form-select:focus { border-color: #1a73e8; box-shadow: 0 0 0 1px #1a73e8; background-color: #fff; }
         .form-label { font-weight: 500; color: #5f6368; font-size: 0.875rem; margin-bottom: 0.3rem; }
 
-        .container-list-desktop {
-            border: 1px solid #e0e0e0;
-            border-radius: 8px;
-            background-color: #fff;
-            overflow-x: hidden; 
-            overflow-y: visible; 
-        }
+        /* Removed .container-list-desktop styles that created the outer box */
+        /* Styles for the table itself remain */
         .table {
             table-layout: fixed;
             width: 100%;
-            background-color: #fff;
+            background-color: #fff; /* Table body background */
             margin-bottom: 0;
+             border-left: 1px solid #e0e0e0; /* Add left border to table */
+             border-right: 1px solid #e0e0e0; /* Add right border to table */
+             border-bottom: 1px solid #e0e0e0; /* Add bottom border to table */
+             border-radius: 8px; /* Optional: if you want rounded corners for the table itself */
+             overflow: hidden; /* Needed if using border-radius on table */
         }
         .table th, .table td {
             padding: 0.75rem 1rem;
@@ -76,32 +76,37 @@
         }
         .table thead th {
             font-weight: 500; color: #5f6368;
-            border-bottom: 2px solid #d1d3d6; background-color: #f8f9fa; border-top: 0;
+            border-bottom: 2px solid #d1d3d6; background-color: #f8f9fa; /* Table header background */
+            border-top: 0; /* Remove default top border for header cells if table has its own top border */
         }
+         /* Ensure first row of th doesn't have top border if table has border-radius and border */
+        .table thead tr:first-child th:first-child { border-top-left-radius: 7px; } /* Adjust to match table's border-radius */
+        .table thead tr:first-child th:last-child { border-top-right-radius: 7px; } /* Adjust to match table's border-radius */
+
         .table-hover > tbody > tr:hover > * { background-color: rgba(26,115,232,.05); }
 
-        .table th.col-name, .table td.col-name { width: 20%; } /* Adjusted width */
+        .table th.col-name, .table td.col-name { width: 20%; }
         .table td.col-name { cursor: pointer; }
         .table th.col-status, .table td.col-status { width: 10%; text-align: center;}
-        .table th.col-ip, .table td.col-ip { width: 18%; } /* Adjusted width */
-        .table th.col-image, .table td.col-image { width: 22%; } /* Adjusted width */
+        .table th.col-ip, .table td.col-ip { width: 18%; }
+        .table th.col-image, .table td.col-image { width: 22%; }
         .table td.col-image { cursor: pointer; }
         .table th.col-created, .table td.col-created { width: 15%; }
         .table th.col-actions, .table td.col-actions {
             width: 15%;
             text-align: end;
-            overflow: visible; 
+            overflow: visible; /* Allow dropdown to overflow */
         }
         .table td.show-full-content {
             overflow: visible !important;
             white-space: normal !important;
             text-overflow: clip !important;
-            word-break: break-all; 
+            word-break: break-all;
         }
 
 
-        #loginFormContainer { 
-            max-width: 400px; 
+        #loginFormContainer {
+            max-width: 400px;
             margin-left: auto;
             margin-right: auto;
         }
@@ -123,21 +128,21 @@
         #natRulesList li { background-color:#fff; border:1px solid #e0e0e0; margin-bottom:.75rem; padding:.75rem 1rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:.85rem; }
         #natRulesList li:hover { background-color:#f1f3f4; }
 
-        .sticky-top-form-container { 
-            position: sticky; 
-            top: 20px; 
+        .sticky-top-form-container {
+            position: sticky;
+            top: 20px;
         }
         .create-form-panel { background-color: #fff; padding: 1.25rem; border-radius: 8px; border: 1px solid #e0e0e0; }
         .offcanvas-header { border-bottom:1px solid #e0e0e0; }
-      
+
     </style>
 </head>
 <body {% if not session.logged_in %}class="login-page"{% endif %}>
     {% if session.logged_in %}
     <div class="container main-content">
         <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-             <h1 class="page-title">Incus Web 管理器</h1>
-             <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">退出登录</a>
+            <h1 class="page-title">Incus Web 管理器</h1>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">退出登录</a>
         </div>
 
         {% if incus_error[0] %}
@@ -156,7 +161,7 @@
                     </div>
                 </div>
 
-                <div class="container-list-desktop d-none d-lg-block">
+                <div class="d-none d-lg-block">
                     <table class="table table-hover">
                         <thead>
                             <tr>
@@ -169,12 +174,12 @@
                             </tr>
                         </thead>
                         <tbody id="containerListDesktop">
-                        </tbody>
+                            </tbody>
                     </table>
                 </div>
                 
                 <div class="container-list-mobile d-block d-lg-none mt-3">
-                </div>
+                    </div>
             </div>
 
             <div class="col-lg-5 order-lg-2 d-none d-lg-block right-column">
@@ -205,7 +210,7 @@
         <div class="offcanvas-header"><h5 class="offcanvas-title" id="offcanvasCreateContainerLabel">创建新容器</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div>
         <div class="offcanvas-body">
             <form id="createContainerFormMobile">
-                 <div class="row g-3">
+                <div class="row g-3">
                     <div class="col-12"><label for="containerNameMobile" class="form-label">容器名称</label><input type="text" class="form-control" id="containerNameMobile" name="name" required></div>
                     <div class="col-12">
                         <label for="containerImageMobile" class="form-label">选择镜像</label>
@@ -223,14 +228,14 @@
     {% else %}
     <div class="container">
         <div id="loginFormContainer" class="py-5">
-             <h2 class="form-title">管理员登录</h2>
-             <form method="POST" action="{{ url_for('login') }}">
-                 <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
-                 <div class="mb-3"><label for="username" class="form-label">用户名</label><input type="text" class="form-control" id="username" name="username" required autofocus></div>
-                 <div class="mb-3"><label for="password" class="form-label">密码</label><input type="password" class="form-control" id="password" name="password" required></div>
-                 {% if login_error %}<div class="alert alert-danger mt-3">{{ login_error }}</div>{% endif %}
-                 <button type="submit" class="btn btn-primary w-100 mt-4">登录</button>
-             </form>
+            <h2 class="form-title">管理员登录</h2>
+            <form method="POST" action="{{ url_for('login') }}">
+                <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+                <div class="mb-3"><label for="username" class="form-label">用户名</label><input type="text" class="form-control" id="username" name="username" required autofocus></div>
+                <div class="mb-3"><label for="password" class="form-label">密码</label><input type="password" class="form-control" id="password" name="password" required></div>
+                {% if login_error %}<div class="alert alert-danger mt-3">{{ login_error }}</div>{% endif %}
+                <button type="submit" class="btn btn-primary w-100 mt-4">登录</button>
+            </form>
         </div>
     </div>
     {% endif %}
@@ -278,9 +283,9 @@
 
     function renderContainerListDesktop(containers) {
         const tbody = $('#containerListDesktop').empty();
-        if (!containers.length) { 
-            tbody.html('<tr><td colspan="6" class="text-center py-4">没有找到容器。</td></tr>'); 
-            return; 
+        if (!containers.length) {
+            tbody.html('<tr><td colspan="6" class="text-center py-4">沒有找到容器。</td></tr>');
+            return;
         }
         containers.forEach((c, i) => {
             const statusBadge = c.status === 'Running' ? 'success' : c.status === 'Stopped' ? 'danger' : 'secondary';
@@ -333,9 +338,9 @@
 
     function renderContainerListMobile(containers) {
         const mobileList = $('.container-list-mobile').empty();
-        if (!containers.length) { 
-            mobileList.html('<div class="alert alert-info text-center">没有找到容器。</div>'); 
-            return; 
+        if (!containers.length) {
+            mobileList.html('<div class="alert alert-info text-center">沒有找到容器。</div>');
+            return;
         }
         containers.forEach((c, i) => {
             const statusBadge = c.status === 'Running' ? 'success' : c.status === 'Stopped' ? 'danger' : 'secondary';
@@ -354,26 +359,42 @@
     }
 
     $(document).ready(function() {
-        initializeContainerData({{ containers|tojson|safe if session.logged_in else [] }});
+        // Ensure Jinja templating for containers is handled correctly
+        // It's assumed that '{{ containers|tojson|safe if session.logged_in else [] }}'
+        // will correctly inject the JavaScript array or an empty array.
+        try {
+            initializeContainerData({{ containers|tojson|safe if session.logged_in else [] }});
+        } catch (e) {
+            console.error("Error initializing container data:", e);
+            initializeContainerData([]); // Fallback to empty array
+        }
+
         $('#confirmModal').on('hidden.bs.modal', function(){ currentConfirmAction=null; currentConfirmContainerName=null; currentConfirmRuleId=null; currentConfirmButtonElement=null;});
         $('#infoModal').on('hidden.bs.modal', function(){ $('#basicInfoContent').html('加载中...'); $('#natRulesContent').html('<li>加载中...</li>'); $('#natRulesError,#infoError').addClass('d-none').text(''); $('#infoModalLabel').text('容器信息'); $('#natRulesList').hide(); });
         $('#execModal').on('hidden.bs.modal', function(){ $('#execContainerName,#commandInput').val(''); $('#execOutput').text('').removeClass('success error'); $('#execModalLabel').text('执行命令'); setButtonProcessing($('#execButton'),false); });
         $('#natModal').on('hidden.bs.modal', function(){ $('#natContainerName,#natContainerIP,#hostPort,#containerPort').val(''); $('#protocol').val('tcp'); $('#natModalLabel').text('添加NAT规则'); setButtonProcessing($('#addNatButton'),false).prop('disabled',false).text('添加');});
+    
+        // Click outside expanded cell to collapse
+        $(document).on('click', function(e) {
+            if (!$(e.target).closest('.show-full-content, .dropdown-menu').length) {
+                $('.table td.show-full-content').removeClass('show-full-content');
+            }
+        });
     });
     function showToast(m,t='info'){let type=t==='success'?'success':t==='error'?'danger':t==='warning'?'warning':'info';$('#toastContainer').append(`<div class="toast align-items-center text-bg-${type} border-0" role="alert"><div class="d-flex"><div class="toast-body">${m}</div><button class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`).children(':last').toast('show').on('hidden.bs.toast',function(){$(this).remove();});}
-    function setButtonProcessing(b,s){const $b=$(b);if(!$b.length)return;if(s){if(!$b.data('h')){$b.data('h',$b.html());$b.html(`<span class="spinner-border spinner-border-sm me-1"></span> ${$b.text().trim()||'处理...'}`);$b.prop('disabled',true).addClass('btn-p');}}else{if($b.data('h'))$b.html($b.data('h')).removeData('h');$b.prop('disabled',false).removeClass('btn-p');}}
+    function setButtonProcessing(b,s){const $b=$(b);if(!$b.length)return $b;if(s){if(!$b.data('h')){$b.data('h',$b.html());$b.html(`<span class="spinner-border spinner-border-sm me-1"></span> ${$b.text().trim()||'处理...'}`);$b.prop('disabled',true).addClass('btn-p');}}else{if($b.data('h'))$b.html($b.data('h')).removeData('h');$b.prop('disabled',false).removeClass('btn-p');} return $b;} // Return jQuery object
     var currentConfirmAction=null,currentConfirmContainerName=null,currentConfirmRuleId=null,currentConfirmButtonElement=null;
-    function showConfirmationModal(a,id,b){currentConfirmAction=a;currentConfirmButtonElement=b;let ti='请确认',bd='',bc='btn-primary',bt='确认';if(a.endsWith('_container'))currentConfirmContainerName=id;else currentConfirmRuleId=id;if(a==='restart_container'){ti='确认重启';bd=`确定重启<strong>${id}</strong>？`;bc='btn-warning';bt='重启';}else if(a==='delete_container'){ti='确认删除';bd=`<strong>警告:</strong>永久删除<strong>${id}</strong>！<br>确定吗？`;bc='btn-danger';bt='删除';}else if(a==='delete_nat_rule'){ti='确认删除NAT';bd=`确定删除ID<strong>${id}</strong>的NAT规则？`;bc='btn-danger';bt='删除规则';}$('#confirmModalLabel').text(ti);$('#confirmModalBody').html(bd);$('#confirmActionButton').removeClass('btn-primary btn-warning btn-danger').addClass(bc).text(bt);setButtonProcessing($('#confirmActionButton'),!1);new bootstrap.Modal(document.getElementById('confirmModal')).show();}
-    $('#confirmActionButton').click(function(){const a=currentConfirmAction,be=currentConfirmButtonElement,cb=$(this);if(!a||(!currentConfirmContainerName&&!currentConfirmRuleId)){showToast("信息丢失",'danger');bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();return;}setButtonProcessing(cb,1);if(a!=='delete_nat_rule'&&be)setButtonProcessing(be,1);let u,y,d;if(a==='delete_nat_rule'){u=`/container/nat_rule/${currentConfirmRuleId}`;y='DELETE';}else{let o=a.replace('_container','');u=`/container/${currentConfirmContainerName}/action`;y='POST';d={action:o};}$.ajax({url:u,type:y,data:d,headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success'||(res.status==='warning'&&a==='delete_nat_rule')){if(a==='delete_nat_rule'){const cnm=$('#infoModalLabel').text().replace('容器信息: ','');if(cnm)loadNatRules(cnm);else location.reload();}else location.reload();}else if(be&&a!=='delete_nat_rule')setButtonProcessing(be,!1);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{showToast(`失败: ${xhr.responseJSON?.message||'未知'}`,'danger');}if(be&&a!=='delete_nat_rule')setButtonProcessing(be,!1);},complete:function(){bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();setButtonProcessing(cb,!1);}});});
-    function handleCreateContainer(f,b){const $f=$(f),$b=$(b);setButtonProcessing($b,1);$.ajax({url:"{{url_for('create_container')}}",type:"POST",data:$f.serialize(),headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success'){$f[0].reset();const offcanvasEl = document.getElementById('offcanvasCreateContainer'); if(offcanvasEl) { const offcanvasBs = bootstrap.Offcanvas.getInstance(offcanvasEl); if(offcanvasBs) { offcanvasBs.hide();}} location.reload();}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{showToast(`错误: ${xhr.responseJSON?.message||'创建失败'}`,'danger');}},complete:function(){setButtonProcessing($b,!1);}});}$('#createContainerForm').submit(function(e){e.preventDefault();handleCreateContainer(this,$('#createButton'));});$('#createContainerFormMobile').submit(function(e){e.preventDefault();handleCreateContainer(this,$('#createButtonMobile'));});
-    function performAction(cn,a,b){if(a==='restart'||a==='delete'){showConfirmationModal(`${a}_container`,cn,b);return;}setButtonProcessing(b,1);$.ajax({url:`/container/${cn}/action`,type:"POST",data:{action:a},headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success')location.reload();else setButtonProcessing(b,!1);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{showToast(`失败: ${xhr.responseJSON?.message||'未知'}`,'danger');}setButtonProcessing(b,!1);}});}
-    function showInfo(cn,b){const m=new bootstrap.Modal(document.getElementById('infoModal'));$('#infoModalLabel').text(`容器信息: ${cn}`);$('#basicInfoContent').html('<p>加载中...</p>');$('#natRulesContent').html('<li>加载中...</li>');$('#natRulesError,#infoError').addClass('d-none');$('#natRulesList').show();if(b)setButtonProcessing(b,1);$.ajax({url:`/container/${cn}/info`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){if(d.status==='NotFound'){$('#basicInfoContent').html(`<p><strong>错误:</strong> ${d.message}</p>`);$('#infoError').removeClass('d-none').text(d.message);showToast("加载失败",'danger');$('#natRulesList').hide();return;}let h=`<p><strong>名称:</strong> ${d.name}</p><p><strong>状态:</strong> <span class="badge bg-${d.status==='Running'?'success':d.status==='Stopped'?'danger':'secondary'}">${d.status}</span> (${d.status_code})</p><p><strong>IP:</strong> ${d.ip||'-'}</p><p><strong>镜像:</strong> ${d.description||d.image_source||'N/A'}</p><p><strong>创建:</strong> ${d.created_at?d.created_at.split('T')[0]:'N/A'}</p><p><strong>架构:</strong> ${d.architecture||'N/A'}</p><p><strong>类型:</strong> ${d.type}</p><p><strong>临时:</strong> ${d.ephemeral?'是':'否'}</p><p><strong>配置:</strong> ${d.profiles.join(', ')||'无'}</p><p class="mt-2"><small class="text-muted">${d.message||''}</small></p>`;$('#basicInfoContent').html(h);if(!d.live_data_available&&d.status!=='NotFound')showToast(d.message,'warning');loadNatRules(cn);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{$('#basicInfoContent').html(`<p><strong>错误:</strong> ${xhr.responseJSON?.message||"请求失败"}</p>`);$('#infoError').removeClass('d-none').text(xhr.responseJSON?.message||"请求失败");$('#natRulesList').hide();showToast("加载失败",'danger');}},complete:function(){if(b)setButtonProcessing(b,!1);m.show();}});}
-    function loadNatRules(cn){$.ajax({url:`/container/${cn}/nat_rules`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){$('#natRulesContent').empty();if(d.status==='success'&&d.rules?.length>0){d.rules.forEach(r=>{$('#natRulesContent').append(`<li data-rule-id="${r.id}"><span class="rule-details"><strong>ID ${r.id}:</strong> 主机 ${r.host_port}/${r.protocol} → 容器 ${r.ip_at_creation}:${r.container_port}<br><small>创建: ${r.created_at?new Date(r.created_at).toLocaleString():'N/A'}</small></span><span class="rule-actions"><button class="btn btn-sm btn-danger" onclick="deleteNatRule(${r.id},this)">删除</button></span></li>`);});}else if(d.status==='success')$('#natRulesContent').html('<li>无NAT记录。</li>');else{$('#natRulesContent').html('<li>加载NAT失败。</li>');$('#natRulesError').removeClass('d-none').text(d.message||'错误');showToast(d.message||"加载NAT失败",'danger');}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{$('#natRulesContent').html('<li>加载NAT失败。</li>');$('#natRulesError').removeClass('d-none').text(xhr.responseJSON?.message||"请求失败");showToast(xhr.responseJSON?.message||"加载NAT失败",'danger');}}});}
+    function showConfirmationModal(a,id,b){currentConfirmAction=a;currentConfirmButtonElement=b;let ti='请确认',bd='',bc='btn-primary',bt='确认';if(a.endsWith('_container'))currentConfirmContainerName=id;else currentConfirmRuleId=id;if(a==='restart_container'){ti='确认重启';bd=`确定重启<strong>${id}</strong>？`;bc='btn-warning';bt='重启';}else if(a==='delete_container'){ti='确认删除';bd=`<strong>警告:</strong>永久删除<strong>${id}</strong>！<br>确定吗？`;bc='btn-danger';bt='删除';}else if(a==='delete_nat_rule'){ti='确认删除NAT';bd=`确定删除ID<strong>${id}</strong>的NAT规则？`;bc='btn-danger';bt='删除规则';}$('#confirmModalLabel').text(ti);$('#confirmModalBody').html(bd);$('#confirmActionButton').removeClass('btn-primary btn-warning btn-danger').addClass(bc).text(bt);setButtonProcessing($('#confirmActionButton'),false);new bootstrap.Modal(document.getElementById('confirmModal')).show();}
+    $('#confirmActionButton').click(function(){const a=currentConfirmAction,be=currentConfirmButtonElement,cb=$(this);if(!a||(!currentConfirmContainerName&&!currentConfirmRuleId)){showToast("信息丢失",'danger');bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();return;}setButtonProcessing(cb,true);if(a!=='delete_nat_rule'&&be)setButtonProcessing(be,true);let u,y,d;if(a==='delete_nat_rule'){u=`/container/nat_rule/${currentConfirmRuleId}`;y='DELETE';}else{let o=a.replace('_container','');u=`/container/${currentConfirmContainerName}/action`;y='POST';d={action:o};}$.ajax({url:u,type:y,data:d,headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success'||(res.status==='warning'&&a==='delete_nat_rule')){if(a==='delete_nat_rule'){const cnm=$('#infoModalLabel').text().replace('容器信息: ','');if(cnm)loadNatRules(cnm);else location.reload();}else location.reload();}else if(be&&a!=='delete_nat_rule')setButtonProcessing(be,false);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`失败: ${xhr.responseJSON?.message||'未知'}`,'danger');}if(be&&a!=='delete_nat_rule')setButtonProcessing(be,false);},complete:function(){bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();setButtonProcessing(cb,false);}});});
+    function handleCreateContainer(f,b){const $f=$(f),$b=$(b);setButtonProcessing($b,true);$.ajax({url:"{{url_for('create_container')}}",type:"POST",data:$f.serialize(),headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success'){$f[0].reset();const offcanvasEl = document.getElementById('offcanvasCreateContainer'); if(offcanvasEl) { const offcanvasBs = bootstrap.Offcanvas.getInstance(offcanvasEl); if(offcanvasBs) { offcanvasBs.hide();}} location.reload();}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`错误: ${xhr.responseJSON?.message||'创建失败'}`,'danger');}},complete:function(){setButtonProcessing($b,false);}});}$('#createContainerForm').submit(function(e){e.preventDefault();handleCreateContainer(this,$('#createButton'));});$('#createContainerFormMobile').submit(function(e){e.preventDefault();handleCreateContainer(this,$('#createButtonMobile'));});
+    function performAction(cn,a,b){if(a==='restart'||a==='delete'){showConfirmationModal(`${a}_container`,cn,b);return;}setButtonProcessing(b,true);$.ajax({url:`/container/${cn}/action`,type:"POST",data:{action:a},headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success')location.reload();else setButtonProcessing(b,false);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`失败: ${xhr.responseJSON?.message||'未知'}`,'danger');}setButtonProcessing(b,false);}});}
+    function showInfo(cn,b){const m=new bootstrap.Modal(document.getElementById('infoModal'));$('#infoModalLabel').text(`容器信息: ${cn}`);$('#basicInfoContent').html('<p>加载中...</p>');$('#natRulesContent').html('<li>加载中...</li>');$('#natRulesError,#infoError').addClass('d-none');$('#natRulesList').show();if(b)setButtonProcessing(b,true);$.ajax({url:`/container/${cn}/info`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){if(d.status==='NotFound'){$('#basicInfoContent').html(`<p><strong>错误:</strong> ${d.message}</p>`);$('#infoError').removeClass('d-none').text(d.message);showToast("加载失败",'danger');$('#natRulesList').hide();return;}let h=`<p><strong>名称:</strong> ${d.name}</p><p><strong>状态:</strong> <span class="badge bg-${d.status==='Running'?'success':d.status==='Stopped'?'danger':'secondary'}">${d.status}</span> (${d.status_code})</p><p><strong>IP:</strong> ${d.ip||'-'}</p><p><strong>镜像:</strong> ${d.description||d.image_source||'N/A'}</p><p><strong>创建:</strong> ${d.created_at?d.created_at.split('T')[0]:'N/A'}</p><p><strong>架构:</strong> ${d.architecture||'N/A'}</p><p><strong>类型:</strong> ${d.type}</p><p><strong>临时:</strong> ${d.ephemeral?'是':'否'}</p><p><strong>配置:</strong> ${d.profiles.join(', ')||'无'}</p><p class="mt-2"><small class="text-muted">${d.message||''}</small></p>`;$('#basicInfoContent').html(h);if(!d.live_data_available&&d.status!=='NotFound')showToast(d.message,'warning');loadNatRules(cn);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{$('#basicInfoContent').html(`<p><strong>错误:</strong> ${xhr.responseJSON?.message||"请求失败"}</p>`);$('#infoError').removeClass('d-none').text(xhr.responseJSON?.message||"请求失败");$('#natRulesList').hide();showToast("加载失败",'danger');}},complete:function(){if(b)setButtonProcessing(b,false);m.show();}});}
+    function loadNatRules(cn){$.ajax({url:`/container/${cn}/nat_rules`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){$('#natRulesContent').empty();if(d.status==='success'&&d.rules?.length>0){d.rules.forEach(r=>{$('#natRulesContent').append(`<li data-rule-id="${r.id}"><span class="rule-details"><strong>ID ${r.id}:</strong> 主机 ${r.host_port}/${r.protocol} → 容器 ${r.ip_at_creation}:${r.container_port}<br><small>创建: ${r.created_at?new Date(r.created_at).toLocaleString():'N/A'}</small></span><span class="rule-actions"><button class="btn btn-sm btn-danger" onclick="deleteNatRule(${r.id},this)">删除</button></span></li>`);});}else if(d.status==='success')$('#natRulesContent').html('<li>无NAT记录。</li>');else{$('#natRulesContent').html('<li>加载NAT失败。</li>');$('#natRulesError').removeClass('d-none').text(d.message||'错误');showToast(d.message||"加载NAT失败",'danger');}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{$('#natRulesContent').html('<li>加载NAT失败。</li>');$('#natRulesError').removeClass('d-none').text(xhr.responseJSON?.message||"请求失败");showToast(xhr.responseJSON?.message||"加载NAT失败",'danger');}}});}
     function deleteNatRule(id,b){showConfirmationModal('delete_nat_rule',id,b);}
-    function openExecModal(cn){$('#execContainerName').val(cn);$('#execModalLabel').text(`在${cn}执行`);$('#commandInput').val('');$('#execOutput').text('').removeClass('success error');setButtonProcessing($('#execButton'),!1);new bootstrap.Modal(document.getElementById('execModal')).show();}
-    $('#execCommandForm').submit(function(e){e.preventDefault();const $f=$(this), $b=$('#execButton',$f),$o=$('#execOutput');let cn=$('#execContainerName').val(),cd=$('#commandInput').val();if(!cd.trim()){showToast("输入命令",'warning');return;}$o.text('执行中...').removeClass('success error');setButtonProcessing($b,1);$.ajax({url:`/container/${cn}/exec`,type:"POST",data:{command:cd},headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){if(d.status==='success'){$o.text(d.output).addClass('success');showToast("成功",'success');}else{$o.text(`失败:\n${d.output||d.message||'无输出'}`).addClass('error');showToast(d.message||"失败",'danger');}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{const m=xhr.responseJSON?.output||xhr.responseJSON?.message||'未知';$o.text(`请求失败:\n${m}`).addClass('error');showToast("请求失败",'danger');}},complete:function(){setButtonProcessing($b,!1);}});});
-    function openNatModal(cn){$('#natContainerName').val(cn);$('#natModalLabel').text(`为${cn}添加NAT`);$('#hostPort,#containerPort').val('');$('#protocol').val('tcp');$('#natContainerIP').val('获取IP...');setButtonProcessing($('#addNatButton'),!1).prop('disabled',!1).text('添加');new bootstrap.Modal(document.getElementById('natModal')).show();$.ajax({url:`/container/${cn}/info`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){if(d.status==='NotFound'||d.status!=='Running'||!d.ip||d.ip==='N/A'){const e=d.status!=='Running'?'未运行':(d.ip==='N/A'?'无IP':(d.message||"无法获取IP"));$('#natContainerIP').val(`失败:${e}`);$('#addNatButton').prop('disabled',1).text('无法添加');showToast(`无法添加NAT:${e}`,'warning');}else{$('#natContainerIP').val(d.ip);}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');const natModalEl = document.getElementById('natModal'); if(natModalEl) { const natModalBs = bootstrap.Modal.getInstance(natModalEl); if(natModalBs) { natModalBs.hide();}} setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{$('#natContainerIP').val('获取IP失败');$('#addNatButton').prop('disabled',1).text('无法添加');showToast(xhr.responseJSON?.message||"获取IP失败",'danger');}}});}
-    $('#addNatForm').submit(function(e){e.preventDefault();const $f=$(this),$b=$('#addNatButton',$f);setButtonProcessing($b,1);$.ajax({url:`/container/${$('#natContainerName').val()}/add_nat_rule`,type:"POST",data:$f.serialize(),headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){showToast(d.message,d.status);if(d.status==='success'||d.status==='warning'){const cnm=$('#infoModalLabel').text().replace('容器信息: ','');if(cnm===$('#natContainerName').val())loadNatRules(cnm);if(d.status==='success'){$f.find('#hostPort,#containerPort').val('');$f.find('#protocol').val('tcp');}}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');const natModalEl = document.getElementById('natModal'); if(natModalEl) { const natModalBs = bootstrap.Modal.getInstance(natModalEl); if(natModalBs) { natModalBs.hide();}} setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1E3);}else{showToast(xhr.responseJSON?.message||'添加失败','danger');}},complete:function(){setButtonProcessing($b,!1);}});});
+    function openExecModal(cn){$('#execContainerName').val(cn);$('#execModalLabel').text(`在${cn}执行`);$('#commandInput').val('');$('#execOutput').text('').removeClass('success error');setButtonProcessing($('#execButton'),false);new bootstrap.Modal(document.getElementById('execModal')).show();}
+    $('#execCommandForm').submit(function(e){e.preventDefault();const $f=$(this), $b=$('#execButton',$f),$o=$('#execOutput');let cn=$('#execContainerName').val(),cd=$('#commandInput').val();if(!cd.trim()){showToast("输入命令",'warning');return;}$o.text('执行中...').removeClass('success error');setButtonProcessing($b,true);$.ajax({url:`/container/${cn}/exec`,type:"POST",data:{command:cd},headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){if(d.status==='success'){$o.text(d.output).addClass('success');showToast("成功",'success');}else{$o.text(`失败:\n${d.output||d.message||'无输出'}`).addClass('error');showToast(d.message||"失败",'danger');}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{const m=xhr.responseJSON?.output||xhr.responseJSON?.message||'未知';$o.text(`请求失败:\n${m}`).addClass('error');showToast("请求失败",'danger');}},complete:function(){setButtonProcessing($b,false);}});});
+    function openNatModal(cn){$('#natContainerName').val(cn);$('#natModalLabel').text(`为${cn}添加NAT`);$('#hostPort,#containerPort').val('');$('#protocol').val('tcp');$('#natContainerIP').val('获取IP...');setButtonProcessing($('#addNatButton'),false).prop('disabled',false).text('添加');new bootstrap.Modal(document.getElementById('natModal')).show();$.ajax({url:`/container/${cn}/info`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){if(d.status==='NotFound'||d.status!=='Running'||!d.ip||d.ip==='N/A'){const e=d.status!=='Running'?'未运行':(d.ip==='N/A'?'无IP':(d.message||"无法获取IP"));$('#natContainerIP').val(`失败:${e}`);$('#addNatButton').prop('disabled',true).text('无法添加');showToast(`无法添加NAT:${e}`,'warning');}else{$('#natContainerIP').val(d.ip);}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');const natModalEl = document.getElementById('natModal'); if(natModalEl) { const natModalBs = bootstrap.Modal.getInstance(natModalEl); if(natModalBs) { natModalBs.hide();}} setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{$('#natContainerIP').val('获取IP失败');$('#addNatButton').prop('disabled',true).text('无法添加');showToast(xhr.responseJSON?.message||"获取IP失败",'danger');}}});}
+    $('#addNatForm').submit(function(e){e.preventDefault();const $f=$(this),$b=$('#addNatButton',$f);setButtonProcessing($b,true);$.ajax({url:`/container/${$('#natContainerName').val()}/add_nat_rule`,type:"POST",data:$f.serialize(),headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(d){showToast(d.message,d.status);if(d.status==='success'||d.status==='warning'){const cnm=$('#infoModalLabel').text().replace('容器信息: ','');if(cnm===$('#natContainerName').val())loadNatRules(cnm);if(d.status==='success'){$f.find('#hostPort,#containerPort').val('');$f.find('#protocol').val('tcp');}}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');const natModalEl = document.getElementById('natModal'); if(natModalEl) { const natModalBs = bootstrap.Modal.getInstance(natModalEl); if(natModalBs) { natModalBs.hide();}} setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(xhr.responseJSON?.message||'添加失败','danger');}},complete:function(){setButtonProcessing($b,false);}});});
 </script>
 </body>
 </html>
