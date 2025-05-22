@@ -100,11 +100,11 @@
             font-weight: bold;
         }
         .truncate-text {
-            max-width: 180px; 
+            max-width: 100%; /* Allow div to fill column, then truncate */
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            display: inline-block;
+            display: inline-block; /* or block if preferred */
             vertical-align: middle; 
         }
         .actions-dropdown .dropdown-menu {
@@ -157,10 +157,10 @@
 
                 <div class="container-list-desktop d-none d-md-block">
                     <div class="row gx-3 py-2 desktop-list-header">
-                        <div class="col-md-2">名称</div>
+                        <div class="col-md-1">名称</div>
                         <div class="col-md-1">状态</div>
                         <div class="col-md-2">IP 地址</div>
-                        <div class="col-md-3">镜像来源</div>
+                        <div class="col-md-4">镜像来源</div>
                         <div class="col-md-2">创建时间</div>
                         <div class="col-md-2 text-center">操作</div>
                     </div>
@@ -168,10 +168,10 @@
                         {% if containers %}
                             {% for c in containers %}
                             <div class="row gx-3 py-2 align-items-center desktop-list-row">
-                                <div class="col-md-2">{{ c.name }}</div>
+                                <div class="col-md-1">{{ c.name }}</div>
                                 <div class="col-md-1"><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></div>
                                 <div class="col-md-2">{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</div>
-                                <div class="col-md-3">
+                                <div class="col-md-4">
                                     <div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">
                                         {{ c.image_source if c.image_source else 'N/A' }}
                                     </div>
