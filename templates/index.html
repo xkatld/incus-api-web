@@ -104,8 +104,8 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            display: inline-block; /* 或者 block，取决于布局需求 */
-            vertical-align: middle; /* 如果是inline-block，用于垂直对齐 */
+            display: inline-block; 
+            vertical-align: middle; 
         }
         .actions-dropdown .dropdown-menu {
             min-width: auto;
@@ -113,16 +113,67 @@
         .actions-dropdown .dropdown-item {
             padding: .25rem 1rem;
         }
-        .desktop-list-header {
+
+        /* Custom adaptive table styles for container list */
+        .custom-container-list-row {
+            display: flex;
+            align-items: center; /* Vertically align items in the row */
+            padding: 0.5rem 0; /* Vertical padding for rows */
+            border-bottom: 1px solid #eee; /* Row separator */
+        }
+        .custom-container-list-row:last-child {
+            border-bottom: none;
+        }
+
+        .custom-container-list-header {
+            display: flex;
+            align-items: center;
             font-weight: bold;
             background-color: #f8f9fa;
             border-bottom: 2px solid #dee2e6;
+            padding: 0.5rem 0; /* Match row padding */
         }
-        .desktop-list-row {
-            border-bottom: 1px solid #eee;
+
+        .custom-col {
+            padding: 0 0.75rem; /* Horizontal padding for columns */
+            box-sizing: border-box;
+            word-break: break-word; /* Allow breaking long words if needed */
         }
-        .desktop-list-row:last-child {
-            border-bottom: none;
+
+        .custom-col-name {
+            flex: 2.5; 
+            min-width: 120px; 
+        }
+
+        .custom-col-status {
+            flex: 1;
+            min-width: 80px;
+            text-align: center; 
+        }
+        .custom-col-status .badge { 
+            display: inline-block;
+        }
+
+        .custom-col-ip {
+            flex: 2;
+            min-width: 100px;
+        }
+
+        .custom-col-image {
+            flex: 2;
+            min-width: 100px;
+            /* .truncate-text class will handle overflow */
+        }
+
+        .custom-col-created {
+            flex: 2.5;
+            min-width: 120px;
+        }
+
+        .custom-col-actions {
+            flex: 1.5;
+            min-width: 90px;
+            text-align: center;
         }
 
     </style>
@@ -161,39 +212,43 @@
                 </div>
 
                 <div class="container-list-desktop d-none d-md-block">
-                    <div class="row gx-3 py-2 desktop-list-header">
-                        <div class="col-md-2">名称</div>
-                        <div class="col-md-1">状态</div>
-                        <div class="col-md-2">IP 地址</div>
-                        <div class="col-md-2">镜像来源</div>
-                        <div class="col-md-3">创建时间</div>
-                        <div class="col-md-2 text-center">操作</div>
+                    <div class="custom-container-list-header">
+                        <div class="custom-col custom-col-name">名称</div>
+                        <div class="custom-col custom-col-status">状态</div>
+                        <div class="custom-col custom-col-ip">IP 地址</div>
+                        <div class="custom-col custom-col-image">镜像来源</div>
+                        <div class="custom-col custom-col-created">创建时间</div>
+                        <div class="custom-col custom-col-actions">操作</div>
                     </div>
                     <div id="containerListDesktopItems">
                         {% if containers %}
                             {% for c in containers %}
-                            <div class="row gx-3 py-2 align-items-center desktop-list-row">
-                                <div class="col-md-2">
+                            <div class="custom-container-list-row">
+                                <div class="custom-col custom-col-name">
                                     <div class="truncate-text" title="{{ c.name }}">
                                         {{ c.name }}
                                     </div>
                                 </div>
-                                <div class="col-md-1"><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></div>
-                                <div class="col-md-2">
+                                <div class="custom-col custom-col-status">
+                                    <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
+                                </div>
+                                <div class="custom-col custom-col-ip">
                                     <div class="truncate-text" title="{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}">
                                         {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}
                                     </div>
                                 </div>
-                                <div class="col-md-2"> <div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">
+                                <div class="custom-col custom-col-image">
+                                    <div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">
                                         {{ c.image_source if c.image_source else 'N/A' }}
                                     </div>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="custom-col custom-col-created">
                                     <div class="truncate-text" title="{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}">
                                         {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}
                                     </div>
                                 </div>
-                                <div class="col-md-2 text-center"> <div class="dropdown actions-dropdown">
+                                <div class="custom-col custom-col-actions">
+                                    <div class="dropdown actions-dropdown">
                                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="actionsDropdownDesktop-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
                                             操作
                                         </button>
