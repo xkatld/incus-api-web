@@ -28,21 +28,21 @@
         }
         .modal { z-index: 1050; }
         .modal-backdrop { z-index: 1049; }
-        .container-actions .d-flex-desktop {
-            align-items: center;
-            display: none !important;
-        }
+        /* .container-actions .d-flex-desktop { */ /* No longer directly used due to dropdown */
+            /* align-items: center; */
+            /* display: none !important; */
+        /* } */
         @media (min-width: 768px) {
-            .container-actions .d-flex-desktop {
-                display: flex !important;
-                flex-direction: row;
-                gap: 0.25rem;
-            }
+            /* .container-actions .d-flex-desktop { */ /* No longer directly used */
+                /* display: flex !important; */
+                /* flex-direction: row; */
+                /* gap: 0.25rem; */
+            /* } */
              .container-list-mobile {
                 display: none;
              }
-             .container-list-desktop {
-                 display: block;
+             .container-list-desktop { /* This class is now on the table */
+                 /* display: block; */ /* Bootstrap d-md-block handles this */
              }
         }
          .container-list-mobile {
@@ -50,9 +50,6 @@
          }
          .container-list-mobile .card-actions {
             margin-top: 1rem;
-            /* display: flex; */ /* Removed for dropdown */
-            /* flex-wrap: wrap; */ /* Removed for dropdown */
-            /* gap: 0.5rem; */ /* Removed for dropdown */
          }
           .container-list-mobile .card-text small {
             font-weight: bold;
@@ -156,8 +153,8 @@
                     </button>
                 </div>
 
-                <div class="table-responsive container-list-desktop d-none d-md-block">
-                    <table class="table table-striped table-hover align-middle">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover align-middle container-list-desktop d-none d-md-block">
                         <thead class="table-light">
                             <tr>
                                 <th>名称</th>
