@@ -9,7 +9,7 @@
     <style>
         body {
             font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
-            background-color: #f8f9fa;
+            background-color: #f8f9fa; /* Main page background */
             color: #3c4043;
         }
         .main-content { padding-top: 1.5rem; padding-bottom: 2rem; }
@@ -32,7 +32,13 @@
         .btn-outline-secondary:hover { background-color: #f1f3f4; color: #202124; border-color: #dadce0; }
         .btn-sm { padding: 0.25rem 0.75rem; font-size: 0.75rem; }
         .dropdown-item { font-size: 0.875rem; padding: 0.35rem 1rem; }
-        .dropdown-menu { border-radius: 4px; box-shadow: 0 2px 5px 0 rgba(0,0,0,.1), 0 2px 10px 0 rgba(0,0,0,.08); border: 1px solid #e0e0e0;}
+        .dropdown-menu {
+            border-radius: 4px;
+            box-shadow: 0 2px 5px 0 rgba(0,0,0,.1), 0 2px 10px 0 rgba(0,0,0,.08);
+            border: 1px solid #e0e0e0;
+            z-index: 1021; /* Ensure dropdown is above table content */
+        }
+        .dropdown-toggle::after { margin-left: .355em; }
 
         .form-control, .form-select {
             border-radius: 4px; border: 1px solid #dadce0; padding: 0.6rem 0.75rem;
@@ -41,17 +47,32 @@
         .form-control:focus, .form-select:focus { border-color: #1a73e8; box-shadow: 0 0 0 1px #1a73e8; background-color: #fff; }
         .form-label { font-weight: 500; color: #5f6368; font-size: 0.875rem; margin-bottom: 0.3rem; }
 
-        .table-responsive { border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; background-color: #fff; }
-        .table { background-color: #fff; margin-bottom: 0; } /* No margin for table inside responsive div */
-        .table th, .table td { padding: 0.75rem 1rem; vertical-align: middle; border-top: 1px solid #e0e0e0; font-size: 0.875rem; }
+        .table-responsive { border: 1px solid #e0e0e0; border-radius: 8px; overflow-x: auto; background-color: #fff; }
+        .table { background-color: #fff; margin-bottom: 0; }
+        .table th, .table td { padding: 0.75rem 1rem; vertical-align: middle; border-top: 1px solid #e0e0e0; font-size: 0.875rem; white-space: nowrap;}
+        .table th:first-child, .table td:first-child { white-space: normal; } /* Allow container name to wrap */
         .table thead th { font-weight: 500; color: #5f6368; border-bottom: 2px solid #d1d3d6; background-color: #f8f9fa; border-top: 0; }
         .table-hover > tbody > tr:hover > * { background-color: rgba(26,115,232,.05); }
 
-        #loginContainer {
-            max-width: 420px; padding: 2.5rem; background-color: #fff; border: 1px solid #dadce0;
-            border-radius: 8px; box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15);
+        /* Login Form Styles */
+        #loginFormContainer {
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+            padding: 2rem 0; /* Padding top/bottom, no side padding */
         }
-        #loginContainer h2.form-title { border-bottom: none; font-size: 1.5rem; color: #202124; margin-bottom: 1.5rem; }
+        #loginFormContainer .form-title {
+            text-align: center;
+            font-size: 1.75rem;
+            color: #202124;
+            margin-bottom: 1.5rem;
+        }
+        #loginFormContainer .form-control {
+            /* Uses default .form-control styles */
+        }
+        #loginFormContainer .btn-primary {
+            /* Uses default .btn-primary styles */
+        }
 
         #execOutput, #infoContent pre {
             white-space: pre-wrap; background-color: #f1f3f4; border: 1px solid #dadce0;
@@ -85,7 +106,15 @@
              box-shadow: 0 1px 2px 0 rgba(60,64,67,.08),0 1px 3px 1px rgba(60,64,67,.05);
              border-radius: 8px;
         }
-        .container-list-mobile .card-actions { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        /* Mobile Card Actions - using dropdown */
+        .container-list-mobile .card-footer {
+            background-color: #fff;
+            border-top: 1px solid #e0e0e0;
+            padding: 0.75rem 1rem;
+        }
+        .container-list-mobile .card-actions-dropdown .btn {
+            width: 100%;
+        }
         .container-list-mobile .card-text small { font-weight: 500; color: #5f6368; margin-right: 0.25rem; }
         .container-list-mobile .card-title { word-break: break-word; font-size: 1.1rem; margin-bottom: 0.25rem !important; }
 
@@ -105,31 +134,18 @@
         .offcanvas-title { font-size: 1.15rem; font-weight: 500; color: #202124; }
 
         .pagination .page-link {
-            color: #1a73e8;
-            border-radius: 4px;
-            margin: 0 2px;
-            border: 1px solid #dadce0;
-            background-color: #fff;
+            color: #1a73e8; border-radius: 4px; margin: 0 2px;
+            border: 1px solid #dadce0; background-color: #fff;
         }
         .pagination .page-item.active .page-link {
-            z-index: 3;
-            color: #fff;
-            background-color: #1a73e8;
-            border-color: #1a73e8;
+            z-index: 3; color: #fff; background-color: #1a73e8; border-color: #1a73e8;
         }
         .pagination .page-item.disabled .page-link {
-            color: #70757a;
-            pointer-events: none;
-            background-color: #fff;
-            border-color: #dadce0;
+            color: #70757a; pointer-events: none; background-color: #fff; border-color: #dadce0;
         }
         .pagination .page-link:hover {
-            z-index: 2;
-            color: #1765cc;
-            background-color: #f1f3f4;
-            border-color: #c8cbcf;
+            z-index: 2; color: #1765cc; background-color: #f1f3f4; border-color: #c8cbcf;
         }
-
     </style>
 </head>
 <body>
@@ -167,7 +183,7 @@
                                 <th>IP 地址</th>
                                 <th>镜像来源</th>
                                 <th>创建时间</th>
-                                <th>操作</th>
+                                <th class="text-end">操作</th>
                             </tr>
                         </thead>
                         <tbody id="containerListDesktop">
@@ -179,7 +195,6 @@
                 <div class="container-list-mobile d-block d-lg-none mt-3">
                 </div>
                 <nav id="paginationMobile" aria-label="Container list navigation mobile" class="mt-3 d-block d-lg-none"></nav>
-
             </div>
 
             <div class="col-lg-5 order-lg-2 d-none d-lg-block right-column">
@@ -188,25 +203,16 @@
                     <div class="create-form-panel">
                         <form id="createContainerForm">
                             <div class="row g-3">
-                                <div class="col-12">
-                                    <label for="containerName" class="form-label">容器名称</label>
-                                    <input type="text" class="form-control" id="containerName" name="name" required>
-                                </div>
+                                <div class="col-12"><label for="containerName" class="form-label">容器名称</label><input type="text" class="form-control" id="containerName" name="name" required></div>
                                 <div class="col-12">
                                     <label for="containerImage" class="form-label">选择镜像</label>
                                     <select class="form-select" id="containerImage" name="image" required>
                                         <option value="" selected disabled>请选择一个镜像</option>
-                                        {% for image in images %}
-                                        <option value="{{ image.name }}">{{ image.description }}</option>
-                                        {% endfor %}
+                                        {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
                                     </select>
-                                    {% if image_error[0] %}
-                                    <div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>
-                                    {% endif %}
+                                    {% if image_error[0] %}<div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>{% endif %}
                                 </div>
-                                <div class="col-12">
-                                    <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
-                                </div>
+                                <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button></div>
                             </div>
                         </form>
                     </div>
@@ -216,53 +222,33 @@
     </div>
 
     <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasCreateContainer" aria-labelledby="offcanvasCreateContainerLabel">
-        <div class="offcanvas-header">
-            <h5 class="offcanvas-title" id="offcanvasCreateContainerLabel">创建新容器</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
-        </div>
+        <div class="offcanvas-header"><h5 class="offcanvas-title" id="offcanvasCreateContainerLabel">创建新容器</h5><button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button></div>
         <div class="offcanvas-body">
             <form id="createContainerFormMobile">
                  <div class="row g-3">
-                    <div class="col-12">
-                        <label for="containerNameMobile" class="form-label">容器名称</label>
-                        <input type="text" class="form-control" id="containerNameMobile" name="name" required>
-                    </div>
+                    <div class="col-12"><label for="containerNameMobile" class="form-label">容器名称</label><input type="text" class="form-control" id="containerNameMobile" name="name" required></div>
                     <div class="col-12">
                         <label for="containerImageMobile" class="form-label">选择镜像</label>
                         <select class="form-select" id="containerImageMobile" name="image" required>
                             <option value="" selected disabled>请选择一个镜像</option>
-                            {% for image in images %}
-                            <option value="{{ image.name }}">{{ image.description }}</option>
-                            {% endfor %}
+                            {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
                         </select>
-                        {% if image_error[0] %}
-                         <div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>
-                        {% endif %}
+                        {% if image_error[0] %}<div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>{% endif %}
                     </div>
-                    <div class="col-12">
-                        <button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button>
-                    </div>
+                    <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button></div>
                 </div>
             </form>
         </div>
     </div>
     {% else %}
     <div class="container">
-        <div id="loginContainer" class="my-5 mx-auto">
-             <h2 class="text-center mb-4 form-title">管理员登录</h2>
+        <div id="loginFormContainer">
+             <h2 class="form-title">管理员登录</h2>
              <form method="POST" action="{{ url_for('login') }}">
                  <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
-                 <div class="mb-3">
-                    <label for="username" class="form-label">用户名</label>
-                    <input type="text" class="form-control" id="username" name="username" required autofocus>
-                 </div>
-                  <div class="mb-3">
-                    <label for="password" class="form-label">密码</label>
-                    <input type="password" class="form-control" id="password" name="password" required>
-                 </div>
-                 {% if login_error %}
-                 <div class="alert alert-danger mt-3" role="alert">{{ login_error }}</div>
-                 {% endif %}
+                 <div class="mb-3"><label for="username" class="form-label">用户名</label><input type="text" class="form-control" id="username" name="username" required autofocus></div>
+                 <div class="mb-3"><label for="password" class="form-label">密码</label><input type="password" class="form-control" id="password" name="password" required></div>
+                 {% if login_error %}<div class="alert alert-danger mt-3" role="alert">{{ login_error }}</div>{% endif %}
                  <button type="submit" class="btn btn-primary w-100 mt-4">登录</button>
              </form>
         </div>
@@ -270,74 +256,20 @@
     {% endif %}
 
     <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer"></div>
-    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="infoModalLabel">容器信息</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                <div class="modal-body">
-                    <div id="basicInfoContent">正在加载基础信息...</div>
-                    <div id="natRulesList" style="display: none;">
-                        <h6>NAT 规则 (本应用添加)</h6>
-                        <ul id="natRulesContent"><li>正在加载 NAT 规则...</li></ul>
-                        <div id="natRulesError" class="alert alert-warning mt-2 d-none"></div>
-                    </div>
-                    <div id="infoError" class="alert alert-danger mt-2 d-none"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="modal fade" id="execModal" tabindex="-1" aria-labelledby="execModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="execModalLabel">在容器内执行命令</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                <div class="modal-body">
-                    <form id="execCommandForm">
-                        <input type="hidden" id="execContainerName" name="container_name">
-                        <div class="mb-3"><label for="commandInput" class="form-label">命令 (例如: ls -l / 或 apt update)</label><input type="text" class="form-control" id="commandInput" name="command" required></div>
-                        <button type="submit" class="btn btn-primary" id="execButton">执行</button>
-                    </form>
-                    <h6 class="mt-3 mb-2">输出:</h6><pre id="execOutput"></pre>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="modal fade" id="natModal" tabindex="-1" aria-labelledby="natModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="natModalLabel">为容器添加 NAT 规则</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                <div class="modal-body">
-                    <div class="alert alert-warning" role="alert">注意：这将在主机上添加一个临时的 iptables NAT 规则。规则在主机重启后会丢失，且需要此Web应用以足够权限(如 root 或 sudo)运行。成功添加规则时，iptables命令通常没有输出内容。</div>
-                    <form id="addNatForm">
-                        <input type="hidden" id="natContainerName" name="container_name">
-                        <div class="mb-3"><label for="natContainerIP" class="form-label">容器 IP 地址 (添加规则时获取)</label><input type="text" class="form-control" id="natContainerIP" readonly></div>
-                        <div class="mb-3"><label for="hostPort" class="form-label">主机端口</label><input type="number" class="form-control" id="hostPort" name="host_port" required min="1" max="65535"></div>
-                        <div class="mb-3"><label for="containerPort" class="form-label">容器端口</label><input type="number" class="form-control" id="containerPort" name="container_port" required min="1" max="65535"></div>
-                        <div class="mb-3"><label for="protocol" class="form-label">协议</label><select class="form-select" id="protocol" name="protocol" required><option value="tcp">TCP</option><option value="udp">UDP</option></select></div>
-                        <button type="submit" class="btn btn-primary" id="addNatButton">添加规则</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="confirmModalLabel">请确认</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
-                <div class="modal-body" id="confirmModalBody"></div>
-                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="button" class="btn btn-primary" id="confirmActionButton">确认</button></div>
-            </div>
-        </div>
-    </div>
+    <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="infoModalLabel">容器信息</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div id="basicInfoContent">正在加载...</div><div id="natRulesList" style="display:none;"><h6>NAT规则</h6><ul id="natRulesContent"><li>加载中...</li></ul><div id="natRulesError" class="alert alert-warning mt-2 d-none"></div></div><div id="infoError" class="alert alert-danger mt-2 d-none"></div></div></div></div></div>
+    <div class="modal fade" id="execModal" tabindex="-1" aria-labelledby="execModalLabel" aria-hidden="true"><div class="modal-dialog modal-lg"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="execModalLabel">执行命令</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><form id="execCommandForm"><input type="hidden" id="execContainerName" name="container_name"><div class="mb-3"><label for="commandInput" class="form-label">命令</label><input type="text" class="form-control" id="commandInput" name="command" required></div><button type="submit" class="btn btn-primary" id="execButton">执行</button></form><h6 class="mt-3 mb-2">输出:</h6><pre id="execOutput"></pre></div></div></div></div>
+    <div class="modal fade" id="natModal" tabindex="-1" aria-labelledby="natModalLabel" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="natModalLabel">添加NAT规则</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body"><div class="alert alert-warning" role="alert">注意：临时规则，重启丢失。</div><form id="addNatForm"><input type="hidden" id="natContainerName" name="container_name"><div class="mb-3"><label for="natContainerIP" class="form-label">容器IP</label><input type="text" class="form-control" id="natContainerIP" readonly></div><div class="mb-3"><label for="hostPort" class="form-label">主机端口</label><input type="number" class="form-control" id="hostPort" name="host_port" required min="1" max="65535"></div><div class="mb-3"><label for="containerPort" class="form-label">容器端口</label><input type="number" class="form-control" id="containerPort" name="container_port" required min="1" max="65535"></div><div class="mb-3"><label for="protocol" class="form-label">协议</label><select class="form-select" id="protocol" name="protocol" required><option value="tcp">TCP</option><option value="udp">UDP</option></select></div><button type="submit" class="btn btn-primary" id="addNatButton">添加</button></form></div></div></div></div>
+    <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="confirmModalLabel">请确认</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body" id="confirmModalBody"></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="button" class="btn btn-primary" id="confirmActionButton">确认</button></div></div></div></div>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
     let allContainers = [];
     let currentPage = 1;
-    const itemsPerPage = 5; // 您可以调整每页显示的数量
+    const itemsPerPage = 5;
 
     function initContainersAndPagination(containersData) {
-        allContainers = containersData;
+        allContainers = containersData || []; // Ensure allContainers is an array
         currentPage = 1;
         renderPaginatedContainers();
     }
@@ -346,423 +278,170 @@
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
         const paginatedContainers = allContainers.slice(startIndex, endIndex);
-
         renderContainerListDesktop(paginatedContainers, startIndex);
-        renderContainerListMobile(paginatedContainers);
+        renderContainerListMobile(paginatedContainers, startIndex);
         renderPaginationControls();
     }
 
-    function renderContainerListDesktop(containersToRender, globalStartIndex) {
-        const tbody = $('#containerListDesktop');
-        tbody.empty();
-        if (allContainers.length === 0) {
-             tbody.html('<tr><td colspan="6" class="text-center py-4">没有找到容器或无法连接到 Incus。</td></tr>');
-             return;
+    function buildActionDropdown(c, indexSuffix, isMobile = false) {
+        const dropdownId = `actionsDropdown${isMobile ? 'Mobile' : 'Desktop'}${indexSuffix}`;
+        let actionsHtml = `<div class="dropdown">
+                <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="${dropdownId}" data-bs-toggle="dropdown" aria-expanded="false">操作</button>
+                <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="${dropdownId}">
+                    <li><button class="dropdown-item" type="button" onclick="showInfo('${c.name}', this)">信息</button></li>`;
+        if (c.status === 'Running') {
+            actionsHtml += `<li><button class="dropdown-item" type="button" onclick="performAction('${c.name}', 'stop', this)">停止</button></li>
+                            <li><button class="dropdown-item" type="button" onclick="performAction('${c.name}', 'restart', this)">重启</button></li>
+                            <li><button class="dropdown-item" type="button" onclick="openExecModal('${c.name}')">执行命令</button></li>
+                            <li><button class="dropdown-item" type="button" onclick="openNatModal('${c.name}')">添加NAT</button></li>`;
+        } else if (c.status === 'Stopped') {
+            actionsHtml += `<li><button class="dropdown-item" type="button" onclick="performAction('${c.name}', 'start', this)">启动</button></li>`;
         }
-        if (containersToRender.length === 0) {
-             tbody.html('<tr><td colspan="6" class="text-center py-4">当前页没有容器。</td></tr>');
-             return;
-        }
-        containersToRender.forEach((c, index) => {
-            const ipDisplay = c.ip && c.ip !== 'N/A' ? c.ip : '-';
-            const imageDisplay = c.image_source ? c.image_source : 'N/A';
-            const createdDate = c.created_at ? c.created_at.split('T')[0] : 'N/A';
-            let statusBadge = 'secondary';
-            if (c.status === 'Running') statusBadge = 'success';
-            else if (c.status === 'Stopped') statusBadge = 'danger';
-
-            let actionsHtml = `
-                <div class="dropdown">
-                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="actionsDropdownDesktop${globalStartIndex + index}" data-bs-toggle="dropdown" aria-expanded="false">
-                        操作
-                    </button>
-                    <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdownDesktop${globalStartIndex + index}">
-                        <li><button class="dropdown-item" type="button" onclick="showInfo('${c.name}', this)">信息</button></li>`;
-            if (c.status === 'Running') {
-                actionsHtml += `
-                        <li><button class="dropdown-item" type="button" onclick="performAction('${c.name}', 'stop', this)">停止</button></li>
-                        <li><button class="dropdown-item" type="button" onclick="performAction('${c.name}', 'restart', this)">重启</button></li>
-                        <li><button class="dropdown-item" type="button" onclick="openExecModal('${c.name}')">执行命令</button></li>
-                        <li><button class="dropdown-item" type="button" onclick="openNatModal('${c.name}')">添加NAT</button></li>`;
-            } else if (c.status === 'Stopped') {
-                actionsHtml += `
-                        <li><button class="dropdown-item" type="button" onclick="performAction('${c.name}', 'start', this)">启动</button></li>`;
-            }
-            actionsHtml += `
-                        <li><hr class="dropdown-divider"></li>
+        actionsHtml += `<li><hr class="dropdown-divider"></li>
                         <li><button class="dropdown-item text-danger" type="button" onclick="performAction('${c.name}', 'delete', this)">删除</button></li>
-                    </ul>
-                </div>`;
-            const row = `
-                <tr>
-                    <td>${c.name}</td>
-                    <td><span class="badge bg-${statusBadge}">${c.status}</span></td>
-                    <td>${ipDisplay}</td>
-                    <td>${imageDisplay}</td>
-                    <td>${createdDate}</td>
-                    <td>${actionsHtml}</td>
-                </tr>`;
+                    </ul></div>`;
+        return actionsHtml;
+    }
+
+    function renderContainerListDesktop(containersToRender, globalStartIndex) {
+        const tbody = $('#containerListDesktop'); tbody.empty();
+        if (allContainers.length === 0) { tbody.html('<tr><td colspan="6" class="text-center py-4">没有找到容器。</td></tr>'); return; }
+        if (containersToRender.length === 0) { tbody.html('<tr><td colspan="6" class="text-center py-4">当前页没有容器。</td></tr>'); return; }
+        containersToRender.forEach((c, index) => {
+            const statusBadge = c.status === 'Running' ? 'success' : (c.status === 'Stopped' ? 'danger' : 'secondary');
+            const actionsDropdown = buildActionDropdown(c, globalStartIndex + index);
+            const row = `<tr>
+                            <td>${c.name}</td>
+                            <td><span class="badge bg-${statusBadge}">${c.status}</span></td>
+                            <td>${c.ip || '-'}</td>
+                            <td>${c.image_source || 'N/A'}</td>
+                            <td>${c.created_at ? c.created_at.split('T')[0] : 'N/A'}</td>
+                            <td class="text-end">${actionsDropdown}</td>
+                         </tr>`;
             tbody.append(row);
         });
     }
 
-    function renderContainerListMobile(containersToRender) {
-        const mobileListContainer = $('.container-list-mobile');
-        mobileListContainer.empty();
-        if (allContainers.length === 0) {
-             mobileListContainer.html('<div class="alert alert-info text-center" role="alert">没有找到容器或无法连接到 Incus。</div>');
-             return;
-        }
-        if (containersToRender.length === 0 ) {
-             mobileListContainer.html('<div class="alert alert-info text-center" role="alert">当前页没有容器。</div>');
-             return;
-        }
-        containersToRender.forEach((c) => {
-            const ipDisplay = c.ip && c.ip !== 'N/A' ? c.ip : '-';
-            const imageDisplay = c.image_source ? c.image_source : 'N/A';
-            const createdDate = c.created_at ? c.created_at.split('T')[0] : 'N/A';
-            let statusBadge = 'secondary';
-            if (c.status === 'Running') statusBadge = 'success';
-            else if (c.status === 'Stopped') statusBadge = 'danger';
-
-            let mobileActions = `<button class="btn btn-sm btn-info" onclick="showInfo('${c.name}', this)">信息</button>`;
-            if (c.status === 'Running') {
-                mobileActions += `
-                    <button class="btn btn-sm btn-warning" onclick="performAction('${c.name}', 'stop', this)">停止</button>
-                    <button class="btn btn-sm btn-secondary" onclick="performAction('${c.name}', 'restart', this)">重启</button>
-                    <button class="btn btn-sm btn-primary" onclick="openExecModal('${c.name}')">执行命令</button>
-                    <button class="btn btn-sm btn-dark" onclick="openNatModal('${c.name}')">添加NAT</button>`;
-            } else if (c.status === 'Stopped') {
-                mobileActions += `<button class="btn btn-sm btn-success" onclick="performAction('${c.name}', 'start', this)">启动</button>`;
-            }
-            mobileActions += `<button class="btn btn-sm btn-danger" onclick="performAction('${c.name}', 'delete', this)">删除</button>`;
-            const card = `
-                <div class="card mb-3">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <h5 class="card-title mb-0">${c.name}</h5>
-                            <span class="badge bg-${statusBadge}">${c.status}</span>
-                        </div>
-                        <p class="card-text mb-1"><small>IP 地址:</small> ${ipDisplay}</p>
-                        <p class="card-text mb-1"><small>镜像:</small> ${imageDisplay}</p>
-                        <p class="card-text mb-3"><small>创建时间:</small> ${createdDate}</p>
-                        <div class="card-actions">${mobileActions}</div>
-                    </div>
-                </div>`;
+    function renderContainerListMobile(containersToRender, globalStartIndex) {
+        const mobileListContainer = $('.container-list-mobile'); mobileListContainer.empty();
+        if (allContainers.length === 0) { mobileListContainer.html('<div class="alert alert-info text-center">没有找到容器。</div>'); return; }
+        if (containersToRender.length === 0) { mobileListContainer.html('<div class="alert alert-info text-center">当前页没有容器。</div>'); return; }
+        containersToRender.forEach((c, index) => {
+            const statusBadge = c.status === 'Running' ? 'success' : (c.status === 'Stopped' ? 'danger' : 'secondary');
+            const actionsDropdown = buildActionDropdown(c, globalStartIndex + index, true);
+            const card = `<div class="card mb-3">
+                            <div class="card-body pb-2">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <h5 class="card-title mb-0">${c.name}</h5>
+                                    <span class="badge bg-${statusBadge}">${c.status}</span>
+                                </div>
+                                <p class="card-text mb-1"><small>IP 地址:</small> ${c.ip || '-'}</p>
+                                <p class="card-text mb-1"><small>镜像:</small> ${c.image_source || 'N/A'}</p>
+                                <p class="card-text mb-2"><small>创建时间:</small> ${c.created_at ? c.created_at.split('T')[0] : 'N/A'}</p>
+                            </div>
+                            <div class="card-footer card-actions-dropdown">${actionsDropdown}</div>
+                          </div>`;
             mobileListContainer.append(card);
         });
     }
 
     function renderPaginationControls() {
-        const paginationContainerDesktop = $('#paginationDesktop');
-        const paginationContainerMobile = $('#paginationMobile');
-        paginationContainerDesktop.empty();
-        paginationContainerMobile.empty();
+        const pagDesktop = $('#paginationDesktop'), pagMobile = $('#paginationMobile');
+        pagDesktop.empty(); pagMobile.empty();
         const totalPages = Math.ceil(allContainers.length / itemsPerPage);
         if (totalPages <= 1) return;
-        let paginationHtml = '<ul class="pagination justify-content-center">';
-        paginationHtml += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}"><a class="page-link" href="#" data-page="${currentPage - 1}">上一页</a></li>`;
-        
-        let startPage, endPage;
-        if (totalPages <= 5) {
-            startPage = 1;
-            endPage = totalPages;
-        } else {
-            if (currentPage <= 3) {
-                startPage = 1;
-                endPage = 5;
-            } else if (currentPage + 2 >= totalPages) {
-                startPage = totalPages - 4;
-                endPage = totalPages;
-            } else {
-                startPage = currentPage - 2;
-                endPage = currentPage + 2;
-            }
+        let html = '<ul class="pagination justify-content-center">';
+        html += `<li class="page-item ${currentPage === 1 ? 'disabled' : ''}"><a class="page-link" href="#" data-page="${currentPage - 1}">上一页</a></li>`;
+        let startP = 1, endP = totalPages;
+        if (totalPages > 5) {
+            if (currentPage <= 3) endP = 5;
+            else if (currentPage + 2 >= totalPages) startP = totalPages - 4;
+            else { startP = currentPage - 2; endP = currentPage + 2; }
         }
-
-        if (startPage > 1) {
-            paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`;
-            if (startPage > 2) {
-                paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-            }
-        }
-
-        for (let i = startPage; i <= endPage; i++) {
-            paginationHtml += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
-        }
-
-        if (endPage < totalPages) {
-            if (endPage < totalPages - 1) {
-                paginationHtml += `<li class="page-item disabled"><span class="page-link">...</span></li>`;
-            }
-            paginationHtml += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a></li>`;
-        }
-        
-        paginationHtml += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}"><a class="page-link" href="#" data-page="${currentPage + 1}">下一页</a></li>`;
-        paginationHtml += '</ul>';
-        paginationContainerDesktop.html(paginationHtml);
-        paginationContainerMobile.html(paginationHtml);
-
-        $('.page-link').off('click').on('click', function(e) { // Use .off('click') to prevent multiple bindings
-            e.preventDefault();
-            const page = parseInt($(this).data('page'));
+        if (startP > 1) { html += `<li class="page-item"><a class="page-link" href="#" data-page="1">1</a></li>`; if (startP > 2) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`; }
+        for (let i = startP; i <= endP; i++) html += `<li class="page-item ${i === currentPage ? 'active' : ''}"><a class="page-link" href="#" data-page="${i}">${i}</a></li>`;
+        if (endP < totalPages) { if (endP < totalPages - 1) html += `<li class="page-item disabled"><span class="page-link">...</span></li>`; html += `<li class="page-item"><a class="page-link" href="#" data-page="${totalPages}">${totalPages}</a></li>`; }
+        html += `<li class="page-item ${currentPage === totalPages ? 'disabled' : ''}"><a class="page-link" href="#" data-page="${currentPage + 1}">下一页</a></li></ul>`;
+        pagDesktop.html(html); pagMobile.html(html);
+        $('.page-link').off('click').on('click', function(e) {
+            e.preventDefault(); const page = parseInt($(this).data('page'));
             if (page && page !== currentPage && page >= 1 && page <= totalPages) {
-                currentPage = page;
-                renderPaginatedContainers();
-                 $('html, body').animate({ scrollTop: $('.left-column').offset().top - 20 }, 'fast'); // Scroll to top of list
+                currentPage = page; renderPaginatedContainers();
+                $('html, body').animate({ scrollTop: $('.left-column').offset().top - 20 }, 300);
             }
         });
     }
-// 从 Flask 模板中获取初始数据
-const initialContainersData = {{ containers|tojson|safe if session.logged_in else [] }};
 
 $(document).ready(function() {
-    if (typeof initialContainersData !== 'undefined' && initialContainersData.length > 0) {
-        initContainersAndPagination(initialContainersData);
-    } else if ({{ 'true' if session.logged_in else 'false' }}) { // Logged in but no containers
-        initContainersAndPagination([]); // Still render empty state and pagination if applicable (though it won't show)
-    }
-    // Modals and other event bindings that are static can remain outside of pagination rendering
-    $('#confirmModal').on('hidden.bs.modal', function () { currentConfirmAction = null; currentConfirmContainerName = null; currentConfirmRuleId = null; });
-    $('#infoModal').on('hidden.bs.modal', function () {
-      $('#basicInfoContent').html('<p>正在加载基础信息...</p>'); $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
-      $('#natRulesError').addClass('d-none').text(''); $('#infoError').addClass('d-none').text('');
-      $('#infoModalLabel').text('容器信息'); $('#natRulesList').hide();
-    });
-    $('#execModal').on('hidden.bs.modal', function () {
-      $('#execContainerName').val(''); $('#commandInput').val(''); $('#execOutput').text('').removeClass('success error');
-      $('#execModalLabel').text('在容器内执行命令'); setButtonProcessing($('#execButton'), false);
-    });
-    $('#natModal').on('hidden.bs.modal', function () {
-        $('#natContainerName').val(''); $('#natContainerIP').val(''); $('#hostPort').val(''); $('#containerPort').val('');
-        $('#protocol').val('tcp'); $('#natModalLabel').text('为容器添加 NAT 规则');
-        setButtonProcessing($('#addNatButton'), false); $('#addNatButton').prop('disabled', false).text('添加规则');
-    });
+    const initialContainersData = {{ containers|tojson|safe if session.logged_in else [] }};
+    initContainersAndPagination(initialContainersData);
+
+    $('#confirmModal').on('hidden.bs.modal', function(){ currentConfirmAction=null; currentConfirmContainerName=null; currentConfirmRuleId=null;});
+    $('#infoModal').on('hidden.bs.modal', function(){ $('#basicInfoContent').html('加载中...'); $('#natRulesContent').html('<li>加载中...</li>'); $('#natRulesError,#infoError').addClass('d-none').text(''); $('#infoModalLabel').text('容器信息'); $('#natRulesList').hide(); });
+    $('#execModal').on('hidden.bs.modal', function(){ $('#execContainerName,#commandInput').val(''); $('#execOutput').text('').removeClass('success error'); $('#execModalLabel').text('执行命令'); setButtonProcessing($('#execButton'),false); });
+    $('#natModal').on('hidden.bs.modal', function(){ $('#natContainerName,#natContainerIP,#hostPort,#containerPort').val(''); $('#protocol').val('tcp'); $('#natModalLabel').text('添加NAT规则'); setButtonProcessing($('#addNatButton'),false).prop('disabled',false).text('添加');});
 });
 
-function showToast(message, type = 'info') {
-    let toastType = 'info';
-    if (type === 'success') toastType = 'success';
-    else if (type === 'error') toastType = 'danger';
-    else if (type === 'warning') toastType = 'warning';
-    const toastContainer = $('#toastContainer');
-    const toastHtml = `<div class="toast align-items-center text-bg-${toastType} border-0" role="alert" aria-live="assertive" aria-atomic="true"><div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div></div>`;
-    const toastElement = $(toastHtml);
-    toastContainer.append(toastElement);
-    new bootstrap.Toast(toastElement[0]).show();
-    toastElement.on('hidden.bs.toast', function () { $(this).remove(); });
+function showToast(message, type = 'info') {let t = type === 'success' ? 'success' : type === 'error' ? 'danger' : type === 'warning' ? 'warning' : 'info'; $('#toastContainer').append(`<div class="toast align-items-center text-bg-${t} border-0" role="alert" aria-live="assertive" aria-atomic="true"><div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button></div></div>`).children(':last').toast('show').on('hidden.bs.toast', function(){$(this).remove();});}
+function setButtonProcessing(btn, active) {const $b=$(btn); if(!$b.length)return; if(active){if(!$b.data('html')){$b.data('html',$b.html()); $b.html(`<span class="spinner-border spinner-border-sm me-1"></span> ${$b.text().trim()||'处理中...'}`); $b.prop('disabled',true).addClass('btn-processing');}}else{if($b.data('html'))$b.html($b.data('html')).removeData('html'); $b.prop('disabled',false).removeClass('btn-processing');}}
+
+function showConfirmationModal(action, id, btn) {
+    currentConfirmAction = action; currentConfirmButtonElement = btn; let title = '请确认', body = '', btnClass = 'btn-primary', btnText = '确认';
+    if(action.endsWith('_container')) currentConfirmContainerName = id; else currentConfirmRuleId = id;
+    if(action==='restart_container'){title='确认重启'; body=`确定重启容器 <strong>${id}</strong>？`; btnClass='btn-warning'; btnText='重启';}
+    else if(action==='delete_container'){title='确认删除'; body=`<strong>警告:</strong>永久删除容器 <strong>${id}</strong> 及数据！<br>确定吗？`; btnClass='btn-danger'; btnText='删除容器';}
+    else if(action==='delete_nat_rule'){title='确认删除NAT'; body=`确定删除ID <strong>${id}</strong> 的NAT规则？`; btnClass='btn-danger'; btnText='删除规则';}
+    $('#confirmModalLabel').text(title); $('#confirmModalBody').html(body); $('#confirmActionButton').removeClass('btn-primary btn-warning btn-danger').addClass(btnClass).text(btnText);
+    setButtonProcessing($('#confirmActionButton'), false); new bootstrap.Modal(document.getElementById('confirmModal')).show();
 }
-
-function setButtonProcessing(button, isProcessing) {
-    const $button = $(button); if (!$button.length) return;
-    if (isProcessing) {
-        if (!$button.data('original-html')) {
-            $button.data('original-html', $button.html());
-            const originalText = $button.text().trim();
-            $button.html(`<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> ${originalText ? '处理中...' : ''}`);
-            $button.addClass('btn-processing').prop('disabled', true);
-        }
-    } else {
-        if ($button.data('original-html')) $button.html($button.data('original-html')).data('original-html', null);
-        $button.removeClass('btn-processing').prop('disabled', false);
-    }
-}
-
-let currentConfirmAction = null, currentConfirmContainerName = null, currentConfirmRuleId = null, currentConfirmButtonElement = null;
-function showConfirmationModal(actionType, nameOrId, buttonElement) {
-    currentConfirmAction = actionType; currentConfirmButtonElement = buttonElement;
-    const modalTitle = $('#confirmModalLabel'), modalBody = $('#confirmModalBody'), confirmButton = $('#confirmActionButton');
-    let message = '', buttonClass = 'btn-primary', buttonText = '确认';
-    if (actionType === 'restart_container') { currentConfirmContainerName = nameOrId; modalTitle.text('确认重启'); message = `确定要重启容器 <strong>${nameOrId}</strong> 吗？`; buttonClass = 'btn-warning'; buttonText = '重启'; }
-    else if (actionType === 'delete_container') { currentConfirmContainerName = nameOrId; modalTitle.text('确认删除容器'); message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及其所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`; buttonClass = 'btn-danger'; buttonText = '删除容器'; }
-    else if (actionType === 'delete_nat_rule') { currentConfirmRuleId = nameOrId; modalTitle.text('确认删除 NAT 规则'); message = `确定要删除 ID 为 <strong>${nameOrId}</strong> 的 NAT 规则吗？此操作将尝试移除对应的 iptables 规则记录。`; buttonClass = 'btn-danger'; buttonText = '删除规则';}
-    modalBody.html(message); confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text(buttonText);
-    setButtonProcessing(confirmButton, false); new bootstrap.Modal(document.getElementById('confirmModal')).show();
-}
-
-$('#confirmActionButton').click(function() {
-    const actionType = currentConfirmAction, buttonElement = currentConfirmButtonElement, confirmButton = $(this);
-    if (!actionType || (!currentConfirmContainerName && !currentConfirmRuleId)) { showToast("确认信息丢失。", 'danger'); bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide(); return; }
-    setButtonProcessing(confirmButton, true);
-    if (actionType !== 'delete_nat_rule' && buttonElement) setButtonProcessing(buttonElement, true);
-
-    let url, type, requestData;
-    if (actionType === 'delete_nat_rule') {
-        url = `/container/nat_rule/${currentConfirmRuleId}`; type = 'DELETE';
-    } else {
-        let operation = actionType.replace('_container', '');
-        url = `/container/${currentConfirmContainerName}/action`; type = 'POST'; requestData = { action: operation };
-    }
-
-    $.ajax({ url: url, type: type, data: requestData, headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            showToast(data.message, data.status);
-            if (data.status === 'success' || (data.status === 'warning' && actionType === 'delete_nat_rule')) {
-                if (actionType === 'delete_nat_rule') {
-                    const cName = $('#infoModalLabel').text().replace('容器信息: ', '');
-                    if (cName) loadNatRules(cName); else location.reload(); // fallback
-                } else {
-                    location.reload(); // Reload for container list changes
-                }
-            } else if (buttonElement && actionType !== 'delete_nat_rule') { // Reset button if no reload
-                setButtonProcessing(buttonElement, false);
-            }
-        },
-        error: function(jqXHR) {
-            if (jqXHR.status === 401) { showToast("操作需要认证，请重新登录。", 'danger'); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-            else { showToast(`操作失败: ${jqXHR.responseJSON?.message || '未知错误'}`, 'danger'); }
-            if (buttonElement && actionType !== 'delete_nat_rule') setButtonProcessing(buttonElement, false);
-        },
-        complete: function() { bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide(); setButtonProcessing(confirmButton, false); }
+$('#confirmActionButton').click(function(){
+    const action = currentConfirmAction, btnElem = currentConfirmButtonElement, confirmBtn = $(this);
+    if(!action || (!currentConfirmContainerName && !currentConfirmRuleId)){showToast("确认信息丢失",'danger'); bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();return;}
+    setButtonProcessing(confirmBtn,true); if(action!=='delete_nat_rule'&& btnElem)setButtonProcessing(btnElem,true);
+    let url, type, reqData;
+    if(action === 'delete_nat_rule'){url=`/container/nat_rule/${currentConfirmRuleId}`; type='DELETE';}
+    else{let op=action.replace('_container',''); url=`/container/${currentConfirmContainerName}/action`; type='POST'; reqData={action:op};}
+    $.ajax({url:url,type:type,data:reqData,headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},
+        success: function(data){ showToast(data.message, data.status); if(data.status==='success' || (data.status==='warning' && action==='delete_nat_rule')){ if(action==='delete_nat_rule'){ const cNameInModal = $('#infoModalLabel').text().replace('容器信息: ',''); if(cNameInModal) loadNatRules(cNameInModal); else location.reload();} else location.reload();} else if(btnElem && action!=='delete_nat_rule') setButtonProcessing(btnElem,false);},
+        error: function(jqXHR){ if(jqXHR.status===401){showToast("操作需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`失败: ${jqXHR.responseJSON?.message||'未知错误'}`,'danger');} if(btnElem && action!=='delete_nat_rule') setButtonProcessing(btnElem,false);},
+        complete: function(){bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide(); setButtonProcessing(confirmBtn,false);}
     });
 });
+function handleCreateContainer(formElem, btnElem){
+    const form = $(formElem), btn = $(btnElem); setButtonProcessing(btn,true);
+    $.ajax({url:"{{url_for('create_container')}}",type:"POST",data:form.serialize(),headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},
+        success: function(data){showToast(data.message, data.status); if(data.status==='success'){form[0].reset(); bootstrap.Offcanvas.getInstance(document.getElementById('offcanvasCreateContainer'))?.hide(); location.reload();}},
+        error: function(jqXHR){ if(jqXHR.status===401){showToast("操作需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`错误: ${jqXHR.responseJSON?.message||'创建失败'}`,'danger');}},
+        complete: function(){setButtonProcessing(btn,false);}
+    });
+}
+$('#createContainerForm').submit(function(e){e.preventDefault();handleCreateContainer(this,$('#createButton'));});
+$('#createContainerFormMobile').submit(function(e){e.preventDefault();handleCreateContainer(this,$('#createButtonMobile'));});
+function performAction(cName, action, btn){if(action==='restart'||action==='delete'){showConfirmationModal(`${action}_container`,cName,btn);return;} setButtonProcessing(btn,true); $.ajax({url:`/container/${cName}/action`,type:"POST",data:{action:action},headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(data){showToast(data.message,data.status);if(data.status==='success')location.reload();else setButtonProcessing(btn,false);},error:function(jqXHR){if(jqXHR.status===401){showToast("操作需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`失败: ${jqXHR.responseJSON?.message||'未知错误'}`,'danger');} setButtonProcessing(btn,false);}});}
 
-function handleCreateContainer(formElement, submitButtonElement) {
-    const form = $(formElement), submitButton = $(submitButtonElement); setButtonProcessing(submitButton, true);
-    $.ajax({ url: "{{ url_for('create_container') }}", type: "POST", data: form.serialize(), headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            showToast(data.message, data.status);
-            if (data.status === 'success') {
-                form[0].reset();
-                bootstrap.Offcanvas.getInstance(document.getElementById('offcanvasCreateContainer'))?.hide();
-                location.reload(); // Reload to see new container and refresh pagination
-            }
-        },
-        error: function(jqXHR) {
-            if (jqXHR.status === 401) { showToast("操作需要认证。", 'danger'); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-            else { showToast(`错误: ${jqXHR.responseJSON?.message || '创建失败'}`, 'danger');}
-        },
-        complete: function() { setButtonProcessing(submitButton, false); }
+function showInfo(cName, btn) {
+    const modal = new bootstrap.Modal(document.getElementById('infoModal'));
+    $('#infoModalLabel').text(`容器信息: ${cName}`); $('#basicInfoContent').html('<p>加载中...</p>'); $('#natRulesContent').html('<li>加载中...</li>');
+    $('#natRulesError,#infoError').addClass('d-none'); $('#natRulesList').show(); if(btn)setButtonProcessing(btn,true);
+    $.ajax({url:`/container/${cName}/info`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},
+        success:function(data){ if(data.status==='NotFound'){$('#basicInfoContent').html(`<p><strong>错误:</strong> ${data.message}</p>`);$('#infoError').removeClass('d-none').text(data.message);showToast("加载信息失败",'danger');$('#natRulesList').hide();return;}
+            let html = `<p><strong>名称:</strong> ${data.name}</p><p><strong>状态:</strong> <span class="badge bg-${data.status==='Running'?'success':data.status==='Stopped'?'danger':'secondary'}">${data.status}</span> (代码: ${data.status_code})</p><p><strong>IP:</strong> ${data.ip||'-'}</p><p><strong>镜像:</strong> ${data.description||data.image_source||'N/A'}</p><p><strong>创建时间:</strong> ${data.created_at?data.created_at.split('T')[0]:'N/A'}</p><p><strong>架构:</strong> ${data.architecture||'N/A'}</p><p><strong>类型:</strong> ${data.type}</p><p><strong>临时:</strong> ${data.ephemeral?'是':'否'}</p><p><strong>配置:</strong> ${data.profiles.join(', ')||'无'}</p><p class="mt-2"><small class="text-muted">${data.message||''}</small></p>`;
+            $('#basicInfoContent').html(html); if(!data.live_data_available&&data.status!=='NotFound')showToast(data.message,'warning'); loadNatRules(cName);},
+        error:function(jqXHR){ if(jqXHR.status===401){showToast("操作需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);} else{$('#basicInfoContent').html(`<p><strong>错误:</strong> ${jqXHR.responseJSON?.message||"请求失败"}</p>`);$('#infoError').removeClass('d-none').text(jqXHR.responseJSON?.message||"请求失败");$('#natRulesList').hide();showToast("加载信息失败",'danger');}},
+        complete:function(){if(btn)setButtonProcessing(btn,false);modal.show();}
     });
 }
-$('#createContainerForm').submit(function(e) { e.preventDefault(); handleCreateContainer(this, $('#createButton')); });
-$('#createContainerFormMobile').submit(function(e) { e.preventDefault(); handleCreateContainer(this, $('#createButtonMobile')); });
-
-function performAction(containerName, action, buttonElement) {
-    if (action === 'restart' || action === 'delete') {
-        showConfirmationModal(`${action}_container`, containerName, buttonElement); return;
-    }
-    // For start/stop, directly proceed if not using confirmation for them
-    setButtonProcessing(buttonElement, true);
-    $.ajax({ url: `/container/${containerName}/action`, type: "POST", data: { action: action }, headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            showToast(data.message, data.status);
-            if (data.status === 'success') location.reload(); // Reload to update list & pagination
-            else setButtonProcessing(buttonElement, false);
-        },
-        error: function(jqXHR) {
-            if (jqXHR.status === 401) { showToast("操作需认证。", 'danger'); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-            else { showToast(`操作失败: ${jqXHR.responseJSON?.message || '未知错误'}`, 'danger'); }
-            setButtonProcessing(buttonElement, false);
-        }
+function loadNatRules(cName) {
+    $.ajax({url:`/container/${cName}/nat_rules`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},
+        success:function(data){ $('#natRulesContent').empty(); if(data.status==='success'&&data.rules?.length>0){ data.rules.forEach(r=>{$('#natRulesContent').append(`<li data-rule-id="${r.id}"><span class="rule-details"><strong>ID ${r.id}:</strong> 主机 ${r.host_port}/${r.protocol} → 容器 ${r.ip_at_creation}:${r.container_port}<br><small>创建: ${r.created_at?new Date(r.created_at).toLocaleString():'N/A'}</small></span><span class="rule-actions"><button class="btn btn-sm btn-danger" onclick="deleteNatRule(${r.id},this)">删除</button></span></li>`);});}else if(data.status==='success')$('#natRulesContent').html('<li>无NAT规则记录。</li>'); else{$('#natRulesContent').html('<li>加载NAT失败。</li>');$('#natRulesError').removeClass('d-none').text(data.message||'错误');showToast(data.message||"加载NAT失败",'danger');}},
+        error:function(jqXHR){ if(jqXHR.status===401){showToast("操作需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);} else{$('#natRulesContent').html('<li>加载NAT失败。</li>');$('#natRulesError').removeClass('d-none').text(jqXHR.responseJSON?.message||"请求失败");showToast(jqXHR.responseJSON?.message||"加载NAT失败",'danger');}}
     });
 }
-
-function showInfo(containerName, buttonElement) {
-    const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
-    $('#infoModalLabel').text(`容器信息: ${containerName}`);
-    $('#basicInfoContent').html('<p>正在加载基础信息...</p>'); $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
-    $('#natRulesError').addClass('d-none').text(''); $('#infoError').addClass('d-none').text('');
-    $('#natRulesList').show();
-    if(buttonElement) setButtonProcessing(buttonElement, true);
-
-    $.ajax({ url: `/container/${containerName}/info`, type: "GET", headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            if (data.status === 'NotFound') {
-                $('#basicInfoContent').html(`<p><strong>错误:</strong> ${data.message}</p>`);
-                $('#infoError').removeClass('d-none').text(data.message);
-                showToast("加载信息失败。", 'danger'); $('#natRulesList').hide(); return;
-            }
-            let html = `<p><strong>名称:</strong> ${data.name}</p>...`; // Truncated for brevity, same as before
-            $('#basicInfoContent').html(html);
-            if (!data.live_data_available && data.status !== 'NotFound') showToast(data.message, 'warning');
-            loadNatRules(containerName);
-        },
-        error: function(jqXHR) {
-             if (jqXHR.status === 401) { showToast("操作需认证", 'danger'); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-             else {$('#basicInfoContent').html(`<p><strong>错误:</strong> ${jqXHR.responseJSON?.message || "请求失败"}</p>`); $('#infoError').removeClass('d-none').text(jqXHR.responseJSON?.message || "请求失败"); $('#natRulesList').hide(); showToast("加载信息失败", 'danger');}
-        },
-        complete: function() { if(buttonElement) setButtonProcessing(buttonElement, false); infoModal.show(); }
-    });
-}
-
-function loadNatRules(containerName) {
-    $.ajax({ url: `/container/${containerName}/nat_rules`, type: "GET", headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            $('#natRulesContent').empty();
-            if (data.status === 'success' && data.rules?.length > 0) {
-                data.rules.forEach(r => {$('#natRulesContent').append(`<li data-rule-id="${r.id}"><span class="rule-details">...</span><span class="rule-actions"><button class="btn btn-sm btn-danger" onclick="deleteNatRule(${r.id}, this)">删除</button></span></li>`);});// Truncated
-            } else if (data.status === 'success') { $('#natRulesContent').html('<li>无NAT规则记录。</li>'); }
-            else { $('#natRulesContent').html('<li>加载NAT规则失败。</li>'); $('#natRulesError').removeClass('d-none').text(data.message || '错误'); showToast(data.message || "加载NAT规则失败", 'danger');}
-        },
-        error: function(jqXHR) {
-             if (jqXHR.status === 401) { showToast("操作需认证", 'danger'); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-             else {$('#natRulesContent').html('<li>加载NAT规则失败。</li>'); $('#natRulesError').removeClass('d-none').text(jqXHR.responseJSON?.message || "请求失败"); showToast("加载NAT规则失败", 'danger');}
-        }
-    });
-}
-// (Keep other modal JS functions: deleteNatRule, openExecModal, execCommandForm submit, openNatModal, addNatForm submit)
-// For brevity, I've truncated some long HTML strings in the JS, please re-insert your full strings from previous versions.
-function deleteNatRule(ruleId, buttonElement) { showConfirmationModal('delete_nat_rule', ruleId, buttonElement); }
-function openExecModal(containerName) {
-    $('#execContainerName').val(containerName); $('#execModalLabel').text(`在 ${containerName} 内执行命令`);
-    $('#commandInput').val(''); $('#execOutput').text('').removeClass('success error'); setButtonProcessing($('#execButton'), false);
-    new bootstrap.Modal(document.getElementById('execModal')).show();
-}
-$('#execCommandForm').submit(function(e) {
-    e.preventDefault(); const form = $(this), submitButton = $('#execButton', form), outputArea = $('#execOutput');
-    var containerName = $('#execContainerName').val(), command = $('#commandInput').val();
-    if (!command.trim()) { showToast("请输入命令。", 'warning'); return; }
-    outputArea.text('正在执行...').removeClass('success error'); setButtonProcessing(submitButton, true);
-    $.ajax({ url: `/container/${containerName}/exec`, type: "POST", data: { command: command }, headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            if (data.status === 'success') { outputArea.text(data.output).addClass('success'); showToast("命令执行成功。", 'success'); }
-            else { outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出')).addClass('error'); showToast(data.message || "命令执行失败。", 'danger'); }
-        },
-        error: function(jqXHR) {
-            if (jqXHR.status === 401) { showToast("操作需认证。", 'danger'); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-            else { const msg = jqXHR.responseJSON?.output || jqXHR.responseJSON?.message || '未知错误'; outputArea.text("请求失败:\n" + msg).addClass('error'); showToast("请求失败。", 'danger'); }
-        },
-        complete: function() { setButtonProcessing(submitButton, false); }
-    });
-});
-function openNatModal(containerName) {
-    $('#natContainerName').val(containerName); $('#natModalLabel').text(`为容器 ${containerName} 添加 NAT 规则`);
-    $('#hostPort').val(''); $('#containerPort').val(''); $('#protocol').val('tcp'); $('#natContainerIP').val('正在获取 IP...');
-    setButtonProcessing($('#addNatButton'), false).prop('disabled', false).text('添加规则');
-    new bootstrap.Modal(document.getElementById('natModal')).show();
-    $.ajax({ url: `/container/${containerName}/info`, type: "GET", headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
-                const ipError = data.status !== 'Running' ? '容器未运行' : (data.ip === 'N/A' ? '未分配IP' : (data.message || "无法获取IP"));
-                $('#natContainerIP').val('获取 IP 失败: ' + ipError);
-                $('#addNatButton').prop('disabled', true).text('无法添加 (无IP)'); showToast("无法添加 NAT: " + ipError, 'warning');
-            } else { $('#natContainerIP').val(data.ip); }
-        },
-        error: function(jqXHR) {
-             if (jqXHR.status === 401) { showToast("操作需认证。", 'danger'); bootstrap.Modal.getInstance(document.getElementById('natModal'))?.hide(); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-             else {$('#natContainerIP').val('获取 IP 失败'); $('#addNatButton').prop('disabled', true).text('无法添加 (无IP)'); showToast(jqXHR.responseJSON?.message || "获取IP失败。", 'danger');}
-        }
-    });
-}
-$('#addNatForm').submit(function(e) {
-    e.preventDefault(); const form = $(this), submitButton = $('#addNatButton', form);
-    setButtonProcessing(submitButton, true);
-    $.ajax({ url: `/container/${$('#natContainerName').val()}/add_nat_rule`, type: "POST", data: form.serialize(), headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
-        success: function(data) {
-            showToast(data.message, data.status);
-            if (data.status === 'success' || data.status === 'warning') {
-                const cName = $('#infoModalLabel').text().replace('容器信息: ', ''); if (cName === $('#natContainerName').val()) loadNatRules(cName);
-                if (data.status === 'success') { form[0].reset(); $('#protocol').val('tcp'); /* Keep natContainerName and natContainerIP */}
-            }
-        },
-        error: function(jqXHR) {
-            if (jqXHR.status === 401) { showToast("操作需认证。", 'danger'); bootstrap.Modal.getInstance(document.getElementById('natModal'))?.hide(); setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000); }
-            else { showToast(jqXHR.responseJSON?.message || '添加失败。', 'danger'); }
-        },
-        complete: function() { setButtonProcessing(submitButton, false); }
-    });
-});
+function deleteNatRule(ruleId, btn){showConfirmationModal('delete_nat_rule',ruleId,btn);}
+function openExecModal(cName){$('#execContainerName').val(cName);$('#execModalLabel').text(`在 ${cName} 执行`);$('#commandInput').val('');$('#execOutput').text('').removeClass('s e');setButtonProcessing($('#execButton'),false);new bootstrap.Modal(document.getElementById('execModal')).show();}
+$('#execCommandForm').submit(function(e){ e.preventDefault();const form=$(this),btn=$('#execButton',form),out=$('#execOutput'); let cName=$('#execContainerName').val(),cmd=$('#commandInput').val(); if(!cmd.trim()){showToast("请输入命令",'warning');return;} out.text('执行中...').removeClass('s e');setButtonProcessing(btn,true); $.ajax({url:`/container/${cName}/exec`,type:"POST",data:{command:cmd},headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(data){if(data.status==='success'){out.text(data.output).addClass('s');showToast("执行成功",'success');}else{out.text(`失败:\n${data.output||data.message||'无输出'}`).addClass('e');showToast(data.message||"执行失败",'danger');}},error:function(jqXHR){if(jqXHR.status===401){showToast("操作需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{const m=jqXHR.responseJSON?.output||jqXHR.responseJSON?.message||'未知';out.text(`请求失败:\n${m}`).addClass('e');showToast("请求失败",'danger');}},complete:function(){setButtonProcessing(btn,false);}});});
+function openNatModal(cName){ $('#natContainerName').val(cName);$('#natModalLabel').text(`为 ${cName} 添加NAT`); $('#hostPort,#containerPort').val('');$('#protocol').val('tcp');$('#natContainerIP').val('获取IP...'); setButtonProcessing($('#addNatButton'),false).prop('disabled',false).text('添加'); new bootstrap.Modal(document.getElementById('natModal')).show(); $.ajax({url:`/container/${cName}/info`,type:"GET",headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(data){if(data.status==='NotFound'||data.status!=='Running'||!data.ip||data.ip==='N/A'){const err=data.status!=='Running'?'未运行':(data.ip==='N/A'?'无IP':(data.message||"无法获取IP"));$('#natContainerIP').val(`获取IP失败: ${err}`);$('#addNatButton').prop('disabled',true).text('无法添加');showToast(`无法添加NAT: ${err}`,'warning');}else{$('#natContainerIP').val(data.ip);}},error:function(jqXHR){if(jqXHR.status===401){showToast("操作需认证",'danger');bootstrap.Modal.getInstance(document.getElementById('natModal'))?.hide();setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{$('#natContainerIP').val('获取IP失败');$('#addNatButton').prop('disabled',true).text('无法添加');showToast(jqXHR.responseJSON?.message||"获取IP失败",'danger');}}});}
+$('#addNatForm').submit(function(e){ e.preventDefault();const form=$(this),btn=$('#addNatButton',form);setButtonProcessing(btn,true); $.ajax({url:`/container/${$('#natContainerName').val()}/add_nat_rule`,type:"POST",data:form.serialize(),headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(data){showToast(data.message,data.status);if(data.status==='success'||data.status==='warning'){const cNameInModal=$('#infoModalLabel').text().replace('容器信息: ','');if(cNameInModal===$('#natContainerName').val())loadNatRules(cNameInModal);if(data.status==='success'){form.find('#hostPort, #containerPort').val('');form.find('#protocol').val('tcp');}}},error:function(jqXHR){if(jqXHR.status===401){showToast("操作需认证",'danger');bootstrap.Modal.getInstance(document.getElementById('natModal'))?.hide();setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(jqXHR.responseJSON?.message||'添加失败','danger');}},complete:function(){setButtonProcessing(btn,false);}});});
 </script>
 </body>
 </html>
