@@ -146,13 +146,18 @@
             <div class="col-lg-7 col-md-6 mb-4 mb-md-0">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="mb-0">容器列表</h2>
-                    <button class="btn btn-outline-primary btn-sm d-flex align-items-center" onclick="location.reload()">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
-                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
-                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
-                        </svg>
-                        刷新列表
-                    </button>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-success btn-sm d-block d-md-none" data-bs-toggle="modal" data-bs-target="#createContainerModalMobile">
+                            创建新容器
+                        </button>
+                        <button class="btn btn-outline-primary btn-sm d-flex align-items-center" onclick="location.reload()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
+                                <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                                <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                            </svg>
+                            刷新列表
+                        </button>
+                    </div>
                 </div>
 
                 <div class="container-list-desktop d-none d-md-block">
@@ -280,12 +285,7 @@
                         </form>
                     </div>
                 </div>
-                <div class="d-block d-md-none mt-3 mb-3">
-                    <button type="button" class="btn btn-primary w-100" data-bs-toggle="modal" data-bs-target="#createContainerModalMobile">
-                        创建新容器
-                    </button>
                 </div>
-            </div>
         </div>
     </div>
     {% else %}
