@@ -972,7 +972,7 @@ def delete_nat_rule(rule_id):
         return jsonify({'status': 'error', 'message': message}), 500
 
 
-def initialize_and_run():
+def perform_initial_setup():
     print("\n============================================")
     print(" Incus Web 管理器启动信息")
     print("============================================")
@@ -1110,9 +1110,10 @@ def initialize_and_run():
          print(f"启动时 iptables 检查发生异常: {e}")
 
 
+if __name__ == '__main__':
+    # Check if this is the main process when debugger is active
+    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        perform_initial_setup()
+
     print("启动 Flask Web 服务器...")
     app.run(debug=True, host='0.0.0.0', port=5000)
-
-
-if __name__ == '__main__':
-    initialize_and_run()
