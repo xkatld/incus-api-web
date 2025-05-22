@@ -1,29 +1,38 @@
-# incus-api-web
-
 ~~~
-v3:实现基础api功能
+v3.5:实现基础安全功能,管理员用户和apiHash,重写安装文档。
 ~~~
 
+环境：Debian12
 
-## 安装Debian12安装incus
+## 安装python3
 ~~~
-curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/install_incus.sh | sudo bash
 apt install python3
 apt install python3-pip
-bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/image/debian12.sh)"
+rm /usr/lib/python3.11/EXTERNALLY-MANAGED
+~~~
+
+## 安装incus
+~~~
+curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/install_incus.sh | sudo bash
 ~~~
 
 ## git 项目
 ~~~
 git clone https://github.com/xkatld/incus-api-web.git
 cd incus-api-web
+pip install flask
 ~~~
 
 ## 运行项目
 ~~~
-pip install flask
 python3 init_db.py
 python3 app.py
+~~~
+
+## 拉取镜像
+~~~
+#Debian12 ssh root 123456
+bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/image/debian12.sh)"
 ~~~
 
 ## API端点表格
