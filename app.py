@@ -13,6 +13,7 @@ import hashlib
 from functools import wraps
 
 app = Flask(__name__)
+app.debug = True # 修改点：确保在调试模式下，启动信息仅由工作进程打印
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
 
@@ -1023,7 +1024,7 @@ def perform_initial_setup():
         indexes = cursor.fetchall()
         has_unique_incus_name = False
         for idx in indexes:
-            if idx[2] == 1:
+            if idx[2] == 1: # 1 indicates a unique index
                 cursor.execute(f"PRAGMA index_info('{idx[1]}');")
                 idx_cols = [col[2] for col in cursor.fetchall()]
                 if len(idx_cols) == 1 and idx_cols[0] == 'incus_name':
@@ -1054,7 +1055,7 @@ def perform_initial_setup():
         indexes = cursor.fetchall()
         unique_composite_index_exists = False
         for index_info in indexes:
-            if index_info[2] == 1:
+            if index_info[2] == 1: # 1 indicates a unique index
                 index_name = index_info[1]
                 cursor.execute(f"PRAGMA index_info('{index_name}');")
                 index_cols = sorted([col[2] for col in cursor.fetchall()])
@@ -1111,9 +1112,9 @@ def perform_initial_setup():
 
 
 if __name__ == '__main__':
-    # Check if this is the main process when debugger is active
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         perform_initial_setup()
 
     print("启动 Flask Web 服务器...")
     app.run(debug=True, host='0.0.0.0', port=5000)
+
