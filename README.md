@@ -8,6 +8,9 @@ v3:实现基础api功能
 ## 安装Debian12安装incus
 ~~~
 curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/install_incus.sh | sudo bash
+apt install python3
+apt install python3-pip
+bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/image/debian12.sh)"
 ~~~
 
 ## git 项目
