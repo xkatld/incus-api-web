@@ -80,11 +80,11 @@
         }
         .table-hover > tbody > tr:hover > * { background-color: rgba(26,115,232,.05); }
 
-        .table th.col-name, .table td.col-name { width: 25%; }
+        .table th.col-name, .table td.col-name { width: 20%; } /* Adjusted width */
         .table td.col-name { cursor: pointer; }
         .table th.col-status, .table td.col-status { width: 10%; text-align: center;}
-        .table th.col-ip, .table td.col-ip { width: 15%; }
-        .table th.col-image, .table td.col-image { width: 20%; }
+        .table th.col-ip, .table td.col-ip { width: 18%; } /* Adjusted width */
+        .table th.col-image, .table td.col-image { width: 22%; } /* Adjusted width */
         .table td.col-image { cursor: pointer; }
         .table th.col-created, .table td.col-created { width: 15%; }
         .table th.col-actions, .table td.col-actions {
@@ -292,11 +292,12 @@
             const tr = $('<tr></tr>');
 
             const nameTd = $(`<td class="col-name" title="${containerName}">${containerName}</td>`);
-            if (containerName) {
+            if (containerName.length > 0) { // Only add click if there's content
                 nameTd.on('click', function(e) {
-                    e.stopPropagation();
+                    e.stopPropagation(); // Prevent event bubbling
                     const $thisCell = $(this);
                     const currentlyExpanded = $thisCell.hasClass('show-full-content');
+                    // Remove from all cells in this table first
                     $thisCell.closest('table').find('td.show-full-content').removeClass('show-full-content');
                     if (!currentlyExpanded) {
                         $thisCell.addClass('show-full-content');
@@ -309,11 +310,12 @@
             tr.append(`<td class="col-ip" title="${containerIp}">${containerIp}</td>`);
 
             const imageTd = $(`<td class="col-image" title="${containerImage}">${containerImage}</td>`);
-            if (containerImage) {
+            if (containerImage.length > 0) { // Only add click if there's content
                 imageTd.on('click', function(e) {
-                    e.stopPropagation();
+                    e.stopPropagation(); // Prevent event bubbling
                     const $thisCell = $(this);
                     const currentlyExpanded = $thisCell.hasClass('show-full-content');
+                    // Remove from all cells in this table first
                     $thisCell.closest('table').find('td.show-full-content').removeClass('show-full-content');
                     if (!currentlyExpanded) {
                         $thisCell.addClass('show-full-content');
