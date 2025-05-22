@@ -1,9 +1,5 @@
 #!/bin/bash
 
-# Incus 安装脚本 - 优化版本
-# 支持 Debian 12 和 Ubuntu 24
-
-# 显示彩色输出的函数
 print_info() {
     echo -e "\e[1;34m[信息]\e[0m $1"
 }
@@ -20,14 +16,12 @@ print_warning() {
     echo -e "\e[1;33m[警告]\e[0m $1"
 }
 
-# 检查是否以 root 权限运行
 if [ "$EUID" -ne 0 ]; then
     print_error "请以 root 权限运行此脚本"
     echo "使用: sudo $0"
     exit 1
 fi
 
-# 检测系统版本
 if [ -f /etc/os-release ]; then
     . /etc/os-release
     OS=$ID
@@ -39,7 +33,6 @@ else
     exit 1
 fi
 
-# 检查是否为支持的系统
 if [[ "$OS" == "debian" && "$VERSION" == "12" ]] || [[ "$OS" == "ubuntu" && "$VERSION" == "24.04" ]]; then
     print_info "系统版本兼容，继续安装..."
 else
@@ -51,7 +44,6 @@ else
     fi
 fi
 
-# 1. 更新系统并安装必要工具
 print_info "正在更新系统并安装必要工具..."
 apt update || { print_error "系统更新失败"; exit 1; }
 apt install curl wget sudo dos2unix ufw jq apt-transport-https ca-certificates gnupg lsb-release -y || { 
@@ -67,7 +59,6 @@ else
     print_info "UFW 防火墙未运行"
 fi
 
-# 2. 处理 dnsmasq 问题
 print_info "检查 dnsmasq 状态..."
 if systemctl is-active --quiet dnsmasq; then
     print_info "正在停止并移除 dnsmasq..."
@@ -80,26 +71,21 @@ else
     print_info "dnsmasq 未运行，跳过移除步骤"
 fi
 
-# 3. 安装 Incus
 print_info "正在安装 Incus..."
 
-# 确保目录存在
 mkdir -p /etc/apt/keyrings/
 
-# 备份原来的源文件（如果存在）
 if [ -f /etc/apt/sources.list.d/zabbly-incus-stable.sources ]; then
     mv /etc/apt/sources.list.d/zabbly-incus-stable.sources /etc/apt/sources.list.d/zabbly-incus-stable.sources.bak
     print_info "已备份原有的 Incus 源文件"
 fi
 
-# 下载密钥
 print_info "添加 Zabbly 仓库密钥..."
 curl -fsSL https://pkgs.zabbly.com/key.asc -o /etc/apt/keyrings/zabbly.asc || {
     print_error "下载 Zabbly 仓库密钥失败"
     exit 1
 }
 
-# 创建源文件
 print_info "配置 Incus 软件源..."
 cat <<EOF > /etc/apt/sources.list.d/zabbly-incus-stable.sources
 Enabled: yes
@@ -111,7 +97,6 @@ Architectures: $(dpkg --print-architecture)
 Signed-By: /etc/apt/keyrings/zabbly.asc
 EOF
 
-# 更新并安装 Incus
 print_info "更新软件源并安装 Incus..."
 apt-get update || {
     print_error "更新软件源失败"
@@ -123,7 +108,6 @@ apt-get install incus -y || {
     exit 1
 }
 
-# 检查 Incus 是否安装成功
 if ! command -v incus &> /dev/null; then
     print_error "Incus 安装失败，未找到 incus 命令"
     exit 1
@@ -131,26 +115,28 @@ fi
 
 print_success "Incus 安装成功！"
 
-# 初始化 Incus
-print_info "正在初始化 Incus..."
-incus admin init || {
-    print_error "Incus 初始化失败"
-    exit 1
-}
-
-print_success "Incus 安装和初始化完成！"
-
-# 显示 Incus 版本和状态信息
 print_info "Incus 版本信息:"
 incus version
 
-print_info "Incus 状态信息:"
-incus admin list
+print_warning "Incus 安装完成，现在需要进行初始化配置。"
+print_info "初始化过程中会询问一些配置选项，如网络设置、存储池等。"
+read -p "是否现在初始化 Incus? (y/n): " init_confirm
 
-# 提供一些使用建议
-cat << EOF
+if [[ "$init_confirm" == "y" || "$init_confirm" == "Y" ]]; then
+    print_info "正在初始化 Incus..."
+    incus admin init || {
+        print_error "Incus 初始化失败"
+        exit 1
+    }
+    
+    print_success "Incus 安装和初始化完成！"
+    
+    print_info "Incus 状态信息:"
+    incus admin list
+    
+    cat << EOF
 
-$(print_success "Incus 已成功安装在您的系统上!")
+$(print_success "Incus 已成功安装并初始化在您的系统上!")
 
 以下是一些常用命令:
 - 列出所有容器: incus list
@@ -161,3 +147,8 @@ $(print_success "Incus 已成功安装在您的系统上!")
 
 更多信息请访问: https://linuxcontainers.org/incus/docs/
 EOF
+else
+    print_info "Incus 安装完成，但未进行初始化。"
+    print_info "您可以稍后运行以下命令进行初始化:"
+    print_info "sudo incus admin init"
+fi
