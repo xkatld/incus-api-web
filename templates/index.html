@@ -269,7 +269,7 @@
                                         <option value="{{ image.name }}">{{ image.description }}</option>
                                         {% endfor %}
                                     </select>
-                                    {% if image_error[0] %}
+                                    {% if image_error is defined and image_error[0] %}
                                     <div class="form-text text-danger">{{ image_error[1] }}</div>
                                     {% endif %}
                                 </div>
@@ -450,7 +450,7 @@
                                     <option value="{{ image.name }}">{{ image.description }}</option>
                                     {% endfor %}
                                 </select>
-                                {% if image_error[0] %}
+                                {% if image_error is defined and image_error[0] %}
                                 <div class="form-text text-danger">{{ image_error[1] }}</div>
                                 {% endif %}
                             </div>
