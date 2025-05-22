@@ -14,18 +14,14 @@ from functools import wraps
 
 app = Flask(__name__)
 
-# --- 安全配置 ---
-# ⚠️ 警告: 硬编码敏感信息不安全，生产环境请使用环境变量或配置文件
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16)) # Flask Session密钥
+app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpassword') # ⚠️ 请修改此默认密码
-API_SECRET_KEY = os.environ.get('API_SECRET_KEY', secrets.token_hex(32)) # ⚠️ 请修改此默认密钥
-API_SECRET_HASH = hashlib.sha256(API_SECRET_KEY.encode('utf-8')).hexdigest() # 服务器端存储哈希用于比较
+ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpassword')
+API_SECRET_KEY = os.environ.get('API_SECRET_KEY', secrets.token_hex(32))
+API_SECRET_HASH = hashlib.sha256(API_SECRET_KEY.encode('utf-8')).hexdigest()
 
-# --- 数据库配置 ---
 DATABASE_NAME = 'incus_manager.db'
 
-# --- 认证装饰器 ---
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -39,18 +35,15 @@ def verify_api_hash():
     if not api_hash:
         return False
     try:
-         client_hash = hashlib.sha256(f"{api_hash}{API_SECRET_KEY}".encode('utf-8')).hexdigest() # Assuming client sends hash(input + key) - NO, client sends hash(key), server hashes input+key... this is confusing. Let's simplify: client sends hash(key), server hashes key and compares.
-         client_hash = api_hash # Revert: client sends the raw hash
-         # For security, use compare_digest to prevent timing attacks
-         if hashlib.compare_digest(client_hash, API_SECRET_HASH):
+         client_hash = api_hash
+         if client_hash == API_SECRET_HASH:
              return True
          else:
-             app.logger.warning(f"API Hash mismatch from {request.remote_addr}")
+             app.logger.warning(f"API Hash mismatch attempt from {request.remote_addr}")
              return False
     except Exception as e:
-         app.logger.error(f"API hash verification failed: {e}")
+         app.logger.error(f"API hash verification encountered exception: {e}")
          return False
-
 
 def web_or_api_authentication_required(f):
     @wraps(f)
@@ -67,7 +60,6 @@ def web_or_api_authentication_required(f):
                 return jsonify({'status': 'error', 'message': '需要认证'}), 401
     return decorated_function
 
-# --- 数据库和命令执行函数 (与原代码相同，仅为完整性保留) ---
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_NAME)
     conn.row_factory = sqlite3.Row
@@ -417,13 +409,11 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
         app.logger.error(f"清理孤立NAT规则时发生异常: {e}")
 
 
-# --- 认证路由 ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        # ⚠️ 这里的密码比较不安全，生产环境应该使用哈希比较
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session['logged_in'] = True
             app.logger.info(f"用户 '{username}' 登录成功。")
@@ -431,8 +421,8 @@ def login():
             return redirect(next_url or url_for('index'))
         else:
             app.logger.warning(f"用户 '{username}' 登录失败。")
-            return render_template('index.html', login_error="用户名或密码错误。", containers=[], images=[]) # Render index with error
-    return render_template('index.html', login_form=True, containers=[], images=[]) # Render index with login form
+            return render_template('index.html', login_error="用户名或密码错误。", containers=[], images=[])
+    return render_template('index.html', login_form=True, containers=[], images=[])
 
 @app.route('/logout')
 def logout():
@@ -440,10 +430,8 @@ def logout():
     app.logger.info("用户已退出登录。")
     return redirect(url_for('index'))
 
-# --- Web/API 路由 (应用认证装饰器) ---
-
 @app.route('/')
-@login_required # 只有登录用户才能访问首页
+@login_required
 def index():
     success_list, containers_data = run_incus_command(['list', '--format', 'json'])
 
@@ -458,7 +446,6 @@ def index():
         app.logger.error(f"数据库表 'containers' 可能不存在: {e}. 请运行 init_db.py.")
         incus_error = True
         incus_error_message = f"数据库错误：容器表未找到，请运行 init_db.py。原始错误: {e}"
-        # Return the index page with login form or error depending on login state
         return render_template('index.html',
                                containers=[],
                                images=[],
@@ -793,7 +780,6 @@ def container_info(name):
     if info_output is None:
         return jsonify({'status': 'NotFound', 'message': error_message}), 404
     else:
-        # Include live_data_available status for UI hint
         response_data = info_output
         return jsonify(response_data), 200
 
@@ -937,29 +923,7 @@ def delete_nat_rule(rule_id):
         return jsonify({'status': 'error', 'message': message}), 500
 
 
-def check_permissions():
-    if os.geteuid() != 0:
-        print("警告: 当前用户不是 root。执行 iptables 等命令可能需要 root 权限。")
-        print("请考虑使用 'sudo python app.py' 运行此应用 (注意安全性风险)。")
-    else:
-        print("当前用户是 root。可以执行 iptables 等需要权限的命令。")
-
-def print_security_warnings():
-    print("\n--- 安全警告 ---")
-    if os.environ.get('ADMIN_PASSWORD') is None:
-        print("警告: 正在使用硬编码的默认管理员密码。请尽快设置环境变量 ADMIN_PASSWORD 来覆盖默认值。")
-    if os.environ.get('API_SECRET_KEY') is None:
-        print("警告: 正在使用硬编码的默认 API Secret Key。请尽快设置环境变量 API_SECRET_KEY 来覆盖默认值。")
-        print(f"当前的 API Secret Key (用于生成 Hash) 是: {API_SECRET_KEY}")
-        print(f"用于 API 验证的 SHA256 Hash 是: {API_SECRET_HASH}")
-    if os.environ.get('SECRET_KEY') is None:
-         print("警告: 正在使用硬编码的默认 Flask Session Secret Key。请尽快设置环境变量 SECRET_KEY 来覆盖默认值。")
-    print("--- 警告结束 ---\n")
-
-
 def main():
-    print_security_warnings()
-
     if not os.path.exists(DATABASE_NAME):
         print(f"错误：数据库文件 '{DATABASE_NAME}' 未找到。")
         print("请先运行 'python init_db.py' 来初始化数据库。")
@@ -1064,19 +1028,15 @@ def main():
     try:
         subprocess.run(['iptables', '--version'], check=True, capture_output=True, text=True, timeout=5)
         print("iptables 命令检查通过。")
-        check_permissions()
     except FileNotFoundError:
          print("警告：'iptables' 命令未找到。NAT 功能可能无法使用。")
     except subprocess.CalledProcessError as e:
          print(f"警告：执行 'iptables --version' 失败 (退出码 {e.returncode}): {e.stderr.strip()}")
          print("iptables 命令可能存在问题或权限不足。")
-         check_permissions()
     except subprocess.TimeoutExpired:
          print("警告：执行 'iptables --version' 超时。")
-         check_permissions()
     except Exception as e:
          print(f"启动时 iptables 检查发生异常: {e}")
-         check_permissions()
 
 
     print("启动 Flask Web 服务器...")
