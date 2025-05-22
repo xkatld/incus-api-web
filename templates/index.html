@@ -100,12 +100,12 @@
             font-weight: bold;
         }
         .truncate-text {
-            max-width: 100%;
+            max-width: 100%; /* 确保在缩小的列中正确工作 */
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            display: inline-block;
-            vertical-align: middle;
+            display: inline-block; /* 或者 block，取决于布局需求 */
+            vertical-align: middle; /* 如果是inline-block，用于垂直对齐 */
         }
         .actions-dropdown .dropdown-menu {
             min-width: auto;
@@ -162,28 +162,38 @@
 
                 <div class="container-list-desktop d-none d-md-block">
                     <div class="row gx-3 py-2 desktop-list-header">
-                        <div class="col-md-1">名称</div>
-                        <div class="col-md-2">状态</div>
+                        <div class="col-md-2">名称</div>
+                        <div class="col-md-1">状态</div>
                         <div class="col-md-2">IP 地址</div>
-                        <div class="col-md-3">镜像来源</div>
+                        <div class="col-md-2">镜像来源</div>
                         <div class="col-md-3">创建时间</div>
-                        <div class="col-md-1 text-center">操作</div>
+                        <div class="col-md-2 text-center">操作</div>
                     </div>
                     <div id="containerListDesktopItems">
                         {% if containers %}
                             {% for c in containers %}
                             <div class="row gx-3 py-2 align-items-center desktop-list-row">
-                                <div class="col-md-1">{{ c.name }}</div>
-                                <div class="col-md-2"><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></div>
-                                <div class="col-md-2">{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</div>
-                                <div class="col-md-3">
-                                    <div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">
+                                <div class="col-md-2">
+                                    <div class="truncate-text" title="{{ c.name }}">
+                                        {{ c.name }}
+                                    </div>
+                                </div>
+                                <div class="col-md-1"><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></div>
+                                <div class="col-md-2">
+                                    <div class="truncate-text" title="{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}">
+                                        {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}
+                                    </div>
+                                </div>
+                                <div class="col-md-2"> <div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">
                                         {{ c.image_source if c.image_source else 'N/A' }}
                                     </div>
                                 </div>
-                                <div class="col-md-3">{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</div>
-                                <div class="col-md-1 text-center">
-                                    <div class="dropdown actions-dropdown">
+                                <div class="col-md-3">
+                                    <div class="truncate-text" title="{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}">
+                                        {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}
+                                    </div>
+                                </div>
+                                <div class="col-md-2 text-center"> <div class="dropdown actions-dropdown">
                                         <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="actionsDropdownDesktop-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
                                             操作
                                         </button>
