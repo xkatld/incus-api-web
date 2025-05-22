@@ -8,13 +8,11 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        body { padding-top: 20px; }
+        body { /* padding-top: 20px; */ }
         #execOutput, #infoContent pre { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
         #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
         #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
         #infoContent { background-color: #fff; border: none; padding: 0; }
-
-
         .btn-processing {
             pointer-events: none;
             opacity: 0.7;
@@ -22,7 +20,6 @@
         .btn-processing .spinner-border {
              margin-right: 5px;
         }
-
         #toastContainer {
             position: fixed;
             top: 20px;
@@ -31,10 +28,9 @@
         }
         .modal { z-index: 1050; }
         .modal-backdrop { z-index: 1049; }
-
         .container-actions .d-flex-desktop {
             align-items: center;
-             display: none !important;
+            display: none !important;
         }
         @media (min-width: 768px) {
             .container-actions .d-flex-desktop {
@@ -49,7 +45,6 @@
                  display: block;
              }
         }
-
          .container-list-mobile {
             display: block;
          }
@@ -66,7 +61,6 @@
          .container-list-mobile .card-title {
              word-break: break-word;
          }
-
         #natRulesList {
             margin-top: 15px;
             border-top: 1px solid #eee;
@@ -99,88 +93,98 @@
             flex-shrink: 0;
             margin-left: auto;
          }
-
-         /* Login Form Styling */
-         #loginContainer {
-             max-width: 400px;
-             margin: 50px auto;
-             padding: 20px;
-             border: 1px solid #ccc;
-             border-radius: 8px;
-             background-color: #f9f9f9;
-         }
-
+        #loginContainer {
+            max-width: 400px;
+            width: 100%;
+            padding: 20px;
+        }
+        .main-content-wrapper {
+            min-height: calc(100vh - 56px - 48px); /* Adjust based on header/footer height if any */
+        }
     </style>
 </head>
-<body>
+<body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% endif %}">
     {% if session.logged_in %}
-    <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-             <h1>Incus Web 管理器</h1>
-             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">退出登录</a>
+    <div class="container-fluid mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 px-md-3">
+            <h1>Incus Web 管理器</h1>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">退出登录</a>
         </div>
 
-
         {% if incus_error[0] %}
-        <div class="alert alert-danger" role="alert">
+        <div class="alert alert-danger mx-md-3" role="alert">
             <strong>错误:</strong> 无法连接到 Incus 或执行命令失败。显示的数据可能来自数据库缓存。 <br>
             详细信息: {{ incus_error[1] }}
         </div>
         {% endif %}
 
-        <div class="card mb-4">
-            <div class="card-header">创建新容器</div>
-            <div class="card-body">
-                <form id="createContainerForm">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label for="containerName" class="form-label">容器名称</label>
-                            <input type="text" class="form-control" id="containerName" name="name" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="containerImage" class="form-label">选择镜像</label>
-                            <select class="form-select" id="containerImage" name="image" required>
-                                <option value="" selected disabled>请选择一个镜像</option>
-                                {% for image in images %}
-                                <option value="{{ image.name }}">{{ image.description }}</option>
-                                {% endfor %}
-                            </select>
-                             {% if image_error[0] %}
-                             <div class="form-text text-danger">{{ image_error[1] }}</div>
-                             {% endif %}
-                        </div>
-                        <div class="col-md-2 align-self-end">
-                            <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
-                        </div>
-                    </div>
-                </form>
-            </div>
-        </div>
+        <div class="row gx-4 px-md-3 main-content-wrapper">
+            <div class="col-lg-7 col-md-6 mb-4 mb-md-0">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h2 class="mb-0">容器列表</h2>
+                    <button class="btn btn-outline-primary btn-sm d-flex align-items-center" onclick="location.reload()">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
+                            <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
+                            <path d="M8 4.466V.534a.25.25 0 0 1 .41-.192l2.36 1.966c.12.1.12.284 0 .384L8.41 4.658A.25.25 0 0 1 8 4.466"/>
+                        </svg>
+                        刷新列表
+                    </button>
+                </div>
 
-        <h2>容器列表</h2>
+                <div class="table-responsive container-list-desktop d-none d-md-block">
+                    <table class="table table-striped table-hover">
+                        <thead class="table-light">
+                            <tr>
+                                <th>名称</th>
+                                <th>状态</th>
+                                <th>IP 地址</th>
+                                <th>镜像来源</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="containerListDesktop">
+                            {% for c in containers %}
+                            <tr>
+                                <td>{{ c.name }}</td>
+                                <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
+                                <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
+                                <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
+                                <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td>
+                                <td class="container-actions">
+                                    <div class="d-flex-desktop gap-1">
+                                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
+                                        {% if c.status == 'Running' %}
+                                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
+                                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
+                                        <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
+                                        {% elif c.status == 'Stopped' %}
+                                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
+                                        {% endif %}
+                                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="text-center">没有找到容器或无法连接到 Incus。</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
 
-        <div class="table-responsive container-list-desktop d-none d-md-block">
-            <table class="table table-striped">
-                <thead>
-                    <tr>
-                        <th>名称</th>
-                        <th>状态</th>
-                        <th>IP 地址</th>
-                        <th>镜像来源</th>
-                        <th>创建时间</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="containerListDesktop">
+                <div class="container-list-mobile d-block d-md-none mt-3">
                     {% for c in containers %}
-                    <tr>
-                        <td>{{ c.name }}</td>
-                        <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
-                        <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
-                        <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
-                        <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td>
-                        <td class="container-actions">
-                            <div class="d-flex-desktop gap-1">
+                    <div class="card mb-3 shadow-sm">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="card-title mb-0">{{ c.name }}</h5>
+                                <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
+                            </div>
+                            <p class="card-text mb-1"><small class="text-muted">IP 地址:</small> {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</p>
+                            <p class="card-text mb-1"><small class="text-muted">镜像:</small> {{ c.image_source if c.image_source else 'N/A' }}</p>
+                            <p class="card-text mb-3"><small class="text-muted">创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
+                            <div class="card-actions">
                                 <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
                                 {% if c.status == 'Running' %}
                                 <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
@@ -192,76 +196,82 @@
                                 {% endif %}
                                 <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
                             </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="6" class="text-center">没有找到容器或无法连接到 Incus。</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="container-list-mobile d-block d-md-none mt-3">
-            {% for c in containers %}
-            <div class="card mb-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="card-title mb-0">{{ c.name }}</h5>
-                        <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
+                        </div>
                     </div>
+                    {% else %}
+                    <div class="alert alert-info text-center" role="alert">
+                        没有找到容器或无法连接到 Incus。
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
 
-                    <p class="card-text mb-1"><small class="text-muted">IP 地址:</small> {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</p>
-                    <p class="card-text mb-1"><small class="text-muted">镜像:</small> {{ c.image_source if c.image_source else 'N/A' }}</p>
-                    <p class="card-text mb-3"><small class="text-muted">创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
-
-                    <div class="card-actions">
-                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
-                        {% if c.status == 'Running' %}
-                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
-                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
-                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
-                         <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
-                        {% elif c.status == 'Stopped' %}
-                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
-                        {% endif %}
-                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
+            <div class="col-lg-5 col-md-6">
+                <div class="card shadow-sm">
+                    <div class="card-header bg-primary text-white">创建新容器</div>
+                    <div class="card-body">
+                        <form id="createContainerForm">
+                            <div class="row g-3">
+                                <div class="col-12">
+                                    <label for="containerName" class="form-label">容器名称</label>
+                                    <input type="text" class="form-control" id="containerName" name="name" required>
+                                </div>
+                                <div class="col-12">
+                                    <label for="containerImage" class="form-label">选择镜像</label>
+                                    <select class="form-select" id="containerImage" name="image" required>
+                                        <option value="" selected disabled>请选择一个镜像</option>
+                                        {% for image in images %}
+                                        <option value="{{ image.name }}">{{ image.description }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    {% if image_error[0] %}
+                                    <div class="form-text text-danger">{{ image_error[1] }}</div>
+                                    {% endif %}
+                                </div>
+                                <div class="col-12">
+                                    <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
+                                </div>
+                            </div>
+                        </form>
                     </div>
                 </div>
             </div>
-            {% else %}
-            <div class="alert alert-info text-center" role="alert">
-                 没有找到容器或无法连接到 Incus。
-            </div>
-            {% endfor %}
         </div>
-
-         <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button>
     </div>
     {% else %}
-    <div class="container">
-        <div id="loginContainer">
-             <h2 class="text-center mb-4">管理员登录</h2>
-             <form method="POST" action="{{ url_for('login') }}">
-                 <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
-                 <div class="mb-3">
-                    <label for="username" class="form-label">用户名</label>
-                    <input type="text" class="form-control" id="username" name="username" required autofocus>
-                 </div>
-                  <div class="mb-3">
-                    <label for="password" class="form-label">密码</label>
-                    <input type="password" class="form-control" id="password" name="password" required>
-                 </div>
-                 {% if login_error %}
-                 <div class="alert alert-danger" role="alert">
-                     {{ login_error }}
-                 </div>
-                 {% endif %}
-                 <button type="submit" class="btn btn-primary w-100">登录</button>
-             </form>
-        </div>
+    <div id="loginContainer">
+        <h2 class="text-center mb-4">管理员登录</h2>
+        <form method="POST" action="{{ url_for('login') }}" id="loginForm">
+            <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+            <div class="mb-3">
+                <label for="username" class="form-label">用户名</label>
+                <input type="text" class="form-control" id="username" name="username" required autofocus>
+            </div>
+            <div class="mb-3">
+                <label for="password" class="form-label">密码</label>
+                <input type="password" class="form-control" id="password" name="password" required>
+            </div>
+            <div class="mb-3">
+                <label for="captchaInput" class="form-label">验证码: <span id="captchaQuestion" class="fw-bold"></span></label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="captchaInput" name="captcha" required>
+                    <button class="btn btn-outline-secondary" type="button" id="refreshCaptchaBtn" title="刷新验证码">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
+                          <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
+                          <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.5A5.002 5.002 0 0 0 8 3zM3.5 13A5.002 5.002 0 0 0 8 15c1.552 0 2.94-.707 3.857-1.818a.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.5a5.002 5.002 0 0 0 0 4z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+            {% if login_error %}
+            <div class="alert alert-danger" role="alert">
+                {{ login_error }}
+            </div>
+            {% endif %}
+            <button type="submit" class="btn btn-primary w-100">登录</button>
+        </form>
     </div>
     {% endif %}
-
 
     <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer">
     </div>
@@ -275,7 +285,6 @@
                 </div>
                 <div class="modal-body">
                     <div id="basicInfoContent">正在加载基础信息...</div>
-
                     <div id="natRulesList">
                         <h6>NAT 规则 (本应用添加)</h6>
                         <ul id="natRulesContent">
@@ -283,9 +292,7 @@
                         </ul>
                          <div id="natRulesError" class="alert alert-warning mt-2 d-none"></div>
                     </div>
-
                      <div id="infoError" class="alert alert-danger mt-2 d-none"></div>
-
                 </div>
             </div>
         </div>
@@ -371,8 +378,34 @@
         </div>
     </div>
 
-
 <script>
+let captchaAnswer = 0;
+
+function generateCaptcha() {
+    const num1 = Math.ceil(Math.random() * 9) + 1;
+    const num2 = Math.ceil(Math.random() * 9) + 1;
+    captchaAnswer = num1 + num2;
+    const captchaQuestionEl = document.getElementById('captchaQuestion');
+    if (captchaQuestionEl) {
+        captchaQuestionEl.innerText = `${num1} + ${num2} = ?`;
+    }
+    const captchaInputEl = document.getElementById('captchaInput');
+    if (captchaInputEl) {
+        captchaInputEl.value = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', function() {
+    if (document.getElementById('loginForm')) {
+        generateCaptcha();
+        const refreshButton = document.getElementById('refreshCaptchaBtn');
+        if(refreshButton) {
+            refreshButton.addEventListener('click', generateCaptcha);
+        }
+    }
+});
+
+
 function showToast(message, type = 'info') {
     let toastType = 'info';
     if (type === 'success') {
@@ -382,7 +415,6 @@ function showToast(message, type = 'info') {
     } else if (type === 'warning') {
         toastType = 'warning';
     }
-
     const toastContainer = $('#toastContainer');
     const toastHtml = `
         <div class="toast align-items-center text-bg-${toastType} border-0" role="alert" aria-live="assertive" aria-atomic="true">
@@ -406,10 +438,8 @@ function showToast(message, type = 'info') {
 function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
     if (!$button.length) {
-         console.warn("Button element not found for processing state update.");
-         return;
+        return;
     }
-
     if (isProcessing) {
         if (!$button.data('original-html')) {
             $button.data('original-html', $button.html());
@@ -424,7 +454,6 @@ function setButtonProcessing(button, isProcessing) {
              $button.data('original-html', null);
              $button.removeClass('btn-processing').prop('disabled', false);
         } else {
-             // If original-html wasn't set (e.g., error happened before processing state was set), just re-enable and remove class
              $button.removeClass('btn-processing').prop('disabled', false);
         }
     }
@@ -435,18 +464,15 @@ let currentConfirmContainerName = null;
 let currentConfirmRuleId = null;
 let currentConfirmButtonElement = null;
 
-
 function showConfirmationModal(actionType, nameOrId, buttonElement) {
     currentConfirmAction = actionType;
     currentConfirmButtonElement = buttonElement;
     const modalTitle = $('#confirmModalLabel');
     const modalBody = $('#confirmModalBody');
     const confirmButton = $('#confirmActionButton');
-
     let message = '';
     let buttonClass = 'btn-primary';
     let buttonText = '确认';
-
     if (actionType === 'restart_container') {
         currentConfirmContainerName = nameOrId;
         currentConfirmRuleId = null;
@@ -469,54 +495,45 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
         buttonClass = 'btn-danger';
         buttonText = '删除规则';
     }
-
     modalBody.html(message);
     confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text(buttonText);
-    setButtonProcessing(confirmButton, false); // Reset confirm button state
-
+    setButtonProcessing(confirmButton, false);
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
     confirmModal.show();
 }
-
 
 $('#confirmActionButton').click(function() {
     const actionType = currentConfirmAction;
     const buttonElement = currentConfirmButtonElement;
     const confirmButton = $(this);
-
     if (!actionType || !buttonElement) {
         showToast("确认信息丢失，无法执行操作。", 'danger');
         const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
         if (confirmModal) confirmModal.hide();
         return;
     }
-
     setButtonProcessing(confirmButton, true);
-     if (actionType !== 'delete_nat_rule') { // Only set processing on the original action button for container actions
-        setButtonProcessing(buttonElement, true);
+     if (actionType !== 'delete_nat_rule') {
+         setButtonProcessing(buttonElement, true);
      }
-
-
     if (actionType === 'delete_nat_rule') {
         const ruleId = currentConfirmRuleId;
         $.ajax({
             url: `/container/nat_rule/${ruleId}`,
             type: 'DELETE',
-            headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash for API calls
+            headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
             success: function(data) {
                 showToast(data.message, data.status);
                 if (data.status === 'success' || data.status === 'warning') {
                     const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', '');
                     if (containerNameInModalLabel) {
-                        loadNatRules(containerNameInModalLabel); // Reload NAT rules in the info modal
+                        loadNatRules(containerNameInModalLabel);
                     } else {
-                         // If info modal is not open, maybe reload the page after a short delay
                          setTimeout(() => location.reload(), 1000);
                     }
                 }
             },
             error: function(jqXHR) {
-                // Check for 401 Unauthorized
                 if (jqXHR.status === 401) {
                     showToast("操作需要认证，请重新登录。", 'danger');
                     setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
@@ -529,33 +546,30 @@ $('#confirmActionButton').click(function() {
                 const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
                 if (confirmModal) confirmModal.hide();
                 setButtonProcessing(buttonElement, false);
-                setButtonProcessing(confirmButton, false); // Ensure confirm button resets
+                setButtonProcessing(confirmButton, false);
             }
         });
-
-    } else { // Container actions (start, stop, restart, delete)
+    } else {
         const containerName = currentConfirmContainerName;
         let action = actionType.replace('_container', '');
-
         $.post(`/container/${containerName}/action`, { action: action }, function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
-                 setTimeout(() => location.reload(), 1000); // Reload page on success to update list
+                 setTimeout(() => location.reload(), 1000);
             }
         }).fail(function(jqXHR) {
-             // Check for 401 Unauthorized
              if (jqXHR.status === 401) {
                 showToast("操作需要认证，请重新登录。", 'danger');
                 setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
              } else {
                 const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
                 showToast("操作失败: " + message, 'danger');
-                setButtonProcessing(buttonElement, false); // Only reset button if not reloading
+                setButtonProcessing(buttonElement, false);
              }
         }).always(function() {
             const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
             if (confirmModal) confirmModal.hide();
-             setButtonProcessing(confirmButton, false); // Ensure confirm button resets
+             setButtonProcessing(confirmButton, false);
         });
     }
 });
@@ -564,27 +578,24 @@ $('#confirmModal').on('hidden.bs.modal', function () {
     currentConfirmAction = null;
     currentConfirmContainerName = null;
     currentConfirmRuleId = null;
-    // Don't reset currentConfirmButtonElement here, it's needed in the .always() callback
 });
-
 
 $('#createContainerForm').submit(function(event) {
     event.preventDefault();
     const form = $(this);
     const submitButton = $('#createButton', form);
     setButtonProcessing(submitButton, true);
-
     var formData = form.serialize();
     $.ajax({
         url: "{{ url_for('create_container') }}",
         type: "POST",
         data: formData,
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
                 form[0].reset();
-                 setTimeout(() => location.reload(), 1000); // Reload page on success
+                 setTimeout(() => location.reload(), 1000);
             }
         },
         error: function(jqXHR) {
@@ -603,7 +614,6 @@ $('#createContainerForm').submit(function(event) {
 });
 
 function performAction(containerName, action, buttonElement) {
-
     if (action === 'restart') {
         showConfirmationModal('restart_container', containerName, buttonElement);
         return;
@@ -612,20 +622,18 @@ function performAction(containerName, action, buttonElement) {
         showConfirmationModal('delete_container', containerName, buttonElement);
         return;
     }
-
     setButtonProcessing(buttonElement, true);
-
     $.ajax({
         url: `/container/${containerName}/action`,
         type: "POST",
         data: { action: action },
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
-                 setTimeout(() => location.reload(), 1000); // Reload page on success
+                 setTimeout(() => location.reload(), 1000);
             } else {
-                 setButtonProcessing(buttonElement, false); // Reset button if not reloading
+                 setButtonProcessing(buttonElement, false);
             }
         },
         error: function(jqXHR) {
@@ -635,7 +643,7 @@ function performAction(containerName, action, buttonElement) {
              } else {
                 const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
                 showToast("操作失败: " + message, 'danger');
-                setButtonProcessing(buttonElement, false); // Reset button on failure
+                setButtonProcessing(buttonElement, false);
              }
         }
     });
@@ -648,31 +656,25 @@ function showInfo(containerName, buttonElement) {
     const natRulesError = $('#natRulesError');
     const infoError = $('#infoError');
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
-
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
     basicInfoContent.html('正在加载基础信息...');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
      infoError.addClass('d-none').text('');
-
     natRulesListContainer.show();
-
-
     setButtonProcessing(buttonElement, true);
-
     $.ajax({
         url: `/container/${containerName}/info`,
         type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
              if (data.status === 'NotFound') {
                  basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
                  infoError.removeClass('d-none').text(data.message);
                  showToast("加载容器信息失败。", 'danger');
                  natRulesListContainer.hide();
-                 return; // Stop here if container not found
-            }
-
+                 return;
+             }
             let infoHtml = `
                 <p><strong>名称:</strong> ${data.name}</p>
                 <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p>
@@ -685,15 +687,11 @@ function showInfo(containerName, buttonElement) {
                 <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
                  <p><small>${data.message}</small></p>
             `;
-
             basicInfoContent.html(infoHtml);
-
             if (!data.live_data_available && data.status !== 'NotFound') {
                  showToast(data.message, 'warning');
             }
-
-            loadNatRules(containerName); // Load NAT rules after basic info is loaded
-
+            loadNatRules(containerName);
         },
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
@@ -703,14 +701,14 @@ function showInfo(containerName, buttonElement) {
                 const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
                 basicInfoContent.html(`<strong>错误:</strong> ${message}`);
                 infoError.removeClass('d-none').text(message);
-                natRulesContent.html('<li>无法加载 NAT 规则。</li>'); // Also show error for NAT rules loading
-                natRulesListContainer.hide(); // Hide NAT rules section if info failed
+                natRulesContent.html('<li>无法加载 NAT 规则。</li>');
+                natRulesListContainer.hide();
                 showToast("加载容器信息失败。", 'danger');
              }
         },
         complete: function() {
             setButtonProcessing(buttonElement, false);
-            infoModal.show(); // Show modal regardless of success/failure, content will indicate error
+            infoModal.show();
         }
     });
 }
@@ -720,14 +718,12 @@ function loadNatRules(containerName) {
      const natRulesError = $('#natRulesError');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
-
      $.ajax({
         url: `/container/${containerName}/nat_rules`,
         type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             natRulesContent.empty();
-
             if (data.status === 'success' && data.rules && data.rules.length > 0) {
                 data.rules.forEach(rule => {
                     const ruleHtml = `
@@ -753,10 +749,7 @@ function loadNatRules(containerName) {
         },
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
-                // If loading NAT rules within the Info modal gets 401, the session likely expired
-                // This is less likely if the main page loaded correctly, but handle defensively.
                 showToast("加载 NAT 规则需要认证，请重新登录。", 'danger');
-                // Redirecting here might interrupt the info modal, but it's necessary for security
                 setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
              } else {
                  const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载 NAT 规则。";
@@ -768,11 +761,9 @@ function loadNatRules(containerName) {
     });
 }
 
-
 function deleteNatRule(ruleId, buttonElement) {
     showConfirmationModal('delete_nat_rule', ruleId, buttonElement);
 }
-
 
 function openExecModal(containerName) {
     $('#execContainerName').val(containerName);
@@ -790,25 +781,20 @@ $('#execCommandForm').submit(function(event) {
     const form = $(this);
     const submitButton = $('#execButton', form);
     const outputArea = $('#execOutput');
-
     var containerName = $('#execContainerName').val();
     var command = $('#commandInput').val();
-
     if (!command.trim()) {
         showToast("请输入要执行的命令。", 'warning');
         return;
     }
-
     outputArea.text('正在执行...');
     outputArea.removeClass('success error');
-
     setButtonProcessing(submitButton, true);
-
     $.ajax({
         url: `/container/${containerName}/exec`,
         type: "POST",
         data: { command: command },
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             if (data.status === 'success') {
                 outputArea.text(data.output);
@@ -845,14 +831,12 @@ function openNatModal(containerName) {
     $('#protocol').val('tcp');
     $('#natContainerIP').val('正在获取 IP...');
     setButtonProcessing($('#addNatButton'), false);
-
     var natModal = new bootstrap.Modal(document.getElementById('natModal'));
     natModal.show();
-
     $.ajax({
         url: `/container/${containerName}/info`,
         type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
              if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
                  const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
@@ -867,7 +851,6 @@ function openNatModal(containerName) {
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
                  showToast("获取容器信息需要认证，请重新登录。", 'danger');
-                 // Close NAT modal before redirecting
                  var natModalInstance = bootstrap.Modal.getInstance(document.getElementById('natModal'));
                  if (natModalInstance) natModalInstance.hide();
                  setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
@@ -879,26 +862,21 @@ function openNatModal(containerName) {
              }
         }
     });
-
 }
 
 $('#addNatForm').submit(function(event) {
     event.preventDefault();
     const form = $(this);
     const submitButton = $('#addNatButton', form);
-
     const containerName = $('#natContainerName').val();
     const hostPort = $('#hostPort').val();
     const containerPort = $('#containerPort').val();
     const protocol = $('#protocol').val();
-
     if (!hostPort || !containerPort || !protocol) {
         showToast("请填写所有 NAT 规则信息。", 'warning');
         return;
     }
-
     setButtonProcessing(submitButton, true);
-
     $.ajax({
         url: `/container/${containerName}/add_nat_rule`,
         type: "POST",
@@ -907,18 +885,15 @@ $('#addNatForm').submit(function(event) {
             container_port: containerPort,
             protocol: protocol
         },
-         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
-
             if (data.status === 'success' || data.status === 'warning') {
                  const containerNameInInfoModal = $('#infoModalLabel').text().replace('容器信息: ', '');
                  if (containerNameInInfoModal === containerName) {
-                     loadNatRules(containerName); // Reload NAT rules in the info modal if open
+                     loadNatRules(containerName);
                  }
-
                  if (data.status === 'success') {
-                     // Clear form fields on successful add
                      $('#hostPort').val('');
                      $('#containerPort').val('');
                      $('#protocol').val('tcp');
@@ -928,7 +903,6 @@ $('#addNatForm').submit(function(event) {
         error: function(jqXHR) {
             if (jqXHR.status === 401) {
                  showToast("操作需要认证，请重新登录。", 'danger');
-                 // Close NAT modal before redirecting
                  var natModalInstance = bootstrap.Modal.getInstance(document.getElementById('natModal'));
                  if (natModalInstance) natModalInstance.hide();
                  setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
@@ -943,15 +917,13 @@ $('#addNatForm').submit(function(event) {
     });
 });
 
-
-// --- Modal Reset Logic ---
 $('#infoModal').on('hidden.bs.modal', function () {
   $('#basicInfoContent').html('正在加载基础信息...');
   $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
   $('#natRulesError').addClass('d-none').text('');
   $('#infoError').addClass('d-none').text('');
   $('#infoModalLabel').text('容器信息');
-   $('#natRulesList').hide(); // Hide the NAT rules section when modal is closed
+   $('#natRulesList').hide();
 });
 
 $('#execModal').on('hidden.bs.modal', function () {
@@ -971,10 +943,8 @@ $('#natModal').on('hidden.bs.modal', function () {
     $('#protocol').val('tcp');
     $('#natModalLabel').text('为容器添加 NAT 规则');
     setButtonProcessing($('#addNatButton'), false);
-    $('#addNatButton').prop('disabled', false).text('添加规则'); // Ensure button is re-enabled if closed before IP check finishes
+    $('#addNatButton').prop('disabled', false).text('添加规则');
 });
-
-
 </script>
 </body>
 </html>
