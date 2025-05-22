@@ -118,14 +118,27 @@ print_success "Incus 安装成功！"
 print_info "Incus 版本信息:"
 incus version
 
-cat << EOF
+print_warning "Incus 安装完成，现在需要进行初始化配置。"
+print_info "初始化过程中会询问一些配置选项，如网络设置、存储池等。"
+read -p "是否现在初始化 Incus? (y/n): " init_confirm
 
-$(print_success "Incus 已成功安装在您的系统上!")
+if [[ "$init_confirm" == "y" || "$init_confirm" == "Y" ]]; then
+    print_info "正在初始化 Incus..."
+    incus admin init || {
+        print_error "Incus 初始化失败"
+        exit 1
+    }
+    
+    print_success "Incus 安装和初始化完成！"
+    
+    print_info "Incus 状态信息:"
+    incus admin list
+    
+    cat << EOF
 
-请运行以下命令进行初始化:
-sudo incus admin init
+$(print_success "Incus 已成功安装并初始化在您的系统上!")
 
-初始化完成后，以下是一些常用命令:
+以下是一些常用命令:
 - 列出所有容器: incus list
 - 创建容器: incus launch images:debian/12 my-container
 - 进入容器: incus exec my-container -- bash
@@ -134,3 +147,8 @@ sudo incus admin init
 
 更多信息请访问: https://linuxcontainers.org/incus/docs/
 EOF
+else
+    print_info "Incus 安装完成，但未进行初始化。"
+    print_info "您可以稍后运行以下命令进行初始化:"
+    print_info "sudo incus admin init"
+fi
