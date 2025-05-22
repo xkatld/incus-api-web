@@ -21,6 +21,8 @@ API_SECRET_KEY = os.environ.get('API_SECRET_KEY', secrets.token_hex(32))
 
 TIMESTAMP_TOLERANCE = 300
 
+DATABASE_NAME = 'incus_manager.db'
+
 def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
