@@ -11,7 +11,10 @@
             font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
             background-color: #f8f9fa;
             color: #3c4043;
-            padding-top: 2rem;
+        }
+
+        .main-content {
+            padding-top: 1.5rem;
             padding-bottom: 2rem;
         }
 
@@ -20,17 +23,21 @@
             font-weight: 500;
         }
 
-        h1 {
+        h1.page-title {
             font-size: 1.75rem;
-            color: #1a73e8;
+            color: #1a73e8; /* Google Blue */
         }
-        h2 {
+        h2.section-title {
             font-size: 1.3rem;
             margin-top: 1.5rem;
             margin-bottom: 1rem;
-            border-bottom: 1px solid #e0e0e0;
             padding-bottom: 0.5rem;
+            color: #202124;
         }
+        .left-column h2.section-title {
+            border-bottom: 1px solid #e0e0e0;
+        }
+
 
         .btn {
             border-radius: 4px;
@@ -38,6 +45,7 @@
             padding: 0.5rem 1rem;
             font-size: 0.875rem;
             transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+            text-transform: none;
         }
 
         .btn-primary {
@@ -48,6 +56,10 @@
             background-color: #1765cc;
             border-color: #1765cc;
             box-shadow: 0 1px 2px 0 rgba(66,133,244,.3),0 1px 3px 1px rgba(66,133,244,.15);
+        }
+        .btn-primary:active {
+            background-color: #1457b3 !important;
+            border-color: #1457b3 !important;
         }
 
         .btn-secondary {
@@ -60,38 +72,27 @@
             border-color: #c8cbcf;
             box-shadow: 0 1px 2px 0 rgba(0,0,0,.1),0 1px 3px 1px rgba(0,0,0,.08);
         }
+        .btn-outline-secondary {
+             color: #5f6368;
+             border-color: #dadce0;
+        }
+        .btn-outline-secondary:hover {
+            background-color: #f1f3f4;
+            color: #202124;
+            border-color: #dadce0;
+        }
 
         .btn-sm {
             padding: 0.25rem 0.75rem;
             font-size: 0.75rem;
         }
+        .btn-outline-danger { color: #ea4335; border-color: #ea4335;}
+        .btn-outline-danger:hover { background-color: #ea4335; color: #fff; }
+        .btn-info { background-color: #89b4f8; border-color: #89b4f8; color: #202124;}
+        .btn-info:hover { background-color: #7ba6e9; border-color: #7ba6e9;}
+        .btn-dark { background-color: #5f6368; border-color: #5f6368;}
+        .btn-dark:hover { background-color: #4e5155; border-color: #4e5155;}
 
-        .btn-outline-danger {
-            color: #ea4335;
-            border-color: #ea4335;
-        }
-        .btn-outline-danger:hover {
-            background-color: #ea4335;
-            color: #fff;
-        }
-        .btn-info {
-            background-color: #89b4f8;
-            border-color: #89b4f8;
-            color: #202124;
-        }
-        .btn-info:hover {
-            background-color: #7ba6e9;
-            border-color: #7ba6e9;
-        }
-
-        .btn-dark {
-            background-color: #5f6368;
-            border-color: #5f6368;
-        }
-        .btn-dark:hover {
-            background-color: #4e5155;
-            border-color: #4e5155;
-        }
 
         .card {
             border: 1px solid #dadce0;
@@ -107,19 +108,19 @@
             font-size: 1rem;
             color: #202124;
         }
-        .card-body {
-            padding: 1.25rem;
-        }
+        .card-body { padding: 1.25rem; }
 
         .form-control, .form-select {
             border-radius: 4px;
             border: 1px solid #dadce0;
             padding: 0.6rem 0.75rem;
             font-size: 0.9rem;
+            background-color: #fff;
         }
         .form-control:focus, .form-select:focus {
             border-color: #1a73e8;
-            box-shadow: 0 0 0 0.2rem rgba(26,115,232,.25);
+            box-shadow: 0 0 0 1px #1a73e8;
+            background-color: #fff;
         }
         .form-label {
             font-weight: 500;
@@ -128,9 +129,7 @@
             margin-bottom: 0.3rem;
         }
 
-        .table {
-            background-color: #fff;
-        }
+        .table { background-color: #fff; }
         .table th, .table td {
             padding: 0.75rem 1rem;
             vertical-align: middle;
@@ -144,32 +143,31 @@
             background-color: #f8f9fa;
             border-top: 0;
         }
-        .table-striped > tbody > tr:nth-of-type(odd) > * {
-            background-color: rgba(0,0,0,.02);
-        }
-        .table-hover > tbody > tr:hover > * {
-            background-color: rgba(26,115,232,.05);
-        }
+        .table-striped > tbody > tr:nth-of-type(odd) > * { background-color: rgba(0,0,0,.02); }
+        .table-hover > tbody > tr:hover > * { background-color: rgba(26,115,232,.05); }
+
         .table-responsive {
             border: 1px solid #dadce0;
             border-radius: 8px;
             overflow: hidden;
         }
 
+
         #loginContainer {
             max-width: 420px;
-            padding: 2rem;
+            padding: 2.5rem;
             background-color: #fff;
             border: 1px solid #dadce0;
             border-radius: 8px;
             box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15);
         }
-        #loginContainer h2 {
+        #loginContainer h2.form-title {
             border-bottom: none;
             font-size: 1.5rem;
             color: #202124;
             margin-bottom: 1.5rem;
         }
+
 
         #execOutput, #infoContent pre {
             white-space: pre-wrap;
@@ -182,193 +180,72 @@
             font-size: 0.85em;
             border-radius: 4px;
         }
-        #execOutput.success {
-            border-color: #81c995;
-            background-color: #e6f4ea;
-            color: #185c37;
-        }
-        #execOutput.error {
-            border-color: #f28b82;
-            background-color: #fce8e6;
-            color: #a50e0e;
-        }
-        #infoContent {
-            background-color: #fff;
-            border: none;
-            padding: 0;
-        }
+        #execOutput.success { border-color: #81c995; background-color: #e6f4ea; color: #185c37; }
+        #execOutput.error { border-color: #f28b82; background-color: #fce8e6; color: #a50e0e; }
+        #infoContent { background-color: #fff; border: none; padding: 0; }
 
-        .btn-processing {
-            pointer-events: none;
-            opacity: 0.8;
-        }
-        .btn-processing .spinner-border {
-            margin-right: 0.5rem;
-        }
 
-        #toastContainer {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1090;
-        }
-        .toast {
-            border-radius: 4px;
-            box-shadow: 0 2px 4px rgba(0,0,0,.18);
-            font-size: 0.9rem;
-        }
-        .toast-header {
-            background-color: #fff;
-            border-bottom: 1px solid #e0e0e0;
-        }
-        .text-bg-danger, .text-bg-success, .text-bg-info, .text-bg-warning {
-            color: #fff !important;
-        }
+        .btn-processing { pointer-events: none; opacity: 0.8; }
+        .btn-processing .spinner-border { margin-right: 0.5rem; }
+
+        #toastContainer { position: fixed; top: 20px; right: 20px; z-index: 1090; }
+        .toast { border-radius: 4px; box-shadow: 0 2px 4px rgba(0,0,0,.18); font-size: 0.9rem; }
+        .text-bg-danger, .text-bg-success, .text-bg-info, .text-bg-warning { color: #fff !important; }
         .text-bg-danger { background-color: #d93025 !important; }
         .text-bg-success { background-color: #1e8e3e !important; }
         .text-bg-info { background-color: #1a73e8 !important; }
         .text-bg-warning { background-color: #f9ab00 !important; color: #202124 !important; }
 
-        .modal-content {
-            border-radius: 8px;
-            border: 1px solid #dadce0;
-            box-shadow: 0 4px 8px 0 rgba(60,64,67,.3),0 6px 20px 0 rgba(60,64,67,.15);
-        }
-        .modal-header {
-            background-color: #fff;
-            border-bottom: 1px solid #e0e0e0;
-            padding: 1rem 1.5rem;
-        }
-        .modal-header .modal-title {
-            font-size: 1.15rem;
-            font-weight: 500;
-            color: #202124;
-        }
-        .modal-body {
-            padding: 1.5rem;
-            font-size: 0.9rem;
-        }
-        .modal-footer {
-            background-color: #f8f9fa;
-            border-top: 1px solid #e0e0e0;
-            padding: 0.75rem 1.5rem;
-        }
+        .modal-content { border-radius: 8px; border: 1px solid #dadce0; box-shadow: 0 4px 8px 0 rgba(60,64,67,.3),0 6px 20px 0 rgba(60,64,67,.15); }
+        .modal-header { background-color: #fff; border-bottom: 1px solid #e0e0e0; padding: 1rem 1.5rem; }
+        .modal-header .modal-title { font-size: 1.15rem; font-weight: 500; color: #202124; }
+        .modal-body { padding: 1.5rem; font-size: 0.9rem; }
+        .modal-footer { background-color: #f8f9fa; border-top: 1px solid #e0e0e0; padding: 0.75rem 1.5rem; }
         .modal { z-index: 1070; }
         .modal-backdrop { z-index: 1069; background-color: rgba(0,0,0,0.6); }
 
 
-        .container-actions .d-flex-desktop {
-            align-items: center;
-            display: none !important;
-        }
-        @media (min-width: 768px) {
-            .container-actions .d-flex-desktop {
-                display: flex !important;
-                flex-direction: row;
-                gap: 0.35rem;
-            }
+        .container-actions .d-flex-desktop { align-items: center; display: none !important; }
+        @media (min-width: 992px) { /* lg breakpoint */
+            .container-actions .d-flex-desktop { display: flex !important; flex-direction: row; gap: 0.35rem; }
         }
 
-        .container-list-mobile .card {
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);
-            border-radius: 8px;
-        }
-        .container-list-mobile .card-actions {
-            margin-top: 1rem;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 0.5rem;
-        }
-        .container-list-mobile .card-text small {
-            font-weight: 500;
-            color: #5f6368;
-            margin-right: 0.25rem;
-        }
-        .container-list-mobile .card-title {
-            word-break: break-word;
-            font-size: 1.1rem;
-            margin-bottom: 0.25rem !important;
-        }
+        .container-list-mobile .card { box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15); border-radius: 8px; }
+        .container-list-mobile .card-actions { margin-top: 1rem; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+        .container-list-mobile .card-text small { font-weight: 500; color: #5f6368; margin-right: 0.25rem; }
+        .container-list-mobile .card-title { word-break: break-word; font-size: 1.1rem; margin-bottom: 0.25rem !important; }
 
-        #natRulesList {
-            margin-top: 1.5rem;
-            border-top: 1px solid #e0e0e0;
-            padding-top: 1.5rem;
-        }
-        #natRulesList h6 {
-            margin-bottom: 1rem;
-            font-size: 0.95rem;
-            font-weight: 500;
-            color: #3c4043;
-        }
-        #natRulesList ul {
-            list-style: none;
-            padding: 0;
-        }
-        #natRulesList li {
-            background-color: #fff;
-            border: 1px solid #e0e0e0;
-            margin-bottom: 0.75rem;
-            padding: 0.75rem 1rem;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-            font-size: 0.85rem;
-        }
-        #natRulesList li:hover {
-            background-color: #f1f3f4;
-        }
-        #natRulesList li .rule-details {
-            flex-grow: 1;
-            margin-right: 0.75rem;
-            word-break: break-word;
-            line-height: 1.5;
-        }
-        #natRulesList li .rule-details small {
-            color: #5f6368;
-            font-size: 0.9em;
-        }
-        #natRulesList li .rule-actions {
-            flex-shrink: 0;
-            margin-left: auto;
-        }
 
-        .alert {
-            border-radius: 4px;
-            padding: 1rem 1.25rem;
-            font-size: 0.9rem;
-        }
-        .alert-danger {
-            background-color: #fce8e6;
-            border-color: #f28b82;
-            color: #a50e0e;
-        }
+        #natRulesList { margin-top: 1.5rem; border-top: 1px solid #e0e0e0; padding-top: 1.5rem; }
+        #natRulesList h6 { margin-bottom: 1rem; font-size: 0.95rem; font-weight: 500; color: #3c4043; }
+        #natRulesList ul { list-style: none; padding: 0; }
+        #natRulesList li { background-color: #fff; border: 1px solid #e0e0e0; margin-bottom: 0.75rem; padding: 0.75rem 1rem; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; font-size: 0.85rem; }
+        #natRulesList li:hover { background-color: #f1f3f4; }
+        #natRulesList li .rule-details { flex-grow: 1; margin-right: 0.75rem; word-break: break-word; line-height: 1.5; }
+        #natRulesList li .rule-details small { color: #5f6368; font-size: 0.9em; }
+        #natRulesList li .rule-actions { flex-shrink: 0; margin-left: auto; }
+
+
+        .alert { border-radius: 4px; padding: 1rem 1.25rem; font-size: 0.9rem; }
+        .alert-danger { background-color: #fce8e6; border-color: #f28b82; color: #a50e0e; }
         .alert-danger strong { color: #8b0000; }
-        .alert-success {
-            background-color: #e6f4ea;
-            border-color: #81c995;
-            color: #185c37;
+        .alert-success { background-color: #e6f4ea; border-color: #81c995; color: #185c37; }
+        .alert-info { background-color: #e8f0fe; border-color: #89b4f8; color: #174ea6; }
+        .alert-warning { background-color: #feedcf; border-color: #fde293; color: #795508; }
+
+        .sticky-top-form {
+            top: 20px; /* Adjust as needed for spacing from navbar if any */
         }
-        .alert-info {
-            background-color: #e8f0fe;
-            border-color: #89b4f8;
-            color: #174ea6;
-        }
-        .alert-warning {
-            background-color: #feedcf;
-            border-color: #fde293;
-            color: #795508;
-        }
+        .offcanvas-header { border-bottom: 1px solid #e0e0e0; }
+        .offcanvas-title { font-size: 1.15rem; font-weight: 500; color: #202124; }
 
     </style>
 </head>
 <body>
     {% if session.logged_in %}
-    <div class="container">
+    <div class="container-fluid px-md-4 main-content">
         <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
-             <h1>Incus Web 管理器</h1>
+             <h1 class="page-title">Incus Web 管理器</h1>
              <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">退出登录</a>
         </div>
 
@@ -379,59 +256,72 @@
         </div>
         {% endif %}
 
-        <div class="card mb-4">
-            <div class="card-header">创建新容器</div>
-            <div class="card-body">
-                <form id="createContainerForm">
-                    <div class="row g-3">
-                        <div class="col-md-4">
-                            <label for="containerName" class="form-label">容器名称</label>
-                            <input type="text" class="form-control" id="containerName" name="name" required>
-                        </div>
-                        <div class="col-md-6">
-                            <label for="containerImage" class="form-label">选择镜像</label>
-                            <select class="form-select" id="containerImage" name="image" required>
-                                <option value="" selected disabled>请选择一个镜像</option>
-                                {% for image in images %}
-                                <option value="{{ image.name }}">{{ image.description }}</option>
-                                {% endfor %}
-                            </select>
-                             {% if image_error[0] %}
-                             <div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>
-                             {% endif %}
-                        </div>
-                        <div class="col-md-2 align-self-end">
-                            <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
-                        </div>
+        <div class="row g-lg-4">
+            <div class="col-lg-7 order-lg-1 left-column">
+                <div class="d-flex justify-content-between align-items-center">
+                    <h2 class="section-title mb-3">容器列表</h2>
+                    <div>
+                        <button class="btn btn-sm btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCreateContainer" aria-controls="offcanvasCreateContainer">
+                            创建容器
+                        </button>
+                        <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新列表</button>
                     </div>
-                </form>
-            </div>
-        </div>
+                </div>
 
-        <h2>容器列表</h2>
+                <div class="table-responsive container-list-desktop d-none d-lg-block">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>名称</th>
+                                <th>状态</th>
+                                <th>IP 地址</th>
+                                <th>镜像来源</th>
+                                <th>创建时间</th>
+                                <th>操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="containerListDesktop">
+                            {% for c in containers %}
+                            <tr>
+                                <td>{{ c.name }}</td>
+                                <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
+                                <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
+                                <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
+                                <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td>
+                                <td class="container-actions">
+                                    <div class="d-flex-desktop">
+                                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
+                                        {% if c.status == 'Running' %}
+                                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
+                                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
+                                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
+                                        <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
+                                        {% elif c.status == 'Stopped' %}
+                                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
+                                        {% endif %}
+                                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="6" class="text-center py-4">没有找到容器或无法连接到 Incus。</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
 
-        <div class="table-responsive container-list-desktop d-none d-md-block">
-            <table class="table table-hover">
-                <thead>
-                    <tr>
-                        <th>名称</th>
-                        <th>状态</th>
-                        <th>IP 地址</th>
-                        <th>镜像来源</th>
-                        <th>创建时间</th>
-                        <th>操作</th>
-                    </tr>
-                </thead>
-                <tbody id="containerListDesktop">
+                <div class="container-list-mobile d-block d-lg-none mt-3">
                     {% for c in containers %}
-                    <tr>
-                        <td>{{ c.name }}</td>
-                        <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
-                        <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
-                        <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
-                        <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td>
-                        <td class="container-actions">
-                            <div class="d-flex-desktop">
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <h5 class="card-title mb-0">{{ c.name }}</h5>
+                                <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
+                            </div>
+                            <p class="card-text mb-1"><small>IP 地址:</small> {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</p>
+                            <p class="card-text mb-1"><small>镜像:</small> {{ c.image_source if c.image_source else 'N/A' }}</p>
+                            <p class="card-text mb-3"><small>创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
+                            <div class="card-actions">
                                 <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
                                 {% if c.status == 'Running' %}
                                 <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
@@ -443,55 +333,88 @@
                                 {% endif %}
                                 <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
                             </div>
-                        </td>
-                    </tr>
-                    {% else %}
-                    <tr><td colspan="6" class="text-center py-4">没有找到容器或无法连接到 Incus。</td></tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-
-        <div class="container-list-mobile d-block d-md-none mt-3">
-            {% for c in containers %}
-            <div class="card mb-3">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h5 class="card-title mb-0">{{ c.name }}</h5>
-                        <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
+                        </div>
                     </div>
+                    {% else %}
+                    <div class="alert alert-info text-center" role="alert">
+                        没有找到容器或无法连接到 Incus。
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
 
-                    <p class="card-text mb-1"><small>IP 地址:</small> {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</p>
-                    <p class="card-text mb-1"><small>镜像:</small> {{ c.image_source if c.image_source else 'N/A' }}</p>
-                    <p class="card-text mb-3"><small>创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
-
-                    <div class="card-actions">
-                        <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
-                        {% if c.status == 'Running' %}
-                        <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
-                        <button class="btn btn-sm btn-secondary" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button>
-                        <button class="btn btn-sm btn-primary" onclick="openExecModal('{{ c.name }}')">执行命令</button>
-                         <button class="btn btn-sm btn-dark" onclick="openNatModal('{{ c.name }}')">添加NAT</button>
-                        {% elif c.status == 'Stopped' %}
-                        <button class="btn btn-sm btn-success" onclick="performAction('{{ c.name }}', 'start', this)">启动</button>
-                        {% endif %}
-                        <button class="btn btn-sm btn-danger" onclick="performAction('{{ c.name }}', 'delete', this)">删除</button>
+            <div class="col-lg-5 order-lg-2 d-none d-lg-block right-column">
+                <div class="sticky-top sticky-top-form">
+                    <div class="card">
+                        <div class="card-header">创建新容器</div>
+                        <div class="card-body">
+                            <form id="createContainerForm">
+                                <div class="row g-3">
+                                    <div class="col-12">
+                                        <label for="containerName" class="form-label">容器名称</label>
+                                        <input type="text" class="form-control" id="containerName" name="name" required>
+                                    </div>
+                                    <div class="col-12">
+                                        <label for="containerImage" class="form-label">选择镜像</label>
+                                        <select class="form-select" id="containerImage" name="image" required>
+                                            <option value="" selected disabled>请选择一个镜像</option>
+                                            {% for image in images %}
+                                            <option value="{{ image.name }}">{{ image.description }}</option>
+                                            {% endfor %}
+                                        </select>
+                                        {% if image_error[0] %}
+                                        <div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <div class="col-12">
+                                        <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
+                                    </div>
+                                </div>
+                            </form>
+                        </div>
                     </div>
                 </div>
             </div>
-            {% else %}
-            <div class="alert alert-info text-center" role="alert">
-                 没有找到容器或无法连接到 Incus。
-            </div>
-            {% endfor %}
         </div>
-
-         <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button>
     </div>
+
+    <div class="offcanvas offcanvas-end" tabindex="-1" id="offcanvasCreateContainer" aria-labelledby="offcanvasCreateContainerLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="offcanvasCreateContainerLabel">创建新容器</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            <form id="createContainerFormMobile">
+                <div class="row g-3">
+                    <div class="col-12">
+                        <label for="containerNameMobile" class="form-label">容器名称</label>
+                        <input type="text" class="form-control" id="containerNameMobile" name="name" required>
+                    </div>
+                    <div class="col-12">
+                        <label for="containerImageMobile" class="form-label">选择镜像</label>
+                        <select class="form-select" id="containerImageMobile" name="image" required>
+                            <option value="" selected disabled>请选择一个镜像</option>
+                            {% for image in images %}
+                            <option value="{{ image.name }}">{{ image.description }}</option>
+                            {% endfor %}
+                        </select>
+                        {% if image_error[0] %}
+                         <div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-12">
+                        <button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
     {% else %}
     <div class="container">
         <div id="loginContainer" class="my-5 mx-auto">
-             <h2 class="text-center mb-4">管理员登录</h2>
+             <h2 class="text-center mb-4 form-title">管理员登录</h2>
              <form method="POST" action="{{ url_for('login') }}">
                  <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
                  <div class="mb-3">
@@ -681,7 +604,6 @@ let currentConfirmContainerName = null;
 let currentConfirmRuleId = null;
 let currentConfirmButtonElement = null;
 
-
 function showConfirmationModal(actionType, nameOrId, buttonElement) {
     currentConfirmAction = actionType;
     currentConfirmButtonElement = buttonElement;
@@ -781,7 +703,7 @@ $('#confirmActionButton').click(function() {
         const containerName = currentConfirmContainerName;
         let action = actionType.replace('_container', '');
 
-        $.post(`/container/${containerName}/action`, { action: action }, function(data) {
+        $.post(`/container/${containerName}/action`, { action: action, _api_hash: '{{ API_SECRET_HASH }}' }, function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
                  setTimeout(() => location.reload(), 1000);
@@ -810,10 +732,9 @@ $('#confirmModal').on('hidden.bs.modal', function () {
 });
 
 
-$('#createContainerForm').submit(function(event) {
-    event.preventDefault();
-    const form = $(this);
-    const submitButton = $('#createButton', form);
+function handleCreateContainer(formElement, submitButtonElement) {
+    const form = $(formElement);
+    const submitButton = $(submitButtonElement);
     setButtonProcessing(submitButton, true);
 
     var formData = form.serialize();
@@ -826,7 +747,11 @@ $('#createContainerForm').submit(function(event) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
                 form[0].reset();
-                 setTimeout(() => location.reload(), 1000);
+                const offcanvasElement = document.getElementById('offcanvasCreateContainer');
+                if (offcanvasElement && bootstrap.Offcanvas.getInstance(offcanvasElement)) {
+                    bootstrap.Offcanvas.getInstance(offcanvasElement).hide();
+                }
+                setTimeout(() => location.reload(), 1000);
             }
         },
         error: function(jqXHR) {
@@ -842,7 +767,18 @@ $('#createContainerForm').submit(function(event) {
             setButtonProcessing(submitButton, false);
         }
     });
+}
+
+$('#createContainerForm').submit(function(event) {
+    event.preventDefault();
+    handleCreateContainer(this, $('#createButton'));
 });
+
+$('#createContainerFormMobile').submit(function(event) {
+    event.preventDefault();
+    handleCreateContainer(this, $('#createButtonMobile'));
+});
+
 
 function performAction(containerName, action, buttonElement) {
 
@@ -892,13 +828,12 @@ function showInfo(containerName, buttonElement) {
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
 
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
-    basicInfoContent.html('正在加载基础信息...');
+    basicInfoContent.html('<p>正在加载基础信息...</p>');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
      infoError.addClass('d-none').text('');
 
     natRulesListContainer.show();
-
 
     setButtonProcessing(buttonElement, true);
 
@@ -933,9 +868,7 @@ function showInfo(containerName, buttonElement) {
             if (!data.live_data_available && data.status !== 'NotFound') {
                  showToast(data.message, 'warning');
             }
-
             loadNatRules(containerName);
-
         },
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
@@ -969,7 +902,6 @@ function loadNatRules(containerName) {
         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             natRulesContent.empty();
-
             if (data.status === 'success' && data.rules && data.rules.length > 0) {
                 data.rules.forEach(rule => {
                     const ruleHtml = `
@@ -1017,8 +949,7 @@ function openExecModal(containerName) {
     $('#execContainerName').val(containerName);
     $('#execModalLabel').text(`在 ${containerName} 内执行命令`);
     $('#commandInput').val('');
-    $('#execOutput').text('');
-    $('#execOutput').removeClass('success error');
+    $('#execOutput').text('').removeClass('success error');
     setButtonProcessing($('#execButton'), false);
     var execModal = new bootstrap.Modal(document.getElementById('execModal'));
     execModal.show();
@@ -1029,7 +960,6 @@ $('#execCommandForm').submit(function(event) {
     const form = $(this);
     const submitButton = $('#execButton', form);
     const outputArea = $('#execOutput');
-
     var containerName = $('#execContainerName').val();
     var command = $('#commandInput').val();
 
@@ -1037,10 +967,7 @@ $('#execCommandForm').submit(function(event) {
         showToast("请输入要执行的命令。", 'warning');
         return;
     }
-
-    outputArea.text('正在执行...');
-    outputArea.removeClass('success error');
-
+    outputArea.text('正在执行...').removeClass('success error');
     setButtonProcessing(submitButton, true);
 
     $.ajax({
@@ -1050,12 +977,10 @@ $('#execCommandForm').submit(function(event) {
         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             if (data.status === 'success') {
-                outputArea.text(data.output);
-                outputArea.addClass('success');
+                outputArea.text(data.output).addClass('success');
                 showToast("命令执行成功。", 'success');
             } else {
-                outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出'));
-                outputArea.addClass('error');
+                outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出')).addClass('error');
                 showToast(data.message || "命令执行失败。", 'danger');
             }
         },
@@ -1065,8 +990,7 @@ $('#execCommandForm').submit(function(event) {
                 setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
              } else {
                 const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "执行命令请求失败。";
-                outputArea.text("请求失败:\n" + message);
-                outputArea.addClass('error');
+                outputArea.text("请求失败:\n" + message).addClass('error');
                 showToast("请求失败。", 'danger');
              }
         },
@@ -1084,7 +1008,6 @@ function openNatModal(containerName) {
     $('#protocol').val('tcp');
     $('#natContainerIP').val('正在获取 IP...');
     setButtonProcessing($('#addNatButton'), false);
-
     var natModal = new bootstrap.Modal(document.getElementById('natModal'));
     natModal.show();
 
@@ -1117,14 +1040,12 @@ function openNatModal(containerName) {
              }
         }
     });
-
 }
 
 $('#addNatForm').submit(function(event) {
     event.preventDefault();
     const form = $(this);
     const submitButton = $('#addNatButton', form);
-
     const containerName = $('#natContainerName').val();
     const hostPort = $('#hostPort').val();
     const containerPort = $('#containerPort').val();
@@ -1134,27 +1055,20 @@ $('#addNatForm').submit(function(event) {
         showToast("请填写所有 NAT 规则信息。", 'warning');
         return;
     }
-
     setButtonProcessing(submitButton, true);
 
     $.ajax({
         url: `/container/${containerName}/add_nat_rule`,
         type: "POST",
-        data: {
-            host_port: hostPort,
-            container_port: containerPort,
-            protocol: protocol
-        },
+        data: { host_port: hostPort, container_port: containerPort, protocol: protocol },
          headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
-
             if (data.status === 'success' || data.status === 'warning') {
                  const containerNameInInfoModal = $('#infoModalLabel').text().replace('容器信息: ', '');
                  if (containerNameInInfoModal === containerName) {
                      loadNatRules(containerName);
                  }
-
                  if (data.status === 'success') {
                      $('#hostPort').val('');
                      $('#containerPort').val('');
@@ -1179,20 +1093,20 @@ $('#addNatForm').submit(function(event) {
     });
 });
 
+
 $('#infoModal').on('hidden.bs.modal', function () {
-  $('#basicInfoContent').html('正在加载基础信息...');
+  $('#basicInfoContent').html('<p>正在加载基础信息...</p>');
   $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
   $('#natRulesError').addClass('d-none').text('');
   $('#infoError').addClass('d-none').text('');
   $('#infoModalLabel').text('容器信息');
-   $('#natRulesList').hide();
+  $('#natRulesList').hide();
 });
 
 $('#execModal').on('hidden.bs.modal', function () {
   $('#execContainerName').val('');
   $('#commandInput').val('');
-  $('#execOutput').text('');
-  $('#execOutput').removeClass('success error');
+  $('#execOutput').text('').removeClass('success error');
   $('#execModalLabel').text('在容器内执行命令');
   setButtonProcessing($('#execButton'), false);
 });
