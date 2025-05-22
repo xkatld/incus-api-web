@@ -14,70 +14,11 @@ from functools import wraps
 
 app = Flask(__name__)
 
-app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
-ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpassword')
-API_SECRET_KEY = os.environ.get('API_SECRET_KEY', secrets.token_hex(32))
-
-TIMESTAMP_TOLERANCE = 300
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
 
 DATABASE_NAME = 'incus_manager.db'
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if session.get('logged_in') is not True:
-            return redirect(url_for('login', next=request.url))
-        return f(*args, **kwargs)
-    return decorated_function
-
-def verify_api_signature():
-    timestamp_str = request.headers.get('X-API-Timestamp')
-    signature = request.headers.get('X-API-Signature')
-
-    if not timestamp_str or not signature:
-        app.logger.warning(f"API签名验证失败: 缺少时间戳或签名头 from {request.remote_addr}")
-        return False
-
-    try:
-        timestamp = int(timestamp_str)
-    except ValueError:
-        app.logger.warning(f"API签名验证失败: 无效的时间戳格式 '{timestamp_str}' from {request.remote_addr}")
-        return False
-
-    current_time = int(time.time())
-    if abs(current_time - timestamp) > TIMESTAMP_TOLERANCE:
-        app.logger.warning(f"API签名验证失败: 时间戳超出容忍范围 (客户端: {timestamp}, 服务器: {current_time}) from {request.remote_addr}")
-        return False
-
-    try:
-        expected_signature = hashlib.sha256((API_SECRET_KEY + timestamp_str).encode('utf-8')).hexdigest()
-        if signature == expected_signature:
-            app.logger.debug(f"API签名验证成功 from {request.remote_addr}")
-            return True
-        else:
-            app.logger.warning(f"API签名验证失败: 签名不匹配 (客户端: {signature}, 期望: {expected_signature}) from {request.remote_addr}")
-            return False
-    except Exception as e:
-        app.logger.error(f"API签名验证发生异常: {e} from {request.remote_addr}")
-        return False
-
-def web_or_api_authentication_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        is_authenticated_via_session = session.get('logged_in') is True
-        is_authenticated_via_api = False
-        if request.headers.get('X-API-Timestamp') or request.headers.get('X-API-Signature'):
-             is_authenticated_via_api = verify_api_signature()
-
-        if is_authenticated_via_session or is_authenticated_via_api:
-            return f(*args, **kwargs)
-        else:
-            if request.method == 'GET':
-                return redirect(url_for('login', next=request.url))
-            else:
-                return jsonify({'status': 'error', 'message': '需要认证'}), 401
-    return decorated_function
+SETTINGS = {}
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_NAME)
@@ -102,6 +43,83 @@ def query_db(query, args=(), one=False):
             conn.close()
     return (rv[0] if rv else None) if one else rv
 
+def load_settings_from_db():
+    global SETTINGS
+    try:
+        settings_rows = query_db('SELECT key, value FROM settings')
+        if not settings_rows:
+            app.logger.error("从数据库加载设置失败: 'settings' 表为空或不存在。请运行 init_db.py。")
+            SETTINGS = {}
+            return False
+        SETTINGS = {row['key']: row['value'] for row in settings_rows}
+        required_keys = ['admin_username', 'admin_password_hash', 'api_key_hash']
+        for key in required_keys:
+            if key not in SETTINGS:
+                app.logger.error(f"从数据库加载设置失败: 缺少键 '{key}'。请运行 init_db.py 检查设置。")
+                SETTINGS = {}
+                return False
+        app.logger.info("从数据库成功加载设置。")
+        return True
+    except sqlite3.OperationalError:
+        app.logger.error("从数据库加载设置失败: 'settings' 表不存在。请运行 init_db.py。")
+        SETTINGS = {}
+        return False
+    except Exception as e:
+        app.logger.error(f"加载设置时发生异常: {e}")
+        SETTINGS = {}
+        return False
+
+
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if session.get('logged_in') is not True:
+            return redirect(url_for('login', next=request.url))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def verify_api_key_hash():
+    api_key_hash_header = request.headers.get('X-API-Key-Hash')
+    stored_api_key_hash = SETTINGS.get('api_key_hash')
+
+    if not api_key_hash_header:
+        app.logger.warning(f"API认证失败: 缺少 'X-API-Key-Hash' 请求头 from {request.remote_addr}")
+        return False
+
+    if not stored_api_key_hash:
+        app.logger.error("API认证失败: 未从数据库加载到 'api_key_hash'。请检查设置。")
+        return False
+
+    if api_key_hash_header == stored_api_key_hash:
+        app.logger.debug(f"API密钥哈希认证成功 from {request.remote_addr}")
+        return True
+    else:
+        app.logger.warning(f"API密钥哈希认证失败: 哈希值不匹配 from {request.remote_addr}")
+        return False
+
+def web_or_api_authentication_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if not SETTINGS:
+             app.logger.error("认证失败: 设置未加载。请检查数据库和 init_db.py 运行情况。")
+             if request.method == 'GET':
+                 return render_template('index.html', incus_error=(True, "应用设置未加载。请检查数据库和 init_db.py 运行情况。"), containers=[], images=[]), 500
+             else:
+                 return jsonify({'status': 'error', 'message': '认证失败: 应用设置未加载。'}), 500
+
+        is_authenticated_via_session = session.get('logged_in') is True
+        is_authenticated_via_api = verify_api_key_hash()
+
+        if is_authenticated_via_session or is_authenticated_via_api:
+            return f(*args, **kwargs)
+        else:
+            if request.method == 'GET':
+                return redirect(url_for('login', next=request.url))
+            else:
+                return jsonify({'status': 'error', 'message': '需要认证'}), 401
+    return decorated_function
+
+
 def run_command(command_parts, parse_json=True, timeout=60):
     try:
         env_vars = os.environ.copy()
@@ -109,13 +127,13 @@ def run_command(command_parts, parse_json=True, timeout=60):
         env_vars['LANG'] = 'C.UTF-8'
 
         log_command = ' '.join(shlex.quote(part) for part in command_parts)
-        app.logger.info(f"Executing command: {log_command}")
+        app.logger.info(f"执行命令: {log_command}")
 
         result = subprocess.run(command_parts, capture_output=True, text=True, check=False, timeout=timeout, env=env_vars)
 
         if result.returncode != 0:
             error_message = result.stderr.strip() if result.stderr else result.stdout.strip()
-            app.logger.error(f"Command failed (Exit code {result.returncode}): {log_command}\nError: {error_message}")
+            app.logger.error(f"命令失败 (退出码 {result.returncode}): {log_command}\n错误: {error_message}")
             return False, error_message
         else:
              if parse_json:
@@ -125,17 +143,17 @@ def run_command(command_parts, parse_json=True, timeout=60):
                         output_text = output_text[1:]
                     return True, json.loads(output_text)
                  except json.JSONDecodeError as e:
-                    app.logger.error(f"Failed to parse JSON from command output: {result.stdout}\nError: {e}")
+                    app.logger.error(f"无法解析命令输出为 JSON: {result.stdout}\n错误: {e}")
                     return False, f"解析命令输出为 JSON 失败: {e}\n原始输出: {result.stdout.strip()}"
              else:
                  return True, result.stdout.strip()
 
     except FileNotFoundError:
         command_name = command_parts[0] if command_parts else 'command'
-        app.logger.error(f"Command not found: {command_name}. Is it installed and in PATH?")
+        app.logger.error(f"命令未找到: {command_name}")
         return False, f"命令 '{command_name}' 未找到。请确保它已安装并在系统 PATH 中。"
     except subprocess.TimeoutExpired:
-        app.logger.error(f"Command timed out (>{timeout}s): {log_command}")
+        app.logger.error(f"命令超时 (>{timeout}s): {log_command}")
         return False, f"命令执行超时 (>{timeout}秒)。"
     except Exception as e:
         app.logger.error(f"执行命令时发生异常: {e}")
@@ -247,9 +265,9 @@ def _get_container_raw_info(name):
         container_data = live_data[0]
         info_output = {
             'name': container_data.get('name', name),
-            'status': container_data.get('status', 'Unknown'),
+            'status': container_data.get('status', '未知'),
             'status_code': container_data.get('status_code', 0),
-            'type': container_data.get('type', 'unknown'),
+            'type': container_data.get('type', '未知'),
             'architecture': container_data.get('architecture', 'N/A'),
             'ephemeral': container_data.get('ephemeral', False),
             'created_at': container_data.get('created_at', None),
@@ -287,9 +305,9 @@ def _get_container_raw_info(name):
     elif db_info:
         info_output = {
             'name': db_info['incus_name'],
-            'status': db_info.get('status', 'Unknown'),
+            'status': db_info.get('status', '未知'),
             'status_code': 0,
-            'type': 'container',
+            'type': '容器',
             'architecture': db_info.get('architecture', 'N/A'),
             'ephemeral': False,
             'created_at': db_info.get('created_at', None),
@@ -297,7 +315,7 @@ def _get_container_raw_info(name):
             'config': {},
             'devices': {},
             'snapshots': [],
-             'state': {'status': db_info.get('status', 'Unknown'), 'status_code': 0, 'network': {}},
+             'state': {'status': db_info.get('status', '未知'), 'status_code': 0, 'network': {}},
             'description': db_info.get('image_source', 'N/A'),
             'ip': 'N/A',
             'live_data_available': False,
@@ -430,10 +448,19 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    if not SETTINGS:
+        return render_template('index.html', incus_error=(True, "应用设置未加载。请检查数据库和 init_db.py 运行情况。"), containers=[], images=[]), 500
+
+    admin_username = SETTINGS.get('admin_username')
+    admin_password_hash = SETTINGS.get('admin_password_hash')
+
+    if not admin_username or not admin_password_hash:
+        return render_template('index.html', incus_error=(True, "数据库中缺少管理员账号或密码哈希设置。请运行 init_db.py。"), containers=[], images=[]), 500
+
     if request.method == 'POST':
         username = request.form.get('username')
         password = request.form.get('password')
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+        if username == admin_username and hashlib.sha256(password.encode('utf-8')).hexdigest() == admin_password_hash:
             session['logged_in'] = True
             app.logger.info(f"用户 '{username}' 登录成功。")
             next_url = request.args.get('next')
@@ -452,6 +479,9 @@ def logout():
 @app.route('/')
 @login_required
 def index():
+    if not SETTINGS:
+        return render_template('index.html', incus_error=(True, "应用设置未加载。请检查数据库和 init_db.py 运行情况。"), containers=[], images=[]), 500
+
     success_list, containers_data = run_incus_command(['list', '--format', 'json'])
 
     listed_containers = []
@@ -481,10 +511,10 @@ def index():
         for name, data in db_containers_dict.items():
             listed_containers.append({
                 'name': name,
-                'status': data.get('status', 'Unknown (from DB)'),
-                'image_source': data.get('image_source', 'N/A (from DB)'),
-                'ip': 'N/A (DB info)',
-                'created_at': data.get('created_at', 'N/A (from DB)')
+                'status': data.get('status', '未知 (来自数据库)'),
+                'image_source': data.get('image_source', 'N/A (来自数据库)'),
+                'ip': 'N/A (数据库信息)',
+                'created_at': data.get('created_at', 'N/A (来自数据库)')
             })
 
     elif isinstance(containers_data, list):
@@ -537,13 +567,13 @@ def index():
 
             container_info = {
                 'name': item_name,
-                'status': item.get('status', 'Unknown'),
+                'status': item.get('status', '未知'),
                 'image_source': image_source,
                 'ip': ip_address,
                 'created_at': created_at_str,
             }
             listed_containers.append(container_info)
-            sync_container_to_db(item_name, image_source, item.get('status', 'Unknown'), created_at_str)
+            sync_container_to_db(item_name, image_source, item.get('status', '未知'), created_at_str)
 
         current_db_names = {row['incus_name'] for row in query_db('SELECT incus_name FROM containers')}
         vanished_names_from_db = [db_name for db_name in current_db_names if db_name not in incus_container_names_set]
@@ -562,10 +592,10 @@ def index():
         for name, data in db_containers_dict.items():
             listed_containers.append({
                 'name': name,
-                'status': data.get('status', 'Unknown (from DB)'),
-                'image_source': data.get('image_source', 'N/A (from DB)'),
-                'ip': 'N/A (DB info)',
-                'created_at': data.get('created_at', 'N/A (from DB)')
+                'status': data.get('status', '未知 (来自数据库)'),
+                'image_source': data.get('image_source', 'N/A (来自数据库)'),
+                'ip': 'N/A (数据库信息)',
+                'created_at': data.get('created_at', 'N/A (来自数据库)')
             })
 
     success_img, images_data = run_incus_command(['image', 'list', '--format', 'json'])
@@ -595,7 +625,7 @@ def index():
             available_images.append({'name': alias_name, 'description': f"{alias_name} ({description})"})
     else:
         image_error = True
-        image_error_message = images_data if not success_img else 'Invalid image data format from Incus.'
+        image_error_message = images_data if not success_img else 'Incus 返回了无效的镜像数据格式。'
         app.logger.error(f"获取镜像列表失败: {image_error_message}")
 
     return render_template('index.html',
@@ -732,7 +762,7 @@ def container_action(name):
 
         _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=10)
 
-        new_status_val = 'Unknown'
+        new_status_val = '未知'
         db_image_source = 'N/A'
         db_created_at = None
 
@@ -806,15 +836,15 @@ def container_info(name):
 @app.route('/container/<name>/add_nat_rule', methods=['POST'])
 @web_or_api_authentication_required
 def add_nat_rule(name):
-    host_port = request.form.get('host_port')
-    container_port = request.form.get('container_port')
+    host_port_str = request.form.get('host_port')
+    container_port_str = request.form.get('container_port')
     protocol = request.form.get('protocol')
 
-    if not host_port or not container_port or not protocol:
+    if not host_port_str or not container_port_str or not protocol:
          return jsonify({'status': 'error', 'message': '主机端口、容器端口和协议不能为空'}), 400
     try:
-        host_port = int(host_port)
-        container_port = int(container_port)
+        host_port = int(host_port_str)
+        container_port = int(container_port_str)
         if not (1 <= host_port <= 65535) or not (1 <= container_port <= 65535):
             raise ValueError("端口号必须在 1 到 65535 之间。")
     except ValueError as e:
@@ -838,7 +868,7 @@ def add_nat_rule(name):
          return jsonify({'status': 'error', 'message': f'无法获取容器 {name} 信息: {info_error_message}'}), 404
 
     if container_info_data.get('status') != 'Running':
-         status_msg = container_info_data.get('status', 'Unknown')
+         status_msg = container_info_data.get('status', '未知')
          return jsonify({'status': 'error', 'message': f'容器 {name} 必须处于 Running 状态才能添加 NAT 规则 (当前状态: {status_msg})。'}), 400
 
     container_ip = container_info_data.get('ip')
@@ -946,29 +976,27 @@ def main():
     print("\n============================================")
     print(" Incus Web 管理器启动信息")
     print("============================================")
-    print(f"默认管理用户名: {ADMIN_USERNAME}")
-    print(f"默认管理密码: {ADMIN_PASSWORD}")
-    print("--------------------------------------------")
-    print("API 认证信息:")
-    print(f"API 密钥 (用于生成签名): {API_SECRET_KEY}")
-    print(f"时间戳容忍度: {TIMESTAMP_TOLERANCE} 秒")
-    print("--------------------------------------------")
-    print("API 调用方法示例 (使用 Headers):")
-    example_timestamp = int(time.time())
-    example_timestamp_str = str(example_timestamp)
-    example_signature = hashlib.sha256((API_SECRET_KEY + example_timestamp_str).encode('utf-8')).hexdigest()
-    print(f"示例时间戳 (当前时刻): {example_timestamp_str}")
-    print(f"对应的示例签名: {example_signature}")
-    print("API 请求 Headers 应包含:")
-    print(f"  X-API-Timestamp: [当前 Unix 时间戳 (秒)]")
-    print(f"  X-API-Signature: SHA256(API_SECRET_KEY + X-API-Timestamp) 的十六进制表示")
-    print("============================================\n")
-
 
     if not os.path.exists(DATABASE_NAME):
         print(f"错误：数据库文件 '{DATABASE_NAME}' 未找到。")
         print("请先运行 'python init_db.py' 来初始化数据库。")
         sys.exit(1)
+
+    if not load_settings_from_db():
+        print("错误：无法从数据库加载所有必需的设置。请检查数据库和 init_db.py 运行情况。")
+        sys.exit(1)
+
+    admin_username = SETTINGS.get('admin_username', 'N/A')
+    api_key_hash = SETTINGS.get('api_key_hash', 'N/A')
+
+    print(f"管理员用户名: {admin_username} (从数据库加载)")
+    print(f"API 密钥哈希: {api_key_hash} (从数据库加载)")
+    print("--------------------------------------------")
+    print("API 调用方法:")
+    print("API 请求 Headers 应包含:")
+    print(f"  X-API-Key-Hash: [您的 API 密钥明文的 SHA256 十六进制哈希值]")
+    print("============================================\n")
+
 
     conn = None
     try:
@@ -979,7 +1007,6 @@ def main():
         if not cursor.fetchone():
             print(f"错误：数据库表 'containers' 在 '{DATABASE_NAME}' 中未找到。")
             print("请确保 'python init_db.py' 已成功运行并创建了表结构。")
-            print("您可以尝试删除旧的 incus_manager.db 文件然后重新运行 init_db.py。")
             sys.exit(1)
 
         cursor.execute("PRAGMA table_info(containers);")
@@ -990,7 +1017,6 @@ def main():
         if missing_container_columns:
             print(f"错误：数据库表 'containers' 缺少必需的列: {', '.join(missing_container_columns)}")
             print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
-            print("您可以尝试删除旧的 incus_manager.db 文件然后重新运行 init_db.py。")
             sys.exit(1)
 
         cursor.execute("PRAGMA index_list(containers);")
@@ -1006,7 +1032,6 @@ def main():
 
         if not has_unique_incus_name:
              print("警告：数据库表 'containers' 的 'incus_name' 列可能没有 UNIQUE约束。这可能导致同步问题。")
-             print("建议删除旧的 incus_manager.db 文件然后重新运行 init_db.py 创建正确的表结构。")
 
 
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='nat_rules';")
@@ -1023,7 +1048,6 @@ def main():
         if missing_nat_columns:
             print(f"错误：数据库表 'nat_rules' 缺少必需的列: {', '.join(missing_nat_columns)}")
             print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
-            print("您可以尝试删除旧的 incus_manager.db 文件然后重新运行 init_db.py。")
             sys.exit(1)
 
         cursor.execute("PRAGMA index_list(nat_rules);")
@@ -1040,6 +1064,12 @@ def main():
 
         if not unique_composite_index_exists:
              print("警告：数据库表 'nat_rules' 可能缺少 UNIQUE (container_name, host_port, protocol) 约束。这可能导致重复规则记录。建议手动检查或重建表。")
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings';")
+        if not cursor.fetchone():
+            print(f"错误：数据库表 'settings' 在 '{DATABASE_NAME}' 中未找到。")
+            print("请确保 'python init_db.py' 已成功运行并创建了表结构。")
+            sys.exit(1)
 
 
     except sqlite3.Error as e:
