@@ -1,5 +1,10 @@
 # incus-api-web
 
+~~~
+v2:实现NAT规则管理，优化UI
+~~~
+
+
 ## 安装Debian12安装incus
 ~~~
 curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/install_incus.sh | sudo bash
