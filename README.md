@@ -35,6 +35,8 @@ python3 app.py
 bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/image/debian12.sh)"
 ~~~
 
+## API使用方法
+
 **API 认证：**
 
 所有以下列出的 API 端点都需要通过在请求 Header 中包含 `X-API-Hash` 进行认证。`X-API-Hash` 的值应为配置的 `API_SECRET_KEY` 的 SHA256 哈希（十六进制字符串）。
@@ -52,14 +54,6 @@ bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs
 | `DELETE` | `/container/nat_rule/{rule_id}`  | 删除指定 ID 的 NAT 规则 (尝试 iptables + DB 记录)。 | `rule_id` (Path, integer)                                              | `200 OK` (含Warning可能) | `401`, `500`                 |
 
 ---
-
-**注意:**
-
-*   表格中的 `{name}` 和 `{rule_id}` 表示路径参数，调用时需要替换为实际值。
-*   `成功响应 (Status)` 仅表示 HTTP 状态码，具体结果请检查 JSON 响应体中的 `"status"` 字段 (`"success"`, `"error"`, `"warning"`, `"NotFound"`) 及 `"message"`。
-*   `主要错误响应 (Status)` 列出了代码中明确返回的不同错误 HTTP 状态码。
-*   参数中的 `(Form)` 表示该参数应通过 `application/x-www-form-urlencoded` 形式提交。
-*   此文档严格基于现有代码生成，未进行任何逻辑修改。
 
 ## 演示图片
 ![image](https://github.com/user-attachments/assets/a38f22e6-b3a9-4904-a462-22f265fa90e7)
