@@ -115,20 +115,20 @@
 </head>
 <body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% else %}bg-light{% endif %}">
     {% if session.logged_in %}
-    <div class="container-fluid mt-4">
-        <div class="d-flex justify-content-between align-items-center mb-4 px-md-3">
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
             <h1>Incus Web 管理器</h1>
             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">退出登录</a>
         </div>
 
         {% if incus_error[0] %}
-        <div class="alert alert-danger mx-md-3" role="alert">
+        <div class="alert alert-danger" role="alert">
             <strong>错误:</strong> 无法连接到 Incus 或执行命令失败。显示的数据可能来自数据库缓存。 <br>
             详细信息: {{ incus_error[1] }}
         </div>
         {% endif %}
 
-        <div class="row gx-4 px-md-3 main-content-wrapper">
+        <div class="row gx-4 main-content-wrapper">
             <div class="col-lg-7 col-md-6 mb-4 mb-md-0">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="mb-0">容器列表</h2>
@@ -268,7 +268,7 @@
                     <button class="btn btn-outline-secondary" type="button" id="refreshCaptchaBtn" title="刷新验证码">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
                           <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
-                          <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.5A5.002 5.002 0 0 0 8 3zM3.5 13A5.002 5.002 0 0 0 8 15c1.552 0 2.94-.707 3.857-1.818a.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.5a5.002 5.002 0 0 0 0 4z"/>
+                          <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.5A5.002 5.002 0 0 0 8 3zM3.5 13A5.002 5.002 0 0 0 8 15c1.552 0 2.94-.707-3.857-1.818a.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.5a5.002 5.002 0 0 0 0 4z"/>
                         </svg>
                     </button>
                 </div>
