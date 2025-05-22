@@ -100,7 +100,7 @@
             font-weight: bold;
         }
         .truncate-text {
-            max-width: 100%; /* 确保在缩小的列中正确工作 */
+            max-width: 100%; 
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
@@ -117,9 +117,9 @@
         /* Custom adaptive table styles for container list */
         .custom-container-list-row {
             display: flex;
-            align-items: center; /* Vertically align items in the row */
-            padding: 0.5rem 0; /* Vertical padding for rows */
-            border-bottom: 1px solid #eee; /* Row separator */
+            align-items: center; 
+            padding: 0.5rem 0; 
+            border-bottom: 1px solid #eee; 
         }
         .custom-container-list-row:last-child {
             border-bottom: none;
@@ -131,48 +131,48 @@
             font-weight: bold;
             background-color: #f8f9fa;
             border-bottom: 2px solid #dee2e6;
-            padding: 0.5rem 0; /* Match row padding */
+            padding: 0.5rem 0; 
         }
 
         .custom-col {
-            padding: 0 0.75rem; /* Horizontal padding for columns */
+            padding: 0 0.75rem; 
             box-sizing: border-box;
-            word-break: break-word; /* Allow breaking long words if needed */
+            word-break: break-word; 
         }
 
-        .custom-col-name {
-            flex: 3; 
-            min-width: 150px; 
+        /* Updated flex ratios: 1:2:2:3:2:1 */
+        .custom-col-name { /* 名称 */
+            flex: 1; 
+            min-width: 90px; 
         }
 
-        .custom-col-status {
-            flex: 0.7;
-            min-width: 60px; /* Adjusted for narrower status column */
+        .custom-col-status { /* 状态 */
+            flex: 2;
+            min-width: 80px; 
             text-align: center; 
         }
         .custom-col-status .badge { 
             display: inline-block;
         }
 
-        .custom-col-ip {
-            flex: 1.8; /* Adjusted flex ratio */
-            min-width: 110px; /* Adjusted min-width */
+        .custom-col-ip { /* IP 地址 */
+            flex: 2; 
+            min-width: 120px; 
         }
 
-        .custom-col-image {
-            flex: 1.8; /* Adjusted flex ratio */
-            min-width: 110px; /* Adjusted min-width */
-            /* .truncate-text class will handle overflow */
+        .custom-col-image { /* 镜像来源 */
+            flex: 3; 
+            min-width: 180px; 
         }
 
-        .custom-col-created {
-            flex: 2.2; /* Adjusted flex ratio */
-            min-width: 120px; /* Adjusted min-width */
+        .custom-col-created { /* 创建时间 */
+            flex: 2; 
+            min-width: 120px; 
         }
 
-        .custom-col-actions {
-            flex: 1; /* Adjusted for narrower actions column */
-            min-width: 70px; /* Adjusted min-width */
+        .custom-col-actions { /* 操作 */
+            flex: 1; 
+            min-width: 80px; 
             text-align: center;
         }
 
