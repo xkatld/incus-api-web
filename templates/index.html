@@ -22,7 +22,6 @@
         h1.page-title { font-size: 1.75rem; color: #1a73e8; }
         h2.section-title { font-size: 1.3rem; margin-top: 0; margin-bottom: 1rem; padding-bottom: 0.5rem; color: #202124; }
         .left-column h2.section-title { border-bottom: 1px solid #e0e0e0; }
-        /* .right-column .section-title { padding-bottom: 0.25rem; margin-bottom: 0.75rem; } */ /* No longer needed */
 
         .btn {
             border-radius: 4px; font-weight: 500; padding: 0.5rem 1rem;
@@ -41,7 +40,7 @@
             border-radius: 4px;
             box-shadow: 0 2px 5px 0 rgba(0,0,0,.1), 0 2px 10px 0 rgba(0,0,0,.08);
             border: 1px solid #e0e0e0;
-            z-index: 1021; /* Ensure dropdown is above table content */
+            z-index: 1021; 
         }
         .dropdown-toggle::after { margin-left: .355em; }
 
@@ -55,30 +54,43 @@
         .table {
             table-layout: fixed;
             width: 100%;
-            background-color: #fff; /* Table body background */
+            background-color: #fff; 
             margin-bottom: 0;
-             border-left: 1px solid #e0e0e0; /* Add left border to table */
-             border-right: 1px solid #e0e0e0; /* Add right border to table */
-             border-bottom: 1px solid #e0e0e0; /* Add bottom border to table */
-             border-radius: 8px; /* Optional: if you want rounded corners for the table itself */
-             overflow: hidden; /* Needed if using border-radius on table */
+             border-left: 1px solid #e0e0e0; 
+             border-right: 1px solid #e0e0e0; 
+             border-bottom: 1px solid #e0e0e0; 
+             border-radius: 8px; 
+             /* overflow: hidden; Removed to allow dropdown to be fully visible */
         }
         .table th, .table td {
             padding: 0.75rem 1rem;
             vertical-align: middle;
             border-top: 1px solid #e0e0e0;
             font-size: 0.875rem;
-            overflow: hidden;
+            overflow: hidden; /* This is for individual cell content, not the dropdown */
             text-overflow: ellipsis;
             white-space: nowrap;
         }
         .table thead th {
             font-weight: 500; color: #5f6368;
-            border-bottom: 2px solid #d1d3d6; background-color: #f8f9fa; /* Table header background */
-            border-top: 0; /* Remove default top border for header cells if table has its own top border */
+            border-bottom: 2px solid #d1d3d6; background-color: #f8f9fa; 
+            border-top: 0; 
         }
-        .table thead tr:first-child th:first-child { border-top-left-radius: 7px; } /* Adjust to match table's border-radius */
-        .table thead tr:first-child th:last-child { border-top-right-radius: 7px; } /* Adjust to match table's border-radius */
+        /* Apply border-radius to top-left and top-right header cells for rounded table effect */
+        .table thead tr:first-child th:first-child { 
+            border-top-left-radius: 7px; /* Adjusted to be slightly less than table's radius if table has border */
+        }
+        .table thead tr:first-child th:last-child { 
+            border-top-right-radius: 7px; /* Adjusted to be slightly less than table's radius if table has border */
+        }
+        /* Apply border-radius to bottom-left and bottom-right cells of the last row in tbody for rounded table effect */
+        .table tbody tr:last-child td:first-child {
+            border-bottom-left-radius: 7px; /* Adjusted to be slightly less than table's radius */
+        }
+        .table tbody tr:last-child td:last-child {
+            border-bottom-right-radius: 7px; /* Adjusted to be slightly less than table's radius */
+        }
+
 
         .table-hover > tbody > tr:hover > * { background-color: rgba(26,115,232,.05); }
 
@@ -92,9 +104,9 @@
         .table th.col-actions, .table td.col-actions {
             width: 15%;
             text-align: end;
-            overflow: visible; /* Allow dropdown to overflow */
+            overflow: visible; /* This is crucial for the dropdown button itself */
         }
-        .table td.show-full-content {
+        .table td.show-full-content { /* For expanding cell content on click */
             overflow: visible !important;
             white-space: normal !important;
             text-overflow: clip !important;
@@ -125,11 +137,6 @@
         #natRulesList li { background-color:#fff; border:1px solid #e0e0e0; margin-bottom:.75rem; padding:.75rem 1rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:.85rem; }
         #natRulesList li:hover { background-color:#f1f3f4; }
 
-        /* .sticky-top-form-container {
-            position: sticky;
-            top: 20px;
-        } */ /* No longer needed */
-        /* .create-form-panel { background-color: #fff; padding: 1.25rem; border-radius: 8px; border: 1px solid #e0e0e0; } */ /* No longer needed */
         .offcanvas-header { border-bottom:1px solid #e0e0e0; }
 
     </style>
@@ -179,30 +186,6 @@
                 <div class="container-list-mobile d-block d-lg-none mt-3">
                     </div>
             </div>
-
-            <!-- 
-            <div class="col-lg-5 order-lg-2 d-none d-lg-block right-column">
-                <div class="sticky-top-form-container">
-                    <h2 class="section-title">创建新容器</h2>
-                    <div class="create-form-panel">
-                        <form id="createContainerForm">
-                            <div class="row g-3">
-                                <div class="col-12"><label for="containerName" class="form-label">容器名称</label><input type="text" class="form-control" id="containerName" name="name" required></div>
-                                <div class="col-12">
-                                    <label for="containerImage" class="form-label">选择镜像</label>
-                                    <select class="form-select" id="containerImage" name="image" required>
-                                        <option value="" selected disabled>请选择镜像</option>
-                                        {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
-                                    </select>
-                                    {% if image_error[0] %}<div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>{% endif %}
-                                </div>
-                                <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button></div>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            </div> 
-            -->
         </div>
     </div>
 
@@ -297,12 +280,11 @@
             const tr = $('<tr></tr>');
 
             const nameTd = $(`<td class="col-name" title="${containerName}">${containerName}</td>`);
-            if (containerName.length > 0) { // Only add click if there's content
+            if (containerName.length > 0) { 
                 nameTd.on('click', function(e) {
-                    e.stopPropagation(); // Prevent event bubbling
+                    e.stopPropagation(); 
                     const $thisCell = $(this);
                     const currentlyExpanded = $thisCell.hasClass('show-full-content');
-                    // Remove from all cells in this table first
                     $thisCell.closest('table').find('td.show-full-content').removeClass('show-full-content');
                     if (!currentlyExpanded) {
                         $thisCell.addClass('show-full-content');
@@ -315,12 +297,11 @@
             tr.append(`<td class="col-ip" title="${containerIp}">${containerIp}</td>`);
 
             const imageTd = $(`<td class="col-image" title="${containerImage}">${containerImage}</td>`);
-            if (containerImage.length > 0) { // Only add click if there's content
+            if (containerImage.length > 0) { 
                 imageTd.on('click', function(e) {
-                    e.stopPropagation(); // Prevent event bubbling
+                    e.stopPropagation(); 
                     const $thisCell = $(this);
                     const currentlyExpanded = $thisCell.hasClass('show-full-content');
-                    // Remove from all cells in this table first
                     $thisCell.closest('table').find('td.show-full-content').removeClass('show-full-content');
                     if (!currentlyExpanded) {
                         $thisCell.addClass('show-full-content');
@@ -377,14 +358,6 @@
             }
         });
 
-        // The form with id="createContainerForm" is removed from the main layout,
-        // so this specific submit handler is no longer needed for a static form.
-        // The offcanvas form ('#createContainerFormMobile') handles submissions.
-        // $('#createContainerForm').submit(function(e){
-        //     e.preventDefault();
-        //     handleCreateContainer(this,$('#createButton'));
-        // });
-
         $('#createContainerFormMobile').submit(function(e){
             e.preventDefault();
             handleCreateContainer(this,$('#createButtonMobile'));
@@ -395,7 +368,6 @@
     var currentConfirmAction=null,currentConfirmContainerName=null,currentConfirmRuleId=null,currentConfirmButtonElement=null;
     function showConfirmationModal(a,id,b){currentConfirmAction=a;currentConfirmButtonElement=b;let ti='请确认',bd='',bc='btn-primary',bt='确认';if(a.endsWith('_container'))currentConfirmContainerName=id;else currentConfirmRuleId=id;if(a==='restart_container'){ti='确认重启';bd=`确定重启<strong>${id}</strong>？`;bc='btn-warning';bt='重启';}else if(a==='delete_container'){ti='确认删除';bd=`<strong>警告:</strong>永久删除<strong>${id}</strong>！<br>确定吗？`;bc='btn-danger';bt='删除';}else if(a==='delete_nat_rule'){ti='确认删除NAT';bd=`确定删除ID<strong>${id}</strong>的NAT规则？`;bc='btn-danger';bt='删除规则';}$('#confirmModalLabel').text(ti);$('#confirmModalBody').html(bd);$('#confirmActionButton').removeClass('btn-primary btn-warning btn-danger').addClass(bc).text(bt);setButtonProcessing($('#confirmActionButton'),false);new bootstrap.Modal(document.getElementById('confirmModal')).show();}
     $('#confirmActionButton').click(function(){const a=currentConfirmAction,be=currentConfirmButtonElement,cb=$(this);if(!a||(!currentConfirmContainerName&&!currentConfirmRuleId)){showToast("信息丢失",'danger');bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();return;}setButtonProcessing(cb,true);if(a!=='delete_nat_rule'&&be)setButtonProcessing(be,true);let u,y,d;if(a==='delete_nat_rule'){u=`/container/nat_rule/${currentConfirmRuleId}`;y='DELETE';}else{let o=a.replace('_container','');u=`/container/${currentConfirmContainerName}/action`;y='POST';d={action:o};}$.ajax({url:u,type:y,data:d,headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success'||(res.status==='warning'&&a==='delete_nat_rule')){if(a==='delete_nat_rule'){const cnm=$('#infoModalLabel').text().replace('容器信息: ','');if(cnm)loadNatRules(cnm);else location.reload();}else location.reload();}else if(be&&a!=='delete_nat_rule')setButtonProcessing(be,false);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`失败: ${xhr.responseJSON?.message||'未知'}`,'danger');}if(be&&a!=='delete_nat_rule')setButtonProcessing(be,false);},complete:function(){bootstrap.Modal.getInstance(document.getElementById('confirmModal'))?.hide();setButtonProcessing(cb,false);}});});
-    // The handleCreateContainer function is now solely responsible for the offcanvas form.
     function handleCreateContainer(f,b){const $f=$(f),$b=$(b);setButtonProcessing($b,true);$.ajax({url:"{{url_for('create_container')}}",type:"POST",data:$f.serialize(),headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success'){$f[0].reset();const offcanvasEl = document.getElementById('offcanvasCreateContainer'); if(offcanvasEl) { const offcanvasBs = bootstrap.Offcanvas.getInstance(offcanvasEl); if(offcanvasBs) { offcanvasBs.hide();}} location.reload();}},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`错误: ${xhr.responseJSON?.message||'创建失败'}`,'danger');}},complete:function(){setButtonProcessing($b,false);}});
     }
     function performAction(cn,a,b){if(a==='restart'||a==='delete'){showConfirmationModal(`${a}_container`,cn,b);return;}setButtonProcessing(b,true);$.ajax({url:`/container/${cn}/action`,type:"POST",data:{action:a},headers:{'X-API-Hash':'{{API_SECRET_HASH}}'},success:function(res){showToast(res.message,res.status);if(res.status==='success')location.reload();else setButtonProcessing(b,false);},error:function(xhr){if(xhr.status===401){showToast("需认证",'danger');setTimeout(()=>window.location.href="{{url_for('login',next=request.url)}}",1000);}else{showToast(`失败: ${xhr.responseJSON?.message||'未知'}`,'danger');}setButtonProcessing(b,false);}});}
