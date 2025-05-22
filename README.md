@@ -38,3 +38,8 @@ python3 app.py
 **关于 “获取容器列表” 的说明：**
 
 如原文所述，`/` 端点直接返回 HTML。如果需要一个纯 JSON API 来获取容器列表，建议添加一个新的路由或修改现有 `/` 的行为以根据 `Accept` 请求头返回 JSON。当前的表格反映了现有实现。
+
+## 演示图片
+![image](https://github.com/user-attachments/assets/a38f22e6-b3a9-4904-a462-22f265fa90e7)
+![image](https://github.com/user-attachments/assets/1f784245-d323-47f7-b7c5-4c7c738e845c)
+![image](https://github.com/user-attachments/assets/1924aa49-0873-4161-aedd-c10861bea988)
