@@ -35,21 +35,31 @@ python3 app.py
 bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/image/debian12.sh)"
 ~~~
 
-## API端点表格
-| 功能 (Function)             | HTTP 方法 (HTTP Method) | URL 路径 (URL Path)                  | 请求体参数 (Request Body Parameters)           | 返回类型 (Return Type) | 示例 (Example)                                                                                   |
-|-------------------------------|-------------------------|--------------------------------------|----------------------------------------------|--------------------|------------------------------------------------------------------------------------------------|
-| 获取容器列表 (Web UI 使用)        | GET                     | `/`                                  | 无                                           | HTML               | (直接在浏览器中打开)                                                                               |
-| 获取单个容器信息 (Web UI 使用)    | GET                     | `/container/<name>/info`             | 无                                           | JSON               | `curl http://localhost:5000/container/mycontainer/info`                                        |
-| 创建容器 (Web UI 使用)          | POST                    | `/container/create`                  | `name=...&image=...`                         | JSON               | `curl -X POST -d "name=new-container&image=ubuntu/22.04" http://localhost:5000/container/create` |
-| 执行容器动作 (Web UI 使用)      | POST                    | `/container/<name>/action`           | `action=start\|stop\|restart\|delete`        | JSON               | `curl -X POST -d "action=start" http://localhost:5000/container/mycontainer/action`              |
-| 在容器内执行命令 (Web UI 使用)  | POST                    | `/container/<name>/exec`             | `command=...`                                | JSON               | `curl -X POST -d "command=ls%20-l%20/" http://localhost:5000/container/mycontainer/exec`       |
-| 添加 NAT 规则 (Web UI 使用)     | POST                    | `/container/<name>/add_nat_rule`     | `host_port=...&container_port=...&protocol=tcp\|udp` | JSON               | `curl -X POST -d "host_port=8080&container_port=80&protocol=tcp" http://localhost:5000/container/mycontainer/add_nat_rule` |
-| 列出容器的 NAT 规则 (Web UI 使用) | GET                     | `/container/<name>/nat_rules`        | 无                                           | JSON               | `curl http://localhost:5000/container/mycontainer/nat_rules`                                   |
-| 删除 NAT 规则 (Web UI 使用)     | DELETE                  | `/container/nat_rule/<rule_id>`      | 无                                           | JSON               | `curl -X DELETE http://localhost:5000/container/nat_rule/123`                                  |
+**API 认证：**
 
-**关于 “获取容器列表” 的说明：**
+所有以下列出的 API 端点都需要通过在请求 Header 中包含 `X-API-Hash` 进行认证。`X-API-Hash` 的值应为配置的 `API_SECRET_KEY` 的 SHA256 哈希（十六进制字符串）。
 
-如原文所述，`/` 端点直接返回 HTML。如果需要一个纯 JSON API 来获取容器列表，建议添加一个新的路由或修改现有 `/` 的行为以根据 `Accept` 请求头返回 JSON。当前的表格反映了现有实现。
+**API 端点表格：**
+
+| 方法   | 端点                             | 描述                                       | 参数 (表单 `x-www-form-urlencoded` / 路径)                               | 成功响应 (Status) | 主要错误响应 (Status)        |
+| :----- | :------------------------------- | :----------------------------------------- | :----------------------------------------------------------------------- | :---------------- | :--------------------------- |
+| `POST` | `/container/create`              | 创建新容器。                               | `name` (Form), `image` (Form) - 必填                                     | `200 OK`          | `400`, `401`, `409`, `500`   |
+| `POST` | `/container/{name}/action`       | 对容器执行 `start`, `stop`, `restart`, `delete` 操作。`delete` 会尝试删除关联规则。 | `name` (Path), `action` (Form: `start`, `stop`, `restart`, `delete`) - 必填 | `200 OK`          | `400`, `401`, `500`          |
+| `POST` | `/container/{name}/exec`         | 在容器内执行命令。                         | `name` (Path), `command` (Form) - 必填                                   | `200 OK`          | `400`, `401`, `500`          |
+| `GET`  | `/container/{name}/info`         | 获取容器详细信息 (优先 Incus 实时，失败 fallback DB)。 | `name` (Path)                                                            | `200 OK`          | `401`, `404`                 |
+| `POST` | `/container/{name}/add_nat_rule` | 为运行中的容器添加 NAT 规则 (iptables + DB 记录)。 | `name` (Path), `host_port` (Form), `container_port` (Form), `protocol` (Form: `tcp`/`udp`) - 必填 | `200 OK` (含Warning可能) | `400`, `401`, `404`, `500`   |
+| `GET`  | `/container/{name}/nat_rules`    | 列出容器在数据库中的 NAT 规则记录。        | `name` (Path)                                                            | `200 OK`          | `401`, `500`                 |
+| `DELETE` | `/container/nat_rule/{rule_id}`  | 删除指定 ID 的 NAT 规则 (尝试 iptables + DB 记录)。 | `rule_id` (Path, integer)                                              | `200 OK` (含Warning可能) | `401`, `500`                 |
+
+---
+
+**注意:**
+
+*   表格中的 `{name}` 和 `{rule_id}` 表示路径参数，调用时需要替换为实际值。
+*   `成功响应 (Status)` 仅表示 HTTP 状态码，具体结果请检查 JSON 响应体中的 `"status"` 字段 (`"success"`, `"error"`, `"warning"`, `"NotFound"`) 及 `"message"`。
+*   `主要错误响应 (Status)` 列出了代码中明确返回的不同错误 HTTP 状态码。
+*   参数中的 `(Form)` 表示该参数应通过 `application/x-www-form-urlencoded` 形式提交。
+*   此文档严格基于现有代码生成，未进行任何逻辑修改。
 
 ## 演示图片
 ![image](https://github.com/user-attachments/assets/a38f22e6-b3a9-4904-a462-22f265fa90e7)
