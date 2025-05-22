@@ -5,11 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Incus Web 管理器</title>
 
-    <link rel="stylesheet" href="https://unpkg.com/antd@5.11.0/dist/reset.css">
-    <link rel="stylesheet" href="https://unpkg.com/antd@5.11.0/dist/antd.min.css">
+    <!-- 引入 Ant Design CSS (使用 jsDelivr) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.11.0/dist/reset.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/antd@5.11.0/dist/antd.min.css">
 
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    <script src="https://unpkg.com/antd@5.11.0/dist/antd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/antd@5.11.0/dist/antd.min.js"></script>
 
 
     <style>
@@ -111,7 +112,6 @@
              border-color: #0dcaf0;
          }
          .ant-btn-info:hover { color: #0aa2c0; border-color: #0aa2c0; }
-
 
     </style>
 </head>
@@ -990,7 +990,7 @@
                                   $('#hostPort').val('');
                                   $('#containerPort').val('');
                                   $('#protocol').val('tcp');
-                                  $('#natContainerIP').val(currentNatContainerIP); // Keep the fetched IP
+                                  $('#natContainerIP').val(currentNatContainerIP);
                               }
                          }
                      },
