@@ -101,9 +101,19 @@
         .main-content-wrapper {
             min-height: calc(100vh - 56px - 48px); /* Adjust based on header/footer height if any */
         }
+        .create-container-card {
+            background-color: transparent !important;
+            border: 1px solid #dee2e6 !important; /* Light border */
+        }
+        .create-container-card .card-header {
+            background-color: transparent !important;
+            border-bottom: 1px solid #dee2e6 !important; /* Light border for header separation */
+            color: inherit !important; /* Inherit text color */
+            font-weight: bold;
+        }
     </style>
 </head>
-<body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% endif %}">
+<body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% else %}bg-light{% endif %}">
     {% if session.logged_in %}
     <div class="container-fluid mt-4">
         <div class="d-flex justify-content-between align-items-center mb-4 px-md-3">
@@ -207,8 +217,8 @@
             </div>
 
             <div class="col-lg-5 col-md-6">
-                <div class="card shadow-sm">
-                    <div class="card-header bg-primary text-white">创建新容器</div>
+                <div class="card create-container-card">
+                    <div class="card-header">创建新容器</div>
                     <div class="card-body">
                         <form id="createContainerForm">
                             <div class="row g-3">
@@ -402,6 +412,16 @@ document.addEventListener('DOMContentLoaded', function() {
         if(refreshButton) {
             refreshButton.addEventListener('click', generateCaptcha);
         }
+
+        const loginForm = document.getElementById('loginForm');
+        loginForm.addEventListener('submit', function(event) {
+            const userAnswer = parseInt(document.getElementById('captchaInput').value, 10);
+            if (userAnswer !== captchaAnswer) {
+                event.preventDefault();
+                showToast('验证码错误，请重试。', 'danger');
+                generateCaptcha();
+            }
+        });
     }
 });
 
