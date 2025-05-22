@@ -15,8 +15,8 @@
         .main-content { padding-top: 1.5rem; padding-bottom: 2rem; }
         h1.page-title { font-size: 1.75rem; color: #1a73e8; }
         h2.section-title { font-size: 1.3rem; margin-top: 0; margin-bottom: 1rem; padding-bottom: 0.5rem; color: #202124; }
-        .left-column h2.section-title { border-bottom: 1px solid #e0e0e0; }
-        .right-column .section-title { padding-bottom: 0.25rem; margin-bottom: 0.75rem; }
+        /* .left-column h2.section-title { border-bottom: 1px solid #e0e0e0; } */ /* Style removed as column structure changed */
+        /* .right-column .section-title { padding-bottom: 0.25rem; margin-bottom: 0.75rem; } */ /* Style removed as column structure changed */
 
         .btn {
             border-radius: 4px; font-weight: 500; padding: 0.5rem 1rem;
@@ -50,8 +50,8 @@
             border: 1px solid #e0e0e0;
             border-radius: 8px;
             background-color: #fff;
-            overflow-x: hidden; /* Prevent horizontal scroll if table is too wide */
-            overflow-y: visible; /* Allow vertical overflow for dropdowns */
+            overflow-x: hidden; 
+            overflow-y: visible; 
         }
         .table {
             table-layout: fixed;
@@ -82,7 +82,7 @@
         .table th.col-actions, .table td.col-actions {
             width: 15%;
             text-align: end;
-            overflow: visible; /* Crucial for dropdown visibility */
+            overflow: visible; 
         }
 
 
@@ -105,7 +105,7 @@
         #natRulesList li { background-color:#fff; border:1px solid #e0e0e0; margin-bottom:.75rem; padding:.75rem 1rem; border-radius:4px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; font-size:.85rem; }
         #natRulesList li:hover { background-color:#f1f3f4; }
 
-        .sticky-top-form-container { position: sticky; top: 20px; }
+        /* .sticky-top-form-container { position: sticky; top: 20px; } */ /* Removed stickiness for now */
         .create-form-panel { background-color: #fff; padding: 1.25rem; border-radius: 8px; border: 1px solid #e0e0e0; }
         .offcanvas-header { border-bottom:1px solid #e0e0e0; }
         .pagination .page-link { color:#1a73e8; border-radius:4px; margin:0 2px; border:1px solid #dadce0; background-color:#fff; }
@@ -129,59 +129,55 @@
         </div>
         {% endif %}
 
-        <div class="row g-lg-4">
-            <div class="col-lg-7 order-lg-1 left-column">
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <h2 class="section-title mb-0">容器列表</h2>
-                    <div>
-                        <button class="btn btn-sm btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCreateContainer" aria-controls="offcanvasCreateContainer">创建容器</button>
-                        <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新列表</button>
-                    </div>
+        <div class="mb-4"> 
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="section-title mb-0">容器列表</h2>
+                <div>
+                    <button class="btn btn-sm btn-outline-primary d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#offcanvasCreateContainer" aria-controls="offcanvasCreateContainer">创建容器</button>
+                    <button class="btn btn-sm btn-secondary" onclick="location.reload()">刷新列表</button>
                 </div>
-
-                <div class="container-list-desktop d-none d-lg-block">
-                    <table class="table table-hover">
-                        <thead>
-                            <tr>
-                                <th class="col-name">名称</th>
-                                <th class="col-status">状态</th>
-                                <th class="col-ip">IP 地址</th>
-                                <th class="col-image">镜像来源</th>
-                                <th class="col-created">创建时间</th>
-                                <th class="col-actions">操作</th>
-                            </tr>
-                        </thead>
-                        <tbody id="containerListDesktop">
-                        </tbody>
-                    </table>
-                </div>
-                <nav id="paginationDesktop" aria-label="Desktop pagination" class="mt-3 d-none d-lg-block"></nav>
-
-                <div class="container-list-mobile d-block d-lg-none mt-3">
-                </div>
-                <nav id="paginationMobile" aria-label="Mobile pagination" class="mt-3 d-block d-lg-none"></nav>
             </div>
 
-            <div class="col-lg-5 order-lg-2 d-none d-lg-block right-column">
-                <div class="sticky-top-form-container">
-                    <h2 class="section-title">创建新容器</h2>
-                    <div class="create-form-panel">
-                        <form id="createContainerForm">
-                            <div class="row g-3">
-                                <div class="col-12"><label for="containerName" class="form-label">容器名称</label><input type="text" class="form-control" id="containerName" name="name" required></div>
-                                <div class="col-12">
-                                    <label for="containerImage" class="form-label">选择镜像</label>
-                                    <select class="form-select" id="containerImage" name="image" required>
-                                        <option value="" selected disabled>请选择镜像</option>
-                                        {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
-                                    </select>
-                                    {% if image_error[0] %}<div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>{% endif %}
-                                </div>
-                                <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button></div>
-                            </div>
-                        </form>
+            <div class="container-list-desktop d-none d-lg-block">
+                <table class="table table-hover">
+                    <thead>
+                        <tr>
+                            <th class="col-name">名称</th>
+                            <th class="col-status">状态</th>
+                            <th class="col-ip">IP 地址</th>
+                            <th class="col-image">镜像来源</th>
+                            <th class="col-created">创建时间</th>
+                            <th class="col-actions">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="containerListDesktop">
+                    </tbody>
+                </table>
+            </div>
+            <nav id="paginationDesktop" aria-label="Desktop pagination" class="mt-3 d-none d-lg-block"></nav>
+
+            <div class="container-list-mobile d-block d-lg-none mt-3">
+            </div>
+            <nav id="paginationMobile" aria-label="Mobile pagination" class="mt-3 d-block d-lg-none"></nav>
+        </div>
+
+        <div class="d-none d-lg-block mb-4"> 
+            <h2 class="section-title">创建新容器</h2>
+            <div class="create-form-panel">
+                <form id="createContainerForm">
+                    <div class="row g-3">
+                        <div class="col-12"><label for="containerName" class="form-label">容器名称</label><input type="text" class="form-control" id="containerName" name="name" required></div>
+                        <div class="col-12">
+                            <label for="containerImage" class="form-label">选择镜像</label>
+                            <select class="form-select" id="containerImage" name="image" required>
+                                <option value="" selected disabled>请选择镜像</option>
+                                {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
+                            </select>
+                            {% if image_error[0] %}<div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>{% endif %}
+                        </div>
+                        <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button></div>
                     </div>
-                </div>
+                </form>
             </div>
         </div>
     </div>
@@ -331,7 +327,10 @@
             e.preventDefault(); const page = parseInt($(this).data('page'));
             if (page && page !== currentPage && page >= 1 && page <= totalPages) {
                 currentPage = page; renderPaginatedContainers();
-                $('html, body').animate({ scrollTop: $('.left-column').offset().top - 20 }, 300);
+                const listTopElement = $('.container-list-desktop').length ? $('.container-list-desktop') : $('.container-list-mobile');
+                if (listTopElement.length) {
+                    $('html, body').animate({ scrollTop: listTopElement.offset().top - 20 }, 300);
+                }
             }
         });
     }
