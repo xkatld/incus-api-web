@@ -5,14 +5,86 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Incus Web 管理器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500&display=swap" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <style>
-        body { padding-top: 20px; }
-        #execOutput, #infoContent pre { white-space: pre-wrap; background-color: var(--bs-gray-100); border: 1px solid var(--bs-border-color); padding: 1rem; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
-        #execOutput.success { border-color: var(--bs-success-border-subtle); background-color: var(--bs-success-bg-subtle); color: var(--bs-success-text-emphasis); }
-        #execOutput.error { border-color: var(--bs-danger-border-subtle); background-color: var(--bs-danger-bg-subtle); color: var(--bs-danger-text-emphasis); }
-        #infoContent { background-color: var(--bs-white); border: none; padding: 0; }
+        body {
+            font-family: 'Roboto', sans-serif;
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1000px;
+            margin: auto;
+            padding: 0 15px;
+        }
+        h1, h2, .modal-title {
+            color: #3c4043;
+            font-weight: 400;
+        }
+        .card {
+            box-shadow: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
+            border: none;
+            border-radius: 8px;
+        }
+         .card-header {
+             background-color: #f1f3f4;
+             border-bottom: 1px solid rgba(0,0,0,.125);
+             border-radius: 8px 8px 0 0;
+             font-weight: 500;
+             color: #3c4043;
+         }
+
+        #execOutput, #infoContent pre {
+            white-space: pre-wrap;
+            background-color: #e8eaed;
+            border: 1px solid #dadce0;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
+            font-size: 0.9em;
+            border-radius: 4px;
+        }
+        #execOutput.success {
+            border-color: #a8dadc;
+            background-color: #f0f7f7;
+            color: #0a5a5c;
+        }
+        #execOutput.error {
+            border-color: #f7cccb;
+            background-color: #fbeae9;
+            color: #a82c28;
+        }
+        #infoContent { background-color: #fff; border: none; padding: 0; }
+
+
+        .btn {
+             border-radius: 4px;
+             font-weight: 500;
+             transition: background-color .15s ease-in-out,border-color .15s ease-in-out,box-shadow .15s ease-in-out;
+        }
+        .btn-primary { background-color: #1a73e8; border-color: #1a73e8; }
+        .btn-primary:hover { background-color: #1565c0; border-color: #1565c0; }
+         .btn-success { background-color: #34a853; border-color: #34a853; }
+        .btn-success:hover { background-color: #2d9449; border-color: #2d9449; }
+        .btn-danger { background-color: #ea4335; border-color: #ea4335; }
+        .btn-danger:hover { background-color: #c62e2b; border-color: #c62e2b; }
+        .btn-warning { background-color: #f9ab00; border-color: #f9ab00; color: #202124 !important; }
+        .btn-warning:hover { background-color: #f29c00; border-color: #f29c00; }
+        .btn-info { background-color: #4285f4; border-color: #4285f4; }
+         .btn-info:hover { background-color: #3367d6; border-color: #3367d6; }
+         .btn-secondary { background-color: #bdc1c6; border-color: #bdc1c6; color: #202124 !important; }
+         .btn-secondary:hover { background-color: #a5a9ac; border-color: #a5a9ac; }
+         .btn-dark { background-color: #5f6368; border-color: #5f6368; }
+         .btn-dark:hover { background-color: #3c4043; border-color: #3c4043; }
+
+
+        .btn-outline-danger { color: #ea4335; border-color: #ea4335; }
+        .btn-outline-danger:hover { background-color: #fce8e6; color: #c5221f; border-color: #fce8e6; }
+
+        .badge { border-radius: 12px; padding: 0.35em 0.85em; font-weight: 500; }
 
 
         .btn-processing {
@@ -29,8 +101,24 @@
             right: 1rem;
             z-index: 1080;
         }
+         .toast {
+            border-radius: 8px;
+            box-shadow: 0 3px 6px rgba(0,0,0,.16);
+            padding: 0.75rem 1rem;
+            background-color: #e8f0fe; /* Blue */
+            color: #3c4043;
+            border-left: 4px solid #1a73e8;
+         }
+         .toast.text-bg-success { background-color: #e6f4ea; color: #1e8e3e; border-left-color: #34a853; }
+         .toast.text-bg-danger { background-color: #fce8e6; color: #d93025; border-left-color: #ea4335; }
+         .toast.text-bg-warning { background-color: #fef7e0; color: #f9ab00; border-left-color: #f9ab00; }
+          .toast .btn-close { filter: invert(45%) sepia(15%) saturate(200%) saturate(2142%) hue-rotate(182deg) brightness(97%) contrast(87%); }
+
+
         .modal { z-index: 1060; }
         .modal-backdrop { z-index: 1059; }
+        .modal-content { border-radius: 8px; }
+
 
         .container-actions .d-flex-desktop {
             align-items: center;
@@ -62,38 +150,43 @@
           .container-list-mobile .card-text small {
             font-weight: bold;
             margin-right: 5px;
+            color: #5f6368 !important;
           }
          .container-list-mobile .card-title {
              word-break: break-word;
+             color: #202124;
          }
 
         #natRulesList {
             margin-top: 1.5rem;
-            border-top: 1px solid var(--bs-border-color-translucent);
+            border-top: 1px solid #dadce0;
             padding-top: 1.5rem;
         }
         #natRulesList h6 {
             margin-bottom: 1rem;
+            color: #202124;
         }
         #natRulesList ul {
             list-style: none;
             padding: 0;
         }
         #natRulesList li {
-            background-color: var(--bs-gray-100);
-            border: 1px solid var(--bs-border-color);
+            background-color: #e8eaed;
+            border: 1px solid #dadce0;
             margin-bottom: 0.5rem;
             padding: 1rem;
-            border-radius: 0.25rem;
+            border-radius: 4px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
+             font-size: 0.9em;
         }
         #natRulesList li .rule-details {
             flex-grow: 1;
             margin-right: 0.5rem;
             word-break: break-word;
+            color: #3c4043;
         }
          #natRulesList li .rule-actions {
             flex-shrink: 0;
@@ -104,11 +197,16 @@
          #loginContainer {
              max-width: 400px;
              margin: 50px auto;
-             padding: 1.5rem;
-             border: 1px solid var(--bs-border-color);
-             border-radius: 0.5rem;
-             background-color: var(--bs-light);
+             padding: 2rem;
+             border: none;
+             border-radius: 8px;
+             background-color: #ffffff;
+             box-shadow: 0 1px 3px 0 rgba(60,64,67,.3), 0 4px 8px 3px rgba(60,64,67,.15);
          }
+        #loginContainer h2 {
+             text-align: center;
+             color: #202124;
+        }
 
     </style>
 </head>
@@ -174,7 +272,7 @@
                 <tbody id="containerListDesktop">
                     {% for c in containers %}
                     <tr>
-                        <td>{{ c.name }}</td>
+                        <td class="text-wrap">{{ c.name }}</td>
                         <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
                         <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
                         <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
@@ -457,7 +555,7 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
         currentConfirmContainerName = nameOrId;
          currentConfirmRuleId = null;
         modalTitle.text('确认删除容器');
-        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及其所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
+        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
         buttonClass = 'btn-danger';
         buttonText = '删除容器';
      } else if (actionType === 'delete_nat_rule') {
