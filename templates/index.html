@@ -5,247 +5,372 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Incus Web 管理器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Segoe+UI:wght@300;400;600&display=swap" rel="stylesheet">
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Roboto+Mono&display=swap" rel="stylesheet">
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            padding-top: 20px;
-            background-color: #f3f2f1; /* Soft neutral background */
-            color: #323130; /* Dark grey text */
+            font-family: 'Roboto', -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #3c4043;
+            padding-top: 2rem;
+            padding-bottom: 2rem;
         }
-        .container {
-            max-width: 1000px;
-            margin: auto;
-            padding: 0 15px;
+
+        h1, h2, h3, h4, h5, h6 {
+            color: #202124;
+            font-weight: 500;
         }
-        h1, h2, .modal-title {
-            color: #005a9e; /* Microsoft Blue */
-            font-weight: 600; /* Semi-bold titles */
+
+        h1 {
+            font-size: 1.75rem;
+            color: #1a73e8;
+        }
+        h2 {
+            font-size: 1.3rem;
+            margin-top: 1.5rem;
             margin-bottom: 1rem;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 0.5rem;
         }
-        h2 { margin-top: 2rem; margin-bottom: 1.5rem; }
+
+        .btn {
+            border-radius: 4px;
+            font-weight: 500;
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+            transition: background-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+        }
+
+        .btn-primary {
+            background-color: #1a73e8;
+            border-color: #1a73e8;
+        }
+        .btn-primary:hover, .btn-primary:focus {
+            background-color: #1765cc;
+            border-color: #1765cc;
+            box-shadow: 0 1px 2px 0 rgba(66,133,244,.3),0 1px 3px 1px rgba(66,133,244,.15);
+        }
+
+        .btn-secondary {
+            background-color: #dadce0;
+            border-color: #dadce0;
+            color: #3c4043;
+        }
+        .btn-secondary:hover, .btn-secondary:focus {
+            background-color: #c8cbcf;
+            border-color: #c8cbcf;
+            box-shadow: 0 1px 2px 0 rgba(0,0,0,.1),0 1px 3px 1px rgba(0,0,0,.08);
+        }
+
+        .btn-sm {
+            padding: 0.25rem 0.75rem;
+            font-size: 0.75rem;
+        }
+
+        .btn-outline-danger {
+            color: #ea4335;
+            border-color: #ea4335;
+        }
+        .btn-outline-danger:hover {
+            background-color: #ea4335;
+            color: #fff;
+        }
+        .btn-info {
+            background-color: #89b4f8;
+            border-color: #89b4f8;
+            color: #202124;
+        }
+        .btn-info:hover {
+            background-color: #7ba6e9;
+            border-color: #7ba6e9;
+        }
+
+        .btn-dark {
+            background-color: #5f6368;
+            border-color: #5f6368;
+        }
+        .btn-dark:hover {
+            background-color: #4e5155;
+            border-color: #4e5155;
+        }
 
         .card {
-            border: 1px solid #edebe9; /* Light grey border */
-            box-shadow: none; /* Flat design */
-            border-radius: 2px; /* Small border radius */
-            background-color: #ffffff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);
+            margin-bottom: 1.5rem;
         }
-         .card-header {
-             background-color: #faf9f8; /* Lighter background */
-             border-bottom: 1px solid #edebe9;
-             font-weight: 600;
-             color: #323130;
-             border-radius: 2px 2px 0 0;
-         }
+        .card-header {
+            background-color: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 500;
+            padding: 0.75rem 1.25rem;
+            font-size: 1rem;
+            color: #202124;
+        }
+        .card-body {
+            padding: 1.25rem;
+        }
+
+        .form-control, .form-select {
+            border-radius: 4px;
+            border: 1px solid #dadce0;
+            padding: 0.6rem 0.75rem;
+            font-size: 0.9rem;
+        }
+        .form-control:focus, .form-select:focus {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 0.2rem rgba(26,115,232,.25);
+        }
+        .form-label {
+            font-weight: 500;
+            color: #5f6368;
+            font-size: 0.875rem;
+            margin-bottom: 0.3rem;
+        }
+
+        .table {
+            background-color: #fff;
+        }
+        .table th, .table td {
+            padding: 0.75rem 1rem;
+            vertical-align: middle;
+            border-top: 1px solid #e0e0e0;
+            font-size: 0.875rem;
+        }
+        .table thead th {
+            font-weight: 500;
+            color: #5f6368;
+            border-bottom: 2px solid #d1d3d6;
+            background-color: #f8f9fa;
+            border-top: 0;
+        }
+        .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba(0,0,0,.02);
+        }
+        .table-hover > tbody > tr:hover > * {
+            background-color: rgba(26,115,232,.05);
+        }
+        .table-responsive {
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        #loginContainer {
+            max-width: 420px;
+            padding: 2rem;
+            background-color: #fff;
+            border: 1px solid #dadce0;
+            border-radius: 8px;
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 2px 6px 2px rgba(60,64,67,.15);
+        }
+        #loginContainer h2 {
+            border-bottom: none;
+            font-size: 1.5rem;
+            color: #202124;
+            margin-bottom: 1.5rem;
+        }
 
         #execOutput, #infoContent pre {
             white-space: pre-wrap;
-            background-color: #edebe9; /* Lighter grey background for code */
-            border: 1px solid #c8c6c4; /* Medium grey border */
+            background-color: #f1f3f4;
+            border: 1px solid #dadce0;
             padding: 1rem;
-            max-height: 300px;
+            max-height: 350px;
             overflow-y: auto;
-            font-family: Consolas, Monaco, 'Andale Mono', 'Ubuntu Mono', monospace;
-            font-size: 0.9em;
-            border-radius: 2px;
-            color: #323130;
+            font-family: 'Roboto Mono', monospace;
+            font-size: 0.85em;
+            border-radius: 4px;
         }
         #execOutput.success {
-            border-color: #a4c2bf; /* Success green border */
-            background-color: #e1f2ef; /* Light green background */
-            color: #0e5245; /* Dark green text */
+            border-color: #81c995;
+            background-color: #e6f4ea;
+            color: #185c37;
         }
         #execOutput.error {
-            border-color: #f2a4b5; /* Danger red border */
-            background-color: #f9e7eb; /* Light red background */
-            color: #a31d45; /* Dark red text */
+            border-color: #f28b82;
+            background-color: #fce8e6;
+            color: #a50e0e;
         }
-        #infoContent { background-color: #fff; border: none; padding: 0; }
-
-
-        .btn {
-             border-radius: 2px;
-             font-weight: 400; /* Regular font-weight */
-             padding: 0.375rem 0.75rem;
-             line-height: 1.5;
+        #infoContent {
+            background-color: #fff;
+            border: none;
+            padding: 0;
         }
-        .btn-primary { background-color: #0078d4; border-color: #0078d4; } /* Microsoft brand blue */
-        .btn-primary:hover { background-color: #005a9e; border-color: #005a9e; }
-        .btn-primary:active { background-color: #004c8c; border-color: #004c8c; }
-         .btn-success { background-color: #107c10; border-color: #107c10; } /* Success green */
-        .btn-success:hover { background-color: #0e6e0e; border-color: #0e6e0e; }
-         .btn-success:active { background-color: #0b5f0b; border-color: #0b5f0b; }
-        .btn-danger { background-color: #d13438; border-color: #d13438; } /* Danger red */
-        .btn-danger:hover { background-color: #a42c2e; border-color: #a42c2e; }
-         .btn-danger:active { background-color: #832325; border-color: #832325; }
-        .btn-warning { background-color: #ffb900; border-color: #ffb900; color: #323130 !important; } /* Warning yellow */
-        .btn-warning:hover { background-color: #f2a900; border-color: #f2a900; }
-         .btn-warning:active { background-color: #e09d00; border-color: #e09d00; }
-        .btn-info { background-color: #71afe5; border-color: #71afe5; } /* Light blue/info */
-         .btn-info:hover { background-color: #5e9ad8; border-color: #5e9ad8; }
-         .btn-info:active { background-color: #4c89cb; border-color: #4c89cb; }
-         .btn-secondary { background-color: #e1dfdd; border-color: #e1dfdd; color: #323130 !important; } /* Secondary grey */
-         .btn-secondary:hover { background-color: #d0cdcb; border-color: #d0cdcb; }
-         .btn-secondary:active { background-color: #bfbcba; border-color: #bfbcba; }
-         .btn-dark { background-color: #323130; border-color: #323130; } /* Dark grey */
-         .btn-dark:hover { background-color: #2b2a29; border-color: #2b2a29; }
-          .btn-dark:active { background-color: #21201f; border-color: #21201f; }
-
-        .btn-outline-danger { color: #d13438; border-color: #d13438; }
-        .btn-outline-danger:hover { background-color: rgba(209, 52, 56, 0.1); color: #d13438; } /* Light hover background */
-         .btn-outline-danger:active { background-color: rgba(209, 52, 56, 0.2); color: #d13438; }
-
-
-        .badge { border-radius: 2px; font-weight: 400; padding: 0.4em 0.6em;}
-
 
         .btn-processing {
             pointer-events: none;
-            opacity: 0.7;
+            opacity: 0.8;
         }
         .btn-processing .spinner-border {
-             margin-right: 0.25rem;
+            margin-right: 0.5rem;
         }
 
         #toastContainer {
             position: fixed;
-            top: 1rem;
-            right: 1rem;
-            z-index: 1080;
+            top: 20px;
+            right: 20px;
+            z-index: 1090;
         }
-         .toast {
+        .toast {
             border-radius: 4px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-            padding: 0.75rem 1rem;
+            box-shadow: 0 2px 4px rgba(0,0,0,.18);
+            font-size: 0.9rem;
+        }
+        .toast-header {
             background-color: #fff;
-            color: #323130;
-            border-left: 4px solid #0078d4; /* Default Toast color */
-         }
-         .toast.text-bg-success { background-color: #fff; color: #107c10; border-left-color: #107c10; }
-         .toast.text-bg-danger { background-color: #fff; color: #d13438; border-left-color: #d13438; }
-         .toast.text-bg-warning { background-color: #fff; color: #ffb900; border-left-color: #ffb900; }
-         .toast .btn-close { filter: invert(25%) sepia(9%) saturate(214%) hue-rotate(358deg) brightness(95%) contrast(84%); /* Dark grey close button */ }
+            border-bottom: 1px solid #e0e0e0;
+        }
+        .text-bg-danger, .text-bg-success, .text-bg-info, .text-bg-warning {
+            color: #fff !important;
+        }
+        .text-bg-danger { background-color: #d93025 !important; }
+        .text-bg-success { background-color: #1e8e3e !important; }
+        .text-bg-info { background-color: #1a73e8 !important; }
+        .text-bg-warning { background-color: #f9ab00 !important; color: #202124 !important; }
 
-
-        .modal { z-index: 1060; }
-        .modal-backdrop { z-index: 1059; }
-        .modal-content { border-radius: 2px; }
+        .modal-content {
+            border-radius: 8px;
+            border: 1px solid #dadce0;
+            box-shadow: 0 4px 8px 0 rgba(60,64,67,.3),0 6px 20px 0 rgba(60,64,67,.15);
+        }
+        .modal-header {
+            background-color: #fff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 1rem 1.5rem;
+        }
+        .modal-header .modal-title {
+            font-size: 1.15rem;
+            font-weight: 500;
+            color: #202124;
+        }
+        .modal-body {
+            padding: 1.5rem;
+            font-size: 0.9rem;
+        }
+        .modal-footer {
+            background-color: #f8f9fa;
+            border-top: 1px solid #e0e0e0;
+            padding: 0.75rem 1.5rem;
+        }
+        .modal { z-index: 1070; }
+        .modal-backdrop { z-index: 1069; background-color: rgba(0,0,0,0.6); }
 
 
         .container-actions .d-flex-desktop {
             align-items: center;
-             display: none !important;
+            display: none !important;
         }
         @media (min-width: 768px) {
             .container-actions .d-flex-desktop {
                 display: flex !important;
                 flex-direction: row;
-                gap: 0.25rem;
+                gap: 0.35rem;
             }
-             .container-list-mobile {
-                display: none;
-             }
-             .container-list-desktop {
-                 display: block;
-             }
         }
 
-         .container-list-mobile {
-            display: block;
-         }
-         .container-list-mobile .card-actions {
+        .container-list-mobile .card {
+            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3),0 1px 3px 1px rgba(60,64,67,.15);
+            border-radius: 8px;
+        }
+        .container-list-mobile .card-actions {
             margin-top: 1rem;
             display: flex;
             flex-wrap: wrap;
             gap: 0.5rem;
-         }
-          .container-list-mobile .card-text small {
-            font-weight: 600; /* Semi-bold */
-            margin-right: 5px;
-            color: #505050 !important; /* Medium grey */
-          }
-         .container-list-mobile .card-title {
-             word-break: break-word;
-             color: #323130;
-         }
+        }
+        .container-list-mobile .card-text small {
+            font-weight: 500;
+            color: #5f6368;
+            margin-right: 0.25rem;
+        }
+        .container-list-mobile .card-title {
+            word-break: break-word;
+            font-size: 1.1rem;
+            margin-bottom: 0.25rem !important;
+        }
 
         #natRulesList {
             margin-top: 1.5rem;
-            border-top: 1px solid #edebe9;
+            border-top: 1px solid #e0e0e0;
             padding-top: 1.5rem;
         }
         #natRulesList h6 {
             margin-bottom: 1rem;
-            color: #323130;
-            font-weight: 600;
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #3c4043;
         }
         #natRulesList ul {
             list-style: none;
             padding: 0;
         }
         #natRulesList li {
-            background-color: #f3f2f1; /* Light grey background */
-            border: 1px solid #c8c6c4; /* Medium grey border */
-            margin-bottom: 0.5rem;
-            padding: 1rem;
-            border-radius: 2px;
+            background-color: #fff;
+            border: 1px solid #e0e0e0;
+            margin-bottom: 0.75rem;
+            padding: 0.75rem 1rem;
+            border-radius: 4px;
             display: flex;
             justify-content: space-between;
             align-items: center;
             flex-wrap: wrap;
-             font-size: 0.9em;
-             color: #323130;
+            font-size: 0.85rem;
         }
-         #natRulesList li small {
-             color: #505050 !important;
-         }
+        #natRulesList li:hover {
+            background-color: #f1f3f4;
+        }
         #natRulesList li .rule-details {
             flex-grow: 1;
-            margin-right: 0.5rem;
+            margin-right: 0.75rem;
             word-break: break-word;
-            color: #323130;
+            line-height: 1.5;
         }
-         #natRulesList li .rule-actions {
+        #natRulesList li .rule-details small {
+            color: #5f6368;
+            font-size: 0.9em;
+        }
+        #natRulesList li .rule-actions {
             flex-shrink: 0;
             margin-left: auto;
-         }
+        }
 
-         /* Login Form Styling */
-         #loginContainer {
-             max-width: 400px;
-             margin: 50px auto;
-             padding: 2rem;
-             border: none;
-             border-radius: 2px;
-             background-color: #ffffff;
-             box-shadow: 0 1px 3px rgba(0,0,0,0.12);
-         }
-        #loginContainer h2 {
-             text-align: center;
-             color: #005a9e;
-             margin-bottom: 1.5rem;
+        .alert {
+            border-radius: 4px;
+            padding: 1rem 1.25rem;
+            font-size: 0.9rem;
         }
-        #loginContainer .form-label {
-             font-weight: 400;
-             color: #323130;
+        .alert-danger {
+            background-color: #fce8e6;
+            border-color: #f28b82;
+            color: #a50e0e;
         }
-         #loginContainer .form-control {
-             border-radius: 2px;
-         }
+        .alert-danger strong { color: #8b0000; }
+        .alert-success {
+            background-color: #e6f4ea;
+            border-color: #81c995;
+            color: #185c37;
+        }
+        .alert-info {
+            background-color: #e8f0fe;
+            border-color: #89b4f8;
+            color: #174ea6;
+        }
+        .alert-warning {
+            background-color: #feedcf;
+            border-color: #fde293;
+            color: #795508;
+        }
 
     </style>
 </head>
 <body>
     {% if session.logged_in %}
     <div class="container">
-        <div class="d-flex justify-content-between align-items-center mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
              <h1>Incus Web 管理器</h1>
-             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">退出登录</a>
+             <a href="{{ url_for('logout') }}" class="btn btn-outline-secondary btn-sm">退出登录</a>
         </div>
-
 
         {% if incus_error[0] %}
         <div class="alert alert-danger" role="alert">
@@ -272,10 +397,10 @@
                                 {% endfor %}
                             </select>
                              {% if image_error[0] %}
-                             <div class="form-text text-danger">{{ image_error[1] }}</div>
+                             <div class="form-text text-danger small mt-1">{{ image_error[1] }}</div>
                              {% endif %}
                         </div>
-                        <div class="col-md-2 d-flex align-items-end">
+                        <div class="col-md-2 align-self-end">
                             <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
                         </div>
                     </div>
@@ -286,7 +411,7 @@
         <h2>容器列表</h2>
 
         <div class="table-responsive container-list-desktop d-none d-md-block">
-            <table class="table table-striped">
+            <table class="table table-hover">
                 <thead>
                     <tr>
                         <th>名称</th>
@@ -300,13 +425,13 @@
                 <tbody id="containerListDesktop">
                     {% for c in containers %}
                     <tr>
-                        <td class="text-wrap">{{ c.name }}</td>
+                        <td>{{ c.name }}</td>
                         <td><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></td>
                         <td>{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</td>
                         <td>{{ c.image_source if c.image_source else 'N/A' }}</td>
                         <td>{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</td>
                         <td class="container-actions">
-                            <div class="d-flex-desktop gap-1">
+                            <div class="d-flex-desktop">
                                 <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
                                 {% if c.status == 'Running' %}
                                 <button class="btn btn-sm btn-warning" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button>
@@ -321,7 +446,7 @@
                         </td>
                     </tr>
                     {% else %}
-                    <tr><td colspan="6" class="text-center">没有找到容器或无法连接到 Incus。</td></tr>
+                    <tr><td colspan="6" class="text-center py-4">没有找到容器或无法连接到 Incus。</td></tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -336,9 +461,9 @@
                         <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
                     </div>
 
-                    <p class="card-text mb-1"><small class="text-muted">IP 地址:</small> {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</p>
-                    <p class="card-text mb-1"><small class="text-muted">镜像:</small> {{ c.image_source if c.image_source else 'N/A' }}</p>
-                    <p class="card-text mb-3"><small class="text-muted">创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
+                    <p class="card-text mb-1"><small>IP 地址:</small> {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</p>
+                    <p class="card-text mb-1"><small>镜像:</small> {{ c.image_source if c.image_source else 'N/A' }}</p>
+                    <p class="card-text mb-3"><small>创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
 
                     <div class="card-actions">
                         <button class="btn btn-sm btn-info" onclick="showInfo('{{ c.name }}', this)">信息</button>
@@ -365,7 +490,7 @@
     </div>
     {% else %}
     <div class="container">
-        <div id="loginContainer">
+        <div id="loginContainer" class="my-5 mx-auto">
              <h2 class="text-center mb-4">管理员登录</h2>
              <form method="POST" action="{{ url_for('login') }}">
                  <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
@@ -378,16 +503,15 @@
                     <input type="password" class="form-control" id="password" name="password" required>
                  </div>
                  {% if login_error %}
-                 <div class="alert alert-danger" role="alert">
+                 <div class="alert alert-danger mt-3" role="alert">
                      {{ login_error }}
                  </div>
                  {% endif %}
-                 <button type="submit" class="btn btn-primary w-100">登录</button>
+                 <button type="submit" class="btn btn-primary w-100 mt-4">登录</button>
              </form>
         </div>
     </div>
     {% endif %}
-
 
     <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer">
     </div>
@@ -401,17 +525,14 @@
                 </div>
                 <div class="modal-body">
                     <div id="basicInfoContent">正在加载基础信息...</div>
-
-                    <div id="natRulesList">
+                    <div id="natRulesList" style="display: none;">
                         <h6>NAT 规则 (本应用添加)</h6>
                         <ul id="natRulesContent">
                             <li>正在加载 NAT 规则...</li>
                         </ul>
                          <div id="natRulesError" class="alert alert-warning mt-2 d-none"></div>
                     </div>
-
                      <div id="infoError" class="alert alert-danger mt-2 d-none"></div>
-
                 </div>
             </div>
         </div>
@@ -433,8 +554,8 @@
                         </div>
                         <button type="submit" class="btn btn-primary" id="execButton">执行</button>
                     </form>
-                    <h6 class="mt-3">输出:</h6>
-                    <pre id="execOutput" class="mt-2"></pre>
+                    <h6 class="mt-3 mb-2">输出:</h6>
+                    <pre id="execOutput"></pre>
                 </div>
             </div>
         </div>
@@ -497,7 +618,8 @@
         </div>
     </div>
 
-
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
 <script>
 function showToast(message, type = 'info') {
     let toastType = 'info';
@@ -532,7 +654,6 @@ function showToast(message, type = 'info') {
 function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
     if (!$button.length) {
-         console.warn("Button element not found for processing state update.");
          return;
     }
 
@@ -583,7 +704,7 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
         currentConfirmContainerName = nameOrId;
          currentConfirmRuleId = null;
         modalTitle.text('确认删除容器');
-        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
+        message = `<strong>警告：</strong> 这将永久删除容器 <strong>${nameOrId}</strong> 及其所有数据！<br>同时将强制删除所有通过本应用添加的关联 NAT 规则。<br>确定删除吗？`;
         buttonClass = 'btn-danger';
         buttonText = '删除容器';
      } else if (actionType === 'delete_nat_rule') {
@@ -664,8 +785,6 @@ $('#confirmActionButton').click(function() {
             showToast(data.message, data.status);
             if (data.status === 'success') {
                  setTimeout(() => location.reload(), 1000);
-            } else {
-                 setButtonProcessing(buttonElement, false);
             }
         }).fail(function(jqXHR) {
              if (jqXHR.status === 401) {
@@ -789,7 +908,7 @@ function showInfo(containerName, buttonElement) {
         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
              if (data.status === 'NotFound') {
-                 basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
+                 basicInfoContent.html(`<p><strong>错误:</strong> ${data.message}</p>`);
                  infoError.removeClass('d-none').text(data.message);
                  showToast("加载容器信息失败。", 'danger');
                  natRulesListContainer.hide();
@@ -806,7 +925,7 @@ function showInfo(containerName, buttonElement) {
                 <p><strong>类型:</strong> ${data.type}</p>
                  <p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p>
                 <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
-                 <p><small>${data.message}</small></p>
+                 <p class="mt-2"><small class="text-muted">${data.message}</small></p>
             `;
 
             basicInfoContent.html(infoHtml);
@@ -824,7 +943,7 @@ function showInfo(containerName, buttonElement) {
                 setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
              } else {
                 const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
-                basicInfoContent.html(`<strong>错误:</strong> ${message}`);
+                basicInfoContent.html(`<p><strong>错误:</strong> ${message}</p>`);
                 infoError.removeClass('d-none').text(message);
                 natRulesContent.html('<li>无法加载 NAT 规则。</li>');
                 natRulesListContainer.hide();
@@ -857,7 +976,7 @@ function loadNatRules(containerName) {
                         <li data-rule-id="${rule.id}">
                             <span class="rule-details">
                                 <strong>ID ${rule.id}:</strong> 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}
-                                <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
+                                <br><small>记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
                             </span>
                             <span class="rule-actions">
                                  <button class="btn btn-sm btn-danger" onclick="deleteNatRule(${rule.id}, this)">删除</button>
@@ -1060,7 +1179,6 @@ $('#addNatForm').submit(function(event) {
     });
 });
 
-
 $('#infoModal').on('hidden.bs.modal', function () {
   $('#basicInfoContent').html('正在加载基础信息...');
   $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
@@ -1089,8 +1207,6 @@ $('#natModal').on('hidden.bs.modal', function () {
     setButtonProcessing($('#addNatButton'), false);
     $('#addNatButton').prop('disabled', false).text('添加规则');
 });
-
-
 </script>
 </body>
 </html>
