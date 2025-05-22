@@ -1,5 +1,10 @@
 # incus-api-web
 
+~~~
+v3:实现基础api功能
+~~~
+
+
 ## 安装Debian12安装incus
 ~~~
 curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/install_incus.sh | sudo bash
@@ -17,3 +22,19 @@ pip install flask
 python3 init_db.py
 python3 app.py
 ~~~
+
+## API端点表格
+| 功能 (Function)             | HTTP 方法 (HTTP Method) | URL 路径 (URL Path)                  | 请求体参数 (Request Body Parameters)           | 返回类型 (Return Type) | 示例 (Example)                                                                                   |
+|-------------------------------|-------------------------|--------------------------------------|----------------------------------------------|--------------------|------------------------------------------------------------------------------------------------|
+| 获取容器列表 (Web UI 使用)        | GET                     | `/`                                  | 无                                           | HTML               | (直接在浏览器中打开)                                                                               |
+| 获取单个容器信息 (Web UI 使用)    | GET                     | `/container/<name>/info`             | 无                                           | JSON               | `curl http://localhost:5000/container/mycontainer/info`                                        |
+| 创建容器 (Web UI 使用)          | POST                    | `/container/create`                  | `name=...&image=...`                         | JSON               | `curl -X POST -d "name=new-container&image=ubuntu/22.04" http://localhost:5000/container/create` |
+| 执行容器动作 (Web UI 使用)      | POST                    | `/container/<name>/action`           | `action=start\|stop\|restart\|delete`        | JSON               | `curl -X POST -d "action=start" http://localhost:5000/container/mycontainer/action`              |
+| 在容器内执行命令 (Web UI 使用)  | POST                    | `/container/<name>/exec`             | `command=...`                                | JSON               | `curl -X POST -d "command=ls%20-l%20/" http://localhost:5000/container/mycontainer/exec`       |
+| 添加 NAT 规则 (Web UI 使用)     | POST                    | `/container/<name>/add_nat_rule`     | `host_port=...&container_port=...&protocol=tcp\|udp` | JSON               | `curl -X POST -d "host_port=8080&container_port=80&protocol=tcp" http://localhost:5000/container/mycontainer/add_nat_rule` |
+| 列出容器的 NAT 规则 (Web UI 使用) | GET                     | `/container/<name>/nat_rules`        | 无                                           | JSON               | `curl http://localhost:5000/container/mycontainer/nat_rules`                                   |
+| 删除 NAT 规则 (Web UI 使用)     | DELETE                  | `/container/nat_rule/<rule_id>`      | 无                                           | JSON               | `curl -X DELETE http://localhost:5000/container/nat_rule/123`                                  |
+
+**关于 “获取容器列表” 的说明：**
+
+如原文所述，`/` 端点直接返回 HTML。如果需要一个纯 JSON API 来获取容器列表，建议添加一个新的路由或修改现有 `/` 的行为以根据 `Accept` 请求头返回 JSON。当前的表格反映了现有实现。
