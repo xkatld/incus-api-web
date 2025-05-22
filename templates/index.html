@@ -81,21 +81,29 @@
         .table-hover > tbody > tr:hover > * { background-color: rgba(26,115,232,.05); }
 
         .table th.col-name, .table td.col-name { width: 25%; }
+        .table td.col-name { cursor: pointer; }
         .table th.col-status, .table td.col-status { width: 10%; text-align: center;}
         .table th.col-ip, .table td.col-ip { width: 15%; }
         .table th.col-image, .table td.col-image { width: 20%; }
+        .table td.col-image { cursor: pointer; }
         .table th.col-created, .table td.col-created { width: 15%; }
         .table th.col-actions, .table td.col-actions {
             width: 15%;
             text-align: end;
             overflow: visible; 
         }
+        .table td.show-full-content {
+            overflow: visible !important;
+            white-space: normal !important;
+            text-overflow: clip !important;
+            word-break: break-all; 
+        }
+
 
         #loginFormContainer { 
             max-width: 400px; 
             margin-left: auto;
             margin-right: auto;
-            /* padding: 2rem 0; original padding */
         }
         #loginFormContainer .form-title { text-align: center; font-size: 1.75rem; color: #202124; margin-bottom: 1.5rem; }
 
@@ -281,14 +289,43 @@
             const containerIp = c.ip || '-';
             const containerImage = c.image_source || 'N/A';
 
-            tbody.append(`<tr>
-                <td class="col-name" title="${containerName}">${containerName}</td>
-                <td class="col-status"><span class="badge bg-${statusBadge}">${c.status}</span></td>
-                <td class="col-ip" title="${containerIp}">${containerIp}</td>
-                <td class="col-image" title="${containerImage}">${containerImage}</td>
-                <td class="col-created" title="${createdDate}">${createdDate}</td>
-                <td class="col-actions">${buildActionDropdown(c, i)}</td>
-            </tr>`);
+            const tr = $('<tr></tr>');
+
+            const nameTd = $(`<td class="col-name" title="${containerName}">${containerName}</td>`);
+            if (containerName) {
+                nameTd.on('click', function(e) {
+                    e.stopPropagation();
+                    const $thisCell = $(this);
+                    const currentlyExpanded = $thisCell.hasClass('show-full-content');
+                    $thisCell.closest('table').find('td.show-full-content').removeClass('show-full-content');
+                    if (!currentlyExpanded) {
+                        $thisCell.addClass('show-full-content');
+                    }
+                });
+            }
+            tr.append(nameTd);
+
+            tr.append(`<td class="col-status"><span class="badge bg-${statusBadge}">${c.status}</span></td>`);
+            tr.append(`<td class="col-ip" title="${containerIp}">${containerIp}</td>`);
+
+            const imageTd = $(`<td class="col-image" title="${containerImage}">${containerImage}</td>`);
+            if (containerImage) {
+                imageTd.on('click', function(e) {
+                    e.stopPropagation();
+                    const $thisCell = $(this);
+                    const currentlyExpanded = $thisCell.hasClass('show-full-content');
+                    $thisCell.closest('table').find('td.show-full-content').removeClass('show-full-content');
+                    if (!currentlyExpanded) {
+                        $thisCell.addClass('show-full-content');
+                    }
+                });
+            }
+            tr.append(imageTd);
+
+            tr.append(`<td class="col-created" title="${createdDate}">${createdDate}</td>`);
+            tr.append(`<td class="col-actions">${buildActionDropdown(c, i)}</td>`);
+
+            tbody.append(tr);
         });
     }
 
