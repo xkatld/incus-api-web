@@ -1,10 +1,16 @@
 import sqlite3
 import os
+import secrets
+import hashlib
 
 DATABASE_NAME = 'incus_manager.db'
 
+DEFAULT_ADMIN_USERNAME = os.environ.get('DEFAULT_ADMIN_USERNAME', 'admin')
+DEFAULT_ADMIN_PASSWORD = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'adminpassword')
+DEFAULT_API_SECRET_KEY = os.environ.get('DEFAULT_API_SECRET_KEY', secrets.token_hex(32))
+
+
 def create_tables():
-    """创建或检查数据库表"""
     conn = None
     try:
         db_exists = os.path.exists(DATABASE_NAME)
@@ -17,7 +23,7 @@ def create_tables():
             cursor.execute('''
             CREATE TABLE containers (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                incus_name TEXT UNIQUE NOT NULL, -- UNIQUE constraint is important for upserts
+                incus_name TEXT UNIQUE NOT NULL,
                 image_source TEXT,
                 status TEXT,
                 created_at TEXT,
@@ -27,7 +33,7 @@ def create_tables():
             conn.commit()
             print("表 'containers' 创建成功。")
         else:
-            print(f"数据库 {DATABASE_NAME} 和表 'containers' 已存在。")
+            print(f"数据库 {DATABASE_NAME} 和表 'containers' 已存在。检查结构...")
             cursor.execute("PRAGMA table_info(containers);")
             containers_columns = [info[1] for info in cursor.fetchall()]
             if 'last_synced' not in containers_columns:
@@ -62,15 +68,15 @@ def create_tables():
                 host_port INTEGER NOT NULL,
                 container_port INTEGER NOT NULL,
                 protocol TEXT NOT NULL CHECK (protocol IN ('tcp', 'udp')),
-                ip_at_creation TEXT NOT NULL, -- Store the container IP when the rule was added
+                ip_at_creation TEXT NOT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE (container_name, host_port, protocol) -- Prevent duplicate rules for the same host port/protocol
+                UNIQUE (container_name, host_port, protocol)
             )
             ''')
             conn.commit()
             print("表 'nat_rules' 创建成功。")
         else:
-            print("表 'nat_rules' 已存在。")
+            print("表 'nat_rules' 已存在。检查结构...")
             cursor.execute("PRAGMA table_info(nat_rules);")
             nat_columns = [info[1] for info in cursor.fetchall()]
             required_nat_cols = ['container_name', 'host_port', 'container_port', 'protocol', 'ip_at_creation']
@@ -100,6 +106,53 @@ def create_tables():
                          break
             if not unique_composite_index_exists:
                  print("警告：表 'nat_rules' 可能缺少 UNIQUE (container_name, host_port, protocol) 约束。这可能导致重复规则记录。建议手动检查或重建表。")
+
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings';")
+        if not cursor.fetchone():
+            print("表 'settings' 不存在，正在创建...")
+            cursor.execute('''
+            CREATE TABLE settings (
+                key TEXT UNIQUE NOT NULL,
+                value TEXT
+            )
+            ''')
+            conn.commit()
+            print("表 'settings' 创建成功。")
+
+        cursor.execute("SELECT COUNT(*) FROM settings;")
+        settings_count = cursor.fetchone()[0]
+
+        settings_to_insert = {}
+
+        cursor.execute("SELECT value FROM settings WHERE key = 'admin_username';")
+        if not cursor.fetchone():
+            settings_to_insert['admin_username'] = DEFAULT_ADMIN_USERNAME
+            print(f"设置 'admin_username' 不存在，将使用默认值: {DEFAULT_ADMIN_USERNAME}")
+
+        cursor.execute("SELECT value FROM settings WHERE key = 'admin_password_hash';")
+        if not cursor.fetchone():
+            password_hash = hashlib.sha256(DEFAULT_ADMIN_PASSWORD.encode('utf-8')).hexdigest()
+            settings_to_insert['admin_password_hash'] = password_hash
+            print(f"设置 'admin_password_hash' 不存在，将使用默认密码的哈希。默认密码明文: '{DEFAULT_ADMIN_PASSWORD}' -> 哈希: {password_hash}")
+
+        cursor.execute("SELECT value FROM settings WHERE key = 'api_key_hash';")
+        if not cursor.fetchone():
+            api_hash = hashlib.sha256(DEFAULT_API_SECRET_KEY.encode('utf-8')).hexdigest()
+            settings_to_insert['api_key_hash'] = api_hash
+            print(f"设置 'api_key_hash' 不存在，将使用默认API密钥的哈希。默认API密钥明文: '{DEFAULT_API_SECRET_KEY}' -> 哈希: {api_hash}")
+            print(f"请将此哈希值 ({api_hash}) 用作 API 请求头 'X-API-Key-Hash' 的值。")
+
+
+        if settings_to_insert:
+            print("正在插入/更新默认设置...")
+            for key, value in settings_to_insert.items():
+                 cursor.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (key, value))
+                 cursor.execute("UPDATE settings SET value = ? WHERE key = ?", (value, key))
+            conn.commit()
+            print(f"{len(settings_to_insert)} 个设置插入/更新完成。")
+        else:
+            print("所有基本设置键已存在。跳过默认值插入。")
 
 
     except sqlite3.Error as e:
