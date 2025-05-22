@@ -249,6 +249,23 @@
             .replace(/'/g, "'");
     }
 
+    function escapeJsString(unsafe) {
+        if (unsafe === null || typeof unsafe === 'undefined') {
+            return '';
+        }
+        return unsafe
+            .toString()
+            .replace(/\\/g, '\\\\')
+            .replace(/'/g, '\\\'')
+            .replace(/"/g, '\\"')
+            .replace(/\n/g, '\\n')
+            .replace(/\r/g, '\\r')
+            .replace(/\t/g, '\\t')
+            .replace(/\f/g, '\\f')
+            .replace(/\b/g, '\\b');
+    }
+
+
     function initContainersAndPagination(containersData) {
         allContainers = Array.isArray(containersData) ? containersData : [];
         currentPage = 1;
@@ -265,28 +282,36 @@
 
     function buildActionDropdown(c, indexSuffix, isMobile = false) {
         const dropdownId = `actionsDropdown${isMobile ? 'Mobile' : 'Desktop'}${indexSuffix}`;
+        const safeContainerName = escapeJsString(c.name);
+
         let actionsHtml = `<div class="dropdown">
             <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="${dropdownId}" data-bs-toggle="dropdown" aria-expanded="false">操作</button>
             <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="${dropdownId}">
-                <li><button class="dropdown-item" type="button" onclick="showInfo('${escapeHtml(c.name)}', this)">信息</button></li>`;
+                <li><button class="dropdown-item" type="button" onclick="showInfo('${safeContainerName}', this)">信息</button></li>`;
         if (c.status === 'Running') {
-            actionsHtml += `<li><button class="dropdown-item" onclick="performAction('${escapeHtml(c.name)}', 'stop', this)">停止</button></li>
-                            <li><button class="dropdown-item" onclick="performAction('${escapeHtml(c.name)}', 'restart', this)">重启</button></li>
-                            <li><button class="dropdown-item" onclick="openExecModal('${escapeHtml(c.name)}')">执行命令</button></li>
-                            <li><button class="dropdown-item" onclick="openNatModal('${escapeHtml(c.name)}')">添加NAT</button></li>`;
+            actionsHtml += `<li><button class="dropdown-item" onclick="performAction('${safeContainerName}', 'stop', this)">停止</button></li>
+                            <li><button class="dropdown-item" onclick="performAction('${safeContainerName}', 'restart', this)">重启</button></li>
+                            <li><button class="dropdown-item" onclick="openExecModal('${safeContainerName}')">执行命令</button></li>
+                            <li><button class="dropdown-item" onclick="openNatModal('${safeContainerName}')">添加NAT</button></li>`;
         } else if (c.status === 'Stopped') {
-            actionsHtml += `<li><button class="dropdown-item" onclick="performAction('${escapeHtml(c.name)}', 'start', this)">启动</button></li>`;
+            actionsHtml += `<li><button class="dropdown-item" onclick="performAction('${safeContainerName}', 'start', this)">启动</button></li>`;
         }
         actionsHtml += `<li><hr class="dropdown-divider"></li>
-                        <li><button class="dropdown-item text-danger" onclick="performAction('${escapeHtml(c.name)}', 'delete', this)">删除</button></li>
+                        <li><button class="dropdown-item text-danger" onclick="performAction('${safeContainerName}', 'delete', this)">删除</button></li>
             </ul></div>`;
         return actionsHtml;
     }
 
     function renderContainerListDesktop(containers, startIndex) {
         const tbody = $('#containerListDesktop').empty();
-        if (!allContainers.length) { tbody.html('<tr><td colspan="6" class="text-center py-4">没有找到容器。</td></tr>'); return; }
-        if (!containers.length) { tbody.html('<tr><td colspan="6" class="text-center py-4">当前页没有容器。</td></tr>'); return; }
+        if (!allContainers.length) {
+            tbody.html('<tr><td colspan="6" class="text-center py-4">没有找到容器。</td></tr>');
+            return;
+        }
+        if (!containers.length) {
+            tbody.html('<tr><td colspan="6" class="text-center py-4">当前页没有容器。</td></tr>');
+            return;
+        }
         containers.forEach((c, i) => {
             const statusBadge = c.status === 'Running' ? 'success' : c.status === 'Stopped' ? 'danger' : 'secondary';
             const displayName = escapeHtml(c.name);
@@ -307,8 +332,14 @@
 
     function renderContainerListMobile(containers, startIndex) {
         const mobileList = $('.container-list-mobile').empty();
-        if (!allContainers.length) { mobileList.html('<div class="alert alert-info text-center">没有找到容器。</div>'); return; }
-        if (!containers.length) { mobileList.html('<div class="alert alert-info text-center">当前页没有容器。</div>'); return; }
+        if (!allContainers.length) {
+            mobileList.html('<div class="alert alert-info text-center">没有找到容器。</div>');
+            return;
+        }
+        if (!containers.length) {
+            mobileList.html('<div class="alert alert-info text-center">当前页没有容器。</div>');
+            return;
+        }
         containers.forEach((c, i) => {
             const statusBadge = c.status === 'Running' ? 'success' : c.status === 'Stopped' ? 'danger' : 'secondary';
             mobileList.append(`<div class="card mb-3">
