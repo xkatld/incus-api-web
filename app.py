@@ -18,9 +18,8 @@ app.secret_key = os.environ.get('SECRET_KEY', secrets.token_hex(16))
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD', 'adminpassword')
 API_SECRET_KEY = os.environ.get('API_SECRET_KEY', secrets.token_hex(32))
-API_SECRET_HASH = hashlib.sha256(API_SECRET_KEY.encode('utf-8')).hexdigest()
 
-DATABASE_NAME = 'incus_manager.db'
+TIMESTAMP_TOLERANCE = 300
 
 def login_required(f):
     @wraps(f)
@@ -30,26 +29,44 @@ def login_required(f):
         return f(*args, **kwargs)
     return decorated_function
 
-def verify_api_hash():
-    api_hash = request.headers.get('X-API-Hash')
-    if not api_hash:
+def verify_api_signature():
+    timestamp_str = request.headers.get('X-API-Timestamp')
+    signature = request.headers.get('X-API-Signature')
+
+    if not timestamp_str or not signature:
+        app.logger.warning(f"API签名验证失败: 缺少时间戳或签名头 from {request.remote_addr}")
         return False
+
     try:
-         client_hash = api_hash
-         if client_hash == API_SECRET_HASH:
-             return True
-         else:
-             app.logger.warning(f"API Hash mismatch attempt from {request.remote_addr}")
-             return False
+        timestamp = int(timestamp_str)
+    except ValueError:
+        app.logger.warning(f"API签名验证失败: 无效的时间戳格式 '{timestamp_str}' from {request.remote_addr}")
+        return False
+
+    current_time = int(time.time())
+    if abs(current_time - timestamp) > TIMESTAMP_TOLERANCE:
+        app.logger.warning(f"API签名验证失败: 时间戳超出容忍范围 (客户端: {timestamp}, 服务器: {current_time}) from {request.remote_addr}")
+        return False
+
+    try:
+        expected_signature = hashlib.sha256((API_SECRET_KEY + timestamp_str).encode('utf-8')).hexdigest()
+        if signature == expected_signature:
+            app.logger.debug(f"API签名验证成功 from {request.remote_addr}")
+            return True
+        else:
+            app.logger.warning(f"API签名验证失败: 签名不匹配 (客户端: {signature}, 期望: {expected_signature}) from {request.remote_addr}")
+            return False
     except Exception as e:
-         app.logger.error(f"API hash verification encountered exception: {e}")
-         return False
+        app.logger.error(f"API签名验证发生异常: {e} from {request.remote_addr}")
+        return False
 
 def web_or_api_authentication_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         is_authenticated_via_session = session.get('logged_in') is True
-        is_authenticated_via_api = verify_api_hash()
+        is_authenticated_via_api = False
+        if request.headers.get('X-API-Timestamp') or request.headers.get('X-API-Signature'):
+             is_authenticated_via_api = verify_api_signature()
 
         if is_authenticated_via_session or is_authenticated_via_api:
             return f(*args, **kwargs)
@@ -484,11 +501,11 @@ def index():
                 if not image_source:
                      image_alias = item_config.get('image.alias')
                      if image_alias:
-                         image_source = f"Alias: {image_alias}"
+                         image_source = f"别名: {image_alias}"
                      else:
                          image_fingerprint = item_config.get('image.fingerprint')
                          if image_fingerprint and isinstance(image_fingerprint, str):
-                              image_source = f"Fingerprint: {image_fingerprint[:12]}"
+                              image_source = f"指纹: {image_fingerprint[:12]}"
                 if not image_source:
                      image_source = 'N/A'
 
@@ -970,7 +987,7 @@ def main():
 
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='nat_rules';")
         if not cursor.fetchone():
-             print(f"错误：数据库表 'nat_rules' 在 '{DATABASE_NAME}' 中未找到。")
+             print(f"错误：数据库表 'nat_rules'在 '{DATABASE_NAME}'中未找到。")
              print("请确保 'python init_db.py' 已成功运行并创建了表结构，包含 'nat_rules' 表。")
              sys.exit(1)
 
