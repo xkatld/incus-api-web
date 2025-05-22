@@ -100,12 +100,26 @@
             margin-left: auto;
          }
 
+         /* Login Form Styling */
+         #loginContainer {
+             max-width: 400px;
+             margin: 50px auto;
+             padding: 20px;
+             border: 1px solid #ccc;
+             border-radius: 8px;
+             background-color: #f9f9f9;
+         }
 
     </style>
 </head>
 <body>
+    {% if session.logged_in %}
     <div class="container">
-        <h1>Incus Web 管理器</h1>
+        <div class="d-flex justify-content-between align-items-center mb-4">
+             <h1>Incus Web 管理器</h1>
+             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">退出登录</a>
+        </div>
+
 
         {% if incus_error[0] %}
         <div class="alert alert-danger" role="alert">
@@ -131,6 +145,9 @@
                                 <option value="{{ image.name }}">{{ image.description }}</option>
                                 {% endfor %}
                             </select>
+                             {% if image_error[0] %}
+                             <div class="form-text text-danger">{{ image_error[1] }}</div>
+                             {% endif %}
                         </div>
                         <div class="col-md-2 align-self-end">
                             <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
@@ -220,6 +237,31 @@
 
          <button class="btn btn-secondary mt-3" onclick="location.reload()">刷新列表</button>
     </div>
+    {% else %}
+    <div class="container">
+        <div id="loginContainer">
+             <h2 class="text-center mb-4">管理员登录</h2>
+             <form method="POST" action="{{ url_for('login') }}">
+                 <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
+                 <div class="mb-3">
+                    <label for="username" class="form-label">用户名</label>
+                    <input type="text" class="form-control" id="username" name="username" required autofocus>
+                 </div>
+                  <div class="mb-3">
+                    <label for="password" class="form-label">密码</label>
+                    <input type="password" class="form-control" id="password" name="password" required>
+                 </div>
+                 {% if login_error %}
+                 <div class="alert alert-danger" role="alert">
+                     {{ login_error }}
+                 </div>
+                 {% endif %}
+                 <button type="submit" class="btn btn-primary w-100">登录</button>
+             </form>
+        </div>
+    </div>
+    {% endif %}
+
 
     <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer">
     </div>
@@ -381,6 +423,9 @@ function setButtonProcessing(button, isProcessing) {
              $button.html($button.data('original-html'));
              $button.data('original-html', null);
              $button.removeClass('btn-processing').prop('disabled', false);
+        } else {
+             // If original-html wasn't set (e.g., error happened before processing state was set), just re-enable and remove class
+             $button.removeClass('btn-processing').prop('disabled', false);
         }
     }
 }
@@ -427,7 +472,7 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
 
     modalBody.html(message);
     confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text(buttonText);
-    setButtonProcessing(confirmButton, false);
+    setButtonProcessing(confirmButton, false); // Reset confirm button state
 
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
     confirmModal.show();
@@ -447,7 +492,7 @@ $('#confirmActionButton').click(function() {
     }
 
     setButtonProcessing(confirmButton, true);
-     if (actionType !== 'delete_nat_rule') {
+     if (actionType !== 'delete_nat_rule') { // Only set processing on the original action button for container actions
         setButtonProcessing(buttonElement, true);
      }
 
@@ -457,46 +502,60 @@ $('#confirmActionButton').click(function() {
         $.ajax({
             url: `/container/nat_rule/${ruleId}`,
             type: 'DELETE',
+            headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash for API calls
             success: function(data) {
                 showToast(data.message, data.status);
                 if (data.status === 'success' || data.status === 'warning') {
                     const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', '');
                     if (containerNameInModalLabel) {
-                        loadNatRules(containerNameInModalLabel);
+                        loadNatRules(containerNameInModalLabel); // Reload NAT rules in the info modal
                     } else {
+                         // If info modal is not open, maybe reload the page after a short delay
                          setTimeout(() => location.reload(), 1000);
                     }
                 }
             },
             error: function(jqXHR) {
-                const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `删除 NAT 规则请求失败。`;
-                showToast("操作失败: " + message, 'danger');
+                // Check for 401 Unauthorized
+                if (jqXHR.status === 401) {
+                    showToast("操作需要认证，请重新登录。", 'danger');
+                    setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+                } else {
+                    const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `删除 NAT 规则请求失败。`;
+                    showToast("操作失败: " + message, 'danger');
+                }
             },
             complete: function() {
                 const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
                 if (confirmModal) confirmModal.hide();
                 setButtonProcessing(buttonElement, false);
+                setButtonProcessing(confirmButton, false); // Ensure confirm button resets
             }
         });
 
-    } else {
+    } else { // Container actions (start, stop, restart, delete)
         const containerName = currentConfirmContainerName;
         let action = actionType.replace('_container', '');
 
         $.post(`/container/${containerName}/action`, { action: action }, function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
-                 setTimeout(() => location.reload(), 1000);
-            } else {
-                setButtonProcessing(buttonElement, false);
+                 setTimeout(() => location.reload(), 1000); // Reload page on success to update list
             }
         }).fail(function(jqXHR) {
-             const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
-             showToast("操作失败: " + message, 'danger');
-             setButtonProcessing(buttonElement, false);
+             // Check for 401 Unauthorized
+             if (jqXHR.status === 401) {
+                showToast("操作需要认证，请重新登录。", 'danger');
+                setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
+                showToast("操作失败: " + message, 'danger');
+                setButtonProcessing(buttonElement, false); // Only reset button if not reloading
+             }
         }).always(function() {
             const confirmModal = bootstrap.Modal.getInstance(document.getElementById('confirmModal'));
             if (confirmModal) confirmModal.hide();
+             setButtonProcessing(confirmButton, false); // Ensure confirm button resets
         });
     }
 });
@@ -505,10 +564,7 @@ $('#confirmModal').on('hidden.bs.modal', function () {
     currentConfirmAction = null;
     currentConfirmContainerName = null;
     currentConfirmRuleId = null;
-    currentConfirmButtonElement = null;
-    const confirmButton = $('#confirmActionButton');
-    confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass('btn-primary').text('确认');
-    setButtonProcessing(confirmButton, false);
+    // Don't reset currentConfirmButtonElement here, it's needed in the .always() callback
 });
 
 
@@ -519,17 +575,30 @@ $('#createContainerForm').submit(function(event) {
     setButtonProcessing(submitButton, true);
 
     var formData = form.serialize();
-    $.post("{{ url_for('create_container') }}", formData, function(data) {
-        showToast(data.message, data.status);
-        if (data.status === 'success') {
-            form[0].reset();
-             setTimeout(() => location.reload(), 1000);
+    $.ajax({
+        url: "{{ url_for('create_container') }}",
+        type: "POST",
+        data: formData,
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        success: function(data) {
+            showToast(data.message, data.status);
+            if (data.status === 'success') {
+                form[0].reset();
+                 setTimeout(() => location.reload(), 1000); // Reload page on success
+            }
+        },
+        error: function(jqXHR) {
+             if (jqXHR.status === 401) {
+                showToast("操作需要认证，请重新登录。", 'danger');
+                setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "创建容器请求失败。";
+                showToast("错误: " + message, 'danger');
+             }
+        },
+        complete: function() {
+            setButtonProcessing(submitButton, false);
         }
-    }).fail(function(jqXHR) {
-        const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "创建容器请求失败。";
-        showToast("错误: " + message, 'danger');
-    }).always(function() {
-        setButtonProcessing(submitButton, false);
     });
 });
 
@@ -546,17 +615,29 @@ function performAction(containerName, action, buttonElement) {
 
     setButtonProcessing(buttonElement, true);
 
-    $.post(`/container/${containerName}/action`, { action: action }, function(data) {
-        showToast(data.message, data.status);
-        if (data.status === 'success') {
-             setTimeout(() => location.reload(), 1000);
-        } else {
-             setButtonProcessing(buttonElement, false);
+    $.ajax({
+        url: `/container/${containerName}/action`,
+        type: "POST",
+        data: { action: action },
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        success: function(data) {
+            showToast(data.message, data.status);
+            if (data.status === 'success') {
+                 setTimeout(() => location.reload(), 1000); // Reload page on success
+            } else {
+                 setButtonProcessing(buttonElement, false); // Reset button if not reloading
+            }
+        },
+        error: function(jqXHR) {
+             if (jqXHR.status === 401) {
+                showToast("操作需要认证，请重新登录。", 'danger');
+                setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
+                showToast("操作失败: " + message, 'danger');
+                setButtonProcessing(buttonElement, false); // Reset button on failure
+             }
         }
-    }).fail(function(jqXHR) {
-         const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
-         showToast("操作失败: " + message, 'danger');
-         setButtonProcessing(buttonElement, false);
     });
 }
 
@@ -579,48 +660,58 @@ function showInfo(containerName, buttonElement) {
 
     setButtonProcessing(buttonElement, true);
 
-    $.get(`/container/${containerName}/info`, function(data) {
-        if (data.status === 'NotFound') {
-             basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
-             infoError.removeClass('d-none').text(data.message);
-             showToast("加载容器信息失败。", 'danger');
-             setButtonProcessing(buttonElement, false);
-             infoModal.show();
-             natRulesListContainer.hide();
-             return;
+    $.ajax({
+        url: `/container/${containerName}/info`,
+        type: "GET",
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        success: function(data) {
+             if (data.status === 'NotFound') {
+                 basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
+                 infoError.removeClass('d-none').text(data.message);
+                 showToast("加载容器信息失败。", 'danger');
+                 natRulesListContainer.hide();
+                 return; // Stop here if container not found
+            }
+
+            let infoHtml = `
+                <p><strong>名称:</strong> ${data.name}</p>
+                <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p>
+                <p><strong>IP 地址:</strong> ${data.ip && data.ip !== 'N/A' ? data.ip : '-'}</p>
+                <p><strong>镜像来源/描述:</strong> ${data.description && data.description !== 'N/A' ? data.description : data.image_source && data.image_source !== 'N/A' ? data.image_source : 'N/A'}</p>
+                <p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p>
+                <p><strong>架构:</strong> ${data.architecture && data.architecture !== 'N/A' ? data.architecture : 'N/A'}</p>
+                <p><strong>类型:</strong> ${data.type}</p>
+                 <p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p>
+                <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
+                 <p><small>${data.message}</small></p>
+            `;
+
+            basicInfoContent.html(infoHtml);
+
+            if (!data.live_data_available && data.status !== 'NotFound') {
+                 showToast(data.message, 'warning');
+            }
+
+            loadNatRules(containerName); // Load NAT rules after basic info is loaded
+
+        },
+        error: function(jqXHR) {
+             if (jqXHR.status === 401) {
+                showToast("操作需要认证，请重新登录。", 'danger');
+                setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
+                basicInfoContent.html(`<strong>错误:</strong> ${message}`);
+                infoError.removeClass('d-none').text(message);
+                natRulesContent.html('<li>无法加载 NAT 规则。</li>'); // Also show error for NAT rules loading
+                natRulesListContainer.hide(); // Hide NAT rules section if info failed
+                showToast("加载容器信息失败。", 'danger');
+             }
+        },
+        complete: function() {
+            setButtonProcessing(buttonElement, false);
+            infoModal.show(); // Show modal regardless of success/failure, content will indicate error
         }
-
-        let infoHtml = `
-            <p><strong>名称:</strong> ${data.name}</p>
-            <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p>
-            <p><strong>IP 地址:</strong> ${data.ip && data.ip !== 'N/A' ? data.ip : '-'}</p>
-            <p><strong>镜像来源/描述:</strong> ${data.description && data.description !== 'N/A' ? data.description : data.image_source && data.image_source !== 'N/A' ? data.image_source : 'N/A'}</p>
-            <p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p>
-            <p><strong>架构:</strong> ${data.architecture && data.architecture !== 'N/A' ? data.architecture : 'N/A'}</p>
-            <p><strong>类型:</strong> ${data.type}</p>
-             <p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p>
-            <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
-             <p><small>${data.message}</small></p>
-        `;
-
-        basicInfoContent.html(infoHtml);
-
-        if (!data.live_data_available && data.status !== 'NotFound') {
-             showToast(data.message, 'warning');
-        }
-
-        loadNatRules(containerName);
-
-    }).fail(function(jqXHR) {
-         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载详细信息。";
-         basicInfoContent.html(`<strong>错误:</strong> ${message}`);
-         infoError.removeClass('d-none').text(message);
-         natRulesContent.html('<li>无法加载 NAT 规则。</li>');
-         showToast("加载容器信息失败。", 'danger');
-         natRulesListContainer.hide();
-    }).always(function() {
-        setButtonProcessing(buttonElement, false);
-        infoModal.show();
     });
 }
 
@@ -630,38 +721,53 @@ function loadNatRules(containerName) {
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
 
-     $.get(`/container/${containerName}/nat_rules`, function(data) {
-        natRulesContent.empty();
+     $.ajax({
+        url: `/container/${containerName}/nat_rules`,
+        type: "GET",
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        success: function(data) {
+            natRulesContent.empty();
 
-        if (data.status === 'success' && data.rules && data.rules.length > 0) {
-            data.rules.forEach(rule => {
-                const ruleHtml = `
-                    <li data-rule-id="${rule.id}">
-                        <span class="rule-details">
-                            <strong>ID ${rule.id}:</strong> 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}
-                            <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
-                        </span>
-                        <span class="rule-actions">
-                             <button class="btn btn-sm btn-danger" onclick="deleteNatRule(${rule.id}, this)">删除</button>
-                        </span>
-                    </li>
-                `;
-                natRulesContent.append(ruleHtml);
-            });
-        } else if (data.status === 'success' && data.rules && data.rules.length === 0) {
-            natRulesContent.html('<li>没有通过本应用添加的 NAT 规则记录。</li>');
-        } else {
-             natRulesContent.html('<li>加载 NAT 规则失败。</li>');
-             natRulesError.removeClass('d-none').text(data.message || '未知错误获取规则列表。');
-             showToast(data.message || "加载 NAT 规则失败。", 'danger');
+            if (data.status === 'success' && data.rules && data.rules.length > 0) {
+                data.rules.forEach(rule => {
+                    const ruleHtml = `
+                        <li data-rule-id="${rule.id}">
+                            <span class="rule-details">
+                                <strong>ID ${rule.id}:</strong> 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}
+                                <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
+                            </span>
+                            <span class="rule-actions">
+                                 <button class="btn btn-sm btn-danger" onclick="deleteNatRule(${rule.id}, this)">删除</button>
+                            </span>
+                        </li>
+                    `;
+                    natRulesContent.append(ruleHtml);
+                });
+            } else if (data.status === 'success' && data.rules && data.rules.length === 0) {
+                natRulesContent.html('<li>没有通过本应用添加的 NAT 规则记录。</li>');
+            } else {
+                 natRulesContent.html('<li>加载 NAT 规则失败。</li>');
+                 natRulesError.removeClass('d-none').text(data.message || '未知错误获取规则列表。');
+                 showToast(data.message || "加载 NAT 规则失败。", 'danger');
+            }
+        },
+        error: function(jqXHR) {
+             if (jqXHR.status === 401) {
+                // If loading NAT rules within the Info modal gets 401, the session likely expired
+                // This is less likely if the main page loaded correctly, but handle defensively.
+                showToast("加载 NAT 规则需要认证，请重新登录。", 'danger');
+                // Redirecting here might interrupt the info modal, but it's necessary for security
+                setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                 const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载 NAT 规则。";
+                 natRulesContent.html('<li>加载 NAT 规则失败。</li>');
+                 natRulesError.removeClass('d-none').text(message);
+                 showToast(message, 'danger');
+             }
         }
-    }).fail(function(jqXHR) {
-         const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败，无法加载 NAT 规则。";
-         natRulesContent.html('<li>加载 NAT 规则失败。</li>');
-         natRulesError.removeClass('d-none').text(message);
-         showToast(message, 'danger');
     });
 }
+
 
 function deleteNatRule(ruleId, buttonElement) {
     showConfirmationModal('delete_nat_rule', ruleId, buttonElement);
@@ -698,23 +804,36 @@ $('#execCommandForm').submit(function(event) {
 
     setButtonProcessing(submitButton, true);
 
-    $.post(`/container/${containerName}/exec`, { command: command }, function(data) {
-        if (data.status === 'success') {
-            outputArea.text(data.output);
-            outputArea.addClass('success');
-            showToast("命令执行成功。", 'success');
-        } else {
-            outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出'));
-            outputArea.addClass('error');
-            showToast(data.message || "命令执行失败。", 'danger');
+    $.ajax({
+        url: `/container/${containerName}/exec`,
+        type: "POST",
+        data: { command: command },
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        success: function(data) {
+            if (data.status === 'success') {
+                outputArea.text(data.output);
+                outputArea.addClass('success');
+                showToast("命令执行成功。", 'success');
+            } else {
+                outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出'));
+                outputArea.addClass('error');
+                showToast(data.message || "命令执行失败。", 'danger');
+            }
+        },
+        error: function(jqXHR) {
+             if (jqXHR.status === 401) {
+                showToast("操作需要认证，请重新登录。", 'danger');
+                setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "执行命令请求失败。";
+                outputArea.text("请求失败:\n" + message);
+                outputArea.addClass('error');
+                showToast("请求失败。", 'danger');
+             }
+        },
+        complete: function() {
+            setButtonProcessing(submitButton, false);
         }
-    }).fail(function(jqXHR) {
-        const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "执行命令请求失败。";
-        outputArea.text("请求失败:\n" + message);
-        outputArea.addClass('error');
-        showToast("请求失败。", 'danger');
-    }).always(function() {
-        setButtonProcessing(submitButton, false);
     });
 });
 
@@ -730,20 +849,35 @@ function openNatModal(containerName) {
     var natModal = new bootstrap.Modal(document.getElementById('natModal'));
     natModal.show();
 
-    $.get(`/container/${containerName}/info`, function(data) {
-         if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
-             const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
-             $('#natContainerIP').val('获取 IP 失败: ' + (data.ip && data.ip === 'N/A' ? '未分配 IP' : data.status !== 'Running' ? '容器未运行' : ipError));
-             $('#addNatButton').prop('disabled', true).text('无法添加 (无IP)');
-             showToast("无法添加 NAT 规则: " + (data.status !== 'Running' ? '容器未运行' : '无法获取IP'), 'warning');
-         } else {
-            $('#natContainerIP').val(data.ip);
-            $('#addNatButton').prop('disabled', false).text('添加规则');
-         }
-    }).fail(function() {
-         $('#natContainerIP').val('获取 IP 失败');
-         $('#addNatButton').prop('disabled', true).text('无法添加 (无IP)');
-         showToast("获取容器 IP 地址失败，无法添加 NAT 规则。", 'danger');
+    $.ajax({
+        url: `/container/${containerName}/info`,
+        type: "GET",
+        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        success: function(data) {
+             if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
+                 const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
+                 $('#natContainerIP').val('获取 IP 失败: ' + (data.ip && data.ip === 'N/A' ? '未分配 IP' : data.status !== 'Running' ? '容器未运行' : ipError));
+                 $('#addNatButton').prop('disabled', true).text('无法添加 (无IP)');
+                 showToast("无法添加 NAT 规则: " + (data.status !== 'Running' ? '容器未运行' : '无法获取IP'), 'warning');
+             } else {
+                $('#natContainerIP').val(data.ip);
+                $('#addNatButton').prop('disabled', false).text('添加规则');
+             }
+        },
+        error: function(jqXHR) {
+             if (jqXHR.status === 401) {
+                 showToast("获取容器信息需要认证，请重新登录。", 'danger');
+                 // Close NAT modal before redirecting
+                 var natModalInstance = bootstrap.Modal.getInstance(document.getElementById('natModal'));
+                 if (natModalInstance) natModalInstance.hide();
+                 setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                 $('#natContainerIP').val('获取 IP 失败');
+                 $('#addNatButton').prop('disabled', true).text('无法添加 (无IP)');
+                 const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "获取容器 IP 地址失败。";
+                 showToast(message, 'danger');
+             }
+        }
     });
 
 }
@@ -765,41 +899,59 @@ $('#addNatForm').submit(function(event) {
 
     setButtonProcessing(submitButton, true);
 
-    $.post(`/container/${containerName}/add_nat_rule`, {
-        host_port: hostPort,
-        container_port: containerPort,
-        protocol: protocol
-    }, function(data) {
-        showToast(data.message, data.status);
+    $.ajax({
+        url: `/container/${containerName}/add_nat_rule`,
+        type: "POST",
+        data: {
+            host_port: hostPort,
+            container_port: containerPort,
+            protocol: protocol
+        },
+         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' }, // Include API Hash
+        success: function(data) {
+            showToast(data.message, data.status);
 
-        if (data.status === 'success' || data.status === 'warning') {
-             const containerNameInInfoModal = $('#infoModalLabel').text().replace('容器信息: ', '');
-             if (containerNameInInfoModal === containerName) {
-                 loadNatRules(containerName);
+            if (data.status === 'success' || data.status === 'warning') {
+                 const containerNameInInfoModal = $('#infoModalLabel').text().replace('容器信息: ', '');
+                 if (containerNameInInfoModal === containerName) {
+                     loadNatRules(containerName); // Reload NAT rules in the info modal if open
+                 }
+
+                 if (data.status === 'success') {
+                     // Clear form fields on successful add
+                     $('#hostPort').val('');
+                     $('#containerPort').val('');
+                     $('#protocol').val('tcp');
+                 }
+            }
+        },
+        error: function(jqXHR) {
+            if (jqXHR.status === 401) {
+                 showToast("操作需要认证，请重新登录。", 'danger');
+                 // Close NAT modal before redirecting
+                 var natModalInstance = bootstrap.Modal.getInstance(document.getElementById('natModal'));
+                 if (natModalInstance) natModalInstance.hide();
+                 setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
+             } else {
+                const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "添加 NAT 规则请求失败。";
+                showToast(message, 'danger');
              }
-
-             if (data.status === 'success') {
-                 $('#hostPort').val('');
-                 $('#containerPort').val('');
-                 $('#protocol').val('tcp');
-             }
-
+        },
+        complete: function() {
+            setButtonProcessing(submitButton, false);
         }
-    }).fail(function(jqXHR) {
-        const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "添加 NAT 规则请求失败。";
-        showToast("请求失败。", 'danger');
-    }).always(function() {
-        setButtonProcessing(submitButton, false);
     });
 });
 
+
+// --- Modal Reset Logic ---
 $('#infoModal').on('hidden.bs.modal', function () {
   $('#basicInfoContent').html('正在加载基础信息...');
   $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
   $('#natRulesError').addClass('d-none').text('');
   $('#infoError').addClass('d-none').text('');
   $('#infoModalLabel').text('容器信息');
-   $('#natRulesList').hide();
+   $('#natRulesList').hide(); // Hide the NAT rules section when modal is closed
 });
 
 $('#execModal').on('hidden.bs.modal', function () {
@@ -819,7 +971,7 @@ $('#natModal').on('hidden.bs.modal', function () {
     $('#protocol').val('tcp');
     $('#natModalLabel').text('为容器添加 NAT 规则');
     setButtonProcessing($('#addNatButton'), false);
-     $('#addNatButton').prop('disabled', false).text('添加规则');
+    $('#addNatButton').prop('disabled', false).text('添加规则'); // Ensure button is re-enabled if closed before IP check finishes
 });
 
 
