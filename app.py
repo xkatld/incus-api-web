@@ -637,7 +637,8 @@ def index():
                            containers=listed_containers,
                            images=available_images,
                            incus_error=(incus_error, incus_error_message),
-                           image_error=(image_error, image_error_message))
+                           image_error=(image_error, image_error_message),
+                           API_SECRET_HASH=SETTINGS.get('api_key_hash', ''))
 
 
 @app.route('/container/create', methods=['POST'])
@@ -645,6 +646,7 @@ def index():
 def create_container():
     name = request.form.get('name')
     image = request.form.get('image')
+
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
 
@@ -653,14 +655,49 @@ def create_container():
         app.logger.warning(f"Attempted to create container {name} which already exists in DB.")
         return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器在数据库中已存在记录。请尝试刷新列表或使用其他名称。'}), 409
 
+    limits_cpu = request.form.get('limits_cpu')
+    limits_cpu_allowance = request.form.get('limits_cpu_allowance')
+    limits_memory = request.form.get('limits_memory')
+    limits_memory_swap = request.form.get('limits_memory_swap') 
+    limits_memory_swap_priority = request.form.get('limits_memory_swap_priority')
+    root_disk_size = request.form.get('root_disk_size')
+    limits_ingress = request.form.get('limits_ingress')
+    limits_egress = request.form.get('limits_egress')
 
-    success, output = run_incus_command(['launch', image, name], parse_json=False, timeout=120)
+    launch_command = ['incus', 'launch', image, name]
+    config_options = []
+    device_options = []
+
+    if limits_cpu:
+        config_options.extend(['-c', f'limits.cpu={limits_cpu}'])
+    if limits_cpu_allowance:
+        config_options.extend(['-c', f'limits.cpu.allowance={limits_cpu_allowance}'])
+    if limits_memory:
+        config_options.extend(['-c', f'limits.memory={limits_memory}'])
+
+    if limits_memory_swap == 'true':
+        config_options.extend(['-c', 'limits.memory.swap=true'])
+        if limits_memory_swap_priority:
+            config_options.extend(['-c', f'limits.memory.swap.priority={limits_memory_swap_priority}'])
+    else:
+        config_options.extend(['-c', 'limits.memory.swap=false'])
+
+
+    if root_disk_size:
+        device_options.extend(['-d', f'root,size={root_disk_size}'])
+    if limits_ingress:
+        config_options.extend(['-c', f'limits.ingress={limits_ingress}'])
+    if limits_egress:
+        config_options.extend(['-c', f'limits.egress={limits_egress}'])
+
+    launch_command.extend(config_options)
+    launch_command.extend(device_options)
+
+    success, output = run_command(launch_command, parse_json=False, timeout=180)
 
     if success:
         time.sleep(5)
-
         _, list_output = run_incus_command(['list', name, '--format', 'json'])
-
         created_at = None
         image_source_desc = image
         status_val = 'Pending'
@@ -677,7 +714,6 @@ def create_container():
         else:
              app.logger.warning(f"Failed to get list info for new container {name} after launch. list output: {list_output}")
         sync_container_to_db(name, image_source_desc, status_val, created_at)
-
         return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。状态将很快同步。'}), 200
     else:
         app.logger.error(f"Failed to launch container {name}: {output}")
