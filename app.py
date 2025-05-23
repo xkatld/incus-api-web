@@ -668,8 +668,6 @@ def create_container():
     storage_pool = request.form.get('storage_pool')
     swap_mb = request.form.get('swap_mb')
     egress_mbit = request.form.get('egress_mbit')
-    ingress_mbit = request.form.get('ingress_mbit')
-    nesting = request.form.get('nesting')
 
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
@@ -697,10 +695,8 @@ def create_container():
             command.extend(['-c', f'limits.swap={swap_mb}MB'])
         if egress_mbit and int(egress_mbit) > 0:
             command.extend(['-c', f'limits.egress={egress_mbit}Mbit'])
-        if ingress_mbit and int(ingress_mbit) > 0:
-            command.extend(['-c', f'limits.ingress={ingress_mbit}Mbit'])
-        if nesting == 'on':
-            command.extend(['-c', 'security.nesting=true'])
+
+        command.extend(['-c', 'security.nesting=true'])
 
     except ValueError:
         return jsonify({'status': 'error', 'message': '资源限制参数必须是有效的数字。'}), 400
