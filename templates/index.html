@@ -13,167 +13,43 @@
         #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
         #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
         #infoContent { background-color: #fff; border: none; padding: 0; }
-        .btn-processing {
-            pointer-events: none;
-            opacity: 0.7;
-        }
-        .btn-processing .spinner-border {
-             margin-right: 5px;
-        }
-        #toastContainer {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1050;
-        }
+        .btn-processing { pointer-events: none; opacity: 0.7; }
+        .btn-processing .spinner-border { margin-right: 5px; }
+        #toastContainer { position: fixed; top: 20px; right: 20px; z-index: 1050; }
         .modal { z-index: 1050; }
         .modal-backdrop { z-index: 1049; }
         @media (min-width: 768px) {
-             .container-list-mobile {
-                display: none;
-             }
-             .container-list-desktop {
-                 display: block;
-             }
+             .container-list-mobile { display: none; }
+             .container-list-desktop { display: block; }
         }
-         .container-list-mobile {
-            display: block;
-         }
-         .container-list-mobile .card-actions {
-            margin-top: 1rem;
-         }
-          .container-list-mobile .card-text small {
-            font-weight: bold;
-            margin-right: 5px;
-          }
-         .container-list-mobile .card-title {
-             word-break: break-word;
-         }
-        #natRulesList {
-            margin-top: 15px;
-            border-top: 1px solid #eee;
-            padding-top: 15px;
-        }
-        #natRulesList h6 {
-            margin-bottom: 10px;
-        }
-        #natRulesList ul {
-            list-style: none;
-            padding: 0;
-        }
-        #natRulesList li {
-            background-color: #f9f9f9;
-            border: 1px solid #eee;
-            margin-bottom: 8px;
-            padding: 10px;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        #natRulesList li .rule-details {
-            flex-grow: 1;
-            margin-right: 10px;
-            word-break: break-word;
-        }
-         #natRulesList li .rule-actions {
-            flex-shrink: 0;
-            margin-left: auto;
-         }
-        #loginContainer {
-            max-width: 400px;
-            width: 100%;
-            padding: 20px;
-        }
-        .main-content-wrapper {
-            min-height: calc(100vh - 56px - 48px);
-        }
-        .create-container-card {
-            background-color: transparent !important;
-            border: 1px solid #dee2e6 !important;
-        }
-        .create-container-card .card-header {
-            background-color: transparent !important;
-            border-bottom: 1px solid #dee2e6 !important;
-            color: inherit !important;
-            font-weight: bold;
-        }
-        .truncate-text {
-            max-width: 100%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: inline-block;
-            vertical-align: middle;
-        }
-        .actions-dropdown .dropdown-menu {
-            min-width: auto;
-        }
-        .actions-dropdown .dropdown-item {
-            padding: .25rem 1rem;
-        }
-
-        .custom-container-list-row {
-            display: flex;
-            align-items: center;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #eee;
-        }
-        .custom-container-list-row:last-child {
-            border-bottom: none;
-        }
-
-        .custom-container-list-header {
-            display: flex;
-            align-items: center;
-            font-weight: bold;
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-            padding: 0.5rem 0;
-        }
-
-        .custom-col {
-            padding: 0 0.75rem;
-            box-sizing: border-box;
-            word-break: break-word;
-        }
-
-        .custom-col-name {
-            flex: 1;
-            min-width: 90px;
-        }
-
-        .custom-col-status {
-            flex: 2;
-            min-width: 80px;
-            text-align: center;
-        }
-        .custom-col-status .badge {
-            display: inline-block;
-        }
-
-        .custom-col-ip {
-            flex: 2;
-            min-width: 120px;
-        }
-
-        .custom-col-image {
-            flex: 3;
-            min-width: 180px;
-        }
-
-        .custom-col-created {
-            flex: 2;
-            min-width: 120px;
-        }
-
-        .custom-col-actions {
-            flex: 1;
-            min-width: 80px;
-            text-align: center;
-        }
-
+         .container-list-mobile { display: block; }
+         .container-list-mobile .card-actions { margin-top: 1rem; }
+          .container-list-mobile .card-text small { font-weight: bold; margin-right: 5px; }
+         .container-list-mobile .card-title { word-break: break-word; }
+        #natRulesList { margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
+        #natRulesList h6 { margin-bottom: 10px; }
+        #natRulesList ul { list-style: none; padding: 0; }
+        #natRulesList li { background-color: #f9f9f9; border: 1px solid #eee; margin-bottom: 8px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        #natRulesList li .rule-details { flex-grow: 1; margin-right: 10px; word-break: break-word; }
+         #natRulesList li .rule-actions { flex-shrink: 0; margin-left: auto; }
+        #loginContainer { max-width: 400px; width: 100%; padding: 20px; }
+        .main-content-wrapper { min-height: calc(100vh - 56px - 48px); }
+        .create-container-card { background-color: transparent !important; border: 1px solid #dee2e6 !important; }
+        .create-container-card .card-header { background-color: transparent !important; border-bottom: 1px solid #dee2e6 !important; color: inherit !important; font-weight: bold; }
+        .truncate-text { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
+        .actions-dropdown .dropdown-menu { min-width: auto; }
+        .actions-dropdown .dropdown-item { padding: .25rem 1rem; }
+        .custom-container-list-row { display: flex; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+        .custom-container-list-row:last-child { border-bottom: none; }
+        .custom-container-list-header { display: flex; align-items: center; font-weight: bold; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; padding: 0.5rem 0; }
+        .custom-col { padding: 0 0.75rem; box-sizing: border-box; word-break: break-word; }
+        .custom-col-name { flex: 1; min-width: 90px; }
+        .custom-col-status { flex: 2; min-width: 80px; text-align: center; }
+        .custom-col-status .badge { display: inline-block; }
+        .custom-col-ip { flex: 2; min-width: 120px; }
+        .custom-col-image { flex: 3; min-width: 180px; }
+        .custom-col-created { flex: 2; min-width: 120px; }
+        .custom-col-actions { flex: 1; min-width: 80px; text-align: center; }
     </style>
 </head>
 <body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% else %}bg-light{% endif %}">
@@ -273,7 +149,6 @@
                     </div>
                 </div>
 
-
                 <div class="container-list-mobile d-block d-md-none mt-3">
                     {% for c in containers %}
                     <div class="card mb-3 shadow-sm">
@@ -323,7 +198,7 @@
                 <div class="card create-container-card d-none d-md-block">
                     <div class="card-header">创建新容器 (带资源限制)</div>
                     <div class="card-body">
-                        <form id="createContainerForm">
+                         <form id="createContainerForm">
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label for="containerName" class="form-label">容器名称</label>
@@ -370,7 +245,23 @@
                                     <label for="diskGB" class="form-label">硬盘 (GB) (可选)</label>
                                     <input type="number" class="form-control" id="diskGB" name="disk_gb" min="1" placeholder="例如: 10">
                                 </div>
-                                <div class="col-12">
+                                <div class="col-6">
+                                    <label for="swapEnabled" class="form-label">启用 Swap (可选)</label>
+                                    <select class="form-select" id="swapEnabled" name="swap">
+                                        <option value="" selected>默认</option>
+                                        <option value="true">启用</option>
+                                        <option value="false">禁用</option>
+                                    </select>
+                                </div>
+                                <div class="col-6">
+                                   <label for="egressLimit" class="form-label">出站带宽 (可选)</label>
+                                   <input type="text" class="form-control" id="egressLimit" name="egress" placeholder="例如: 10Mbit">
+                                </div>
+                                <div class="col-6">
+                                   <label for="ingressLimit" class="form-label">入站带宽 (可选)</label>
+                                   <input type="text" class="form-control" id="ingressLimit" name="ingress" placeholder="例如: 1Gbit">
+                                </div>
+                                <div class="col-12 mt-4">
                                     <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
                                 </div>
                             </div>
@@ -574,7 +465,23 @@
                                 <label for="diskGBMobile" class="form-label">硬盘(GB)</label>
                                 <input type="number" class="form-control" id="diskGBMobile" name="disk_gb" min="1" placeholder="可选">
                             </div>
-                            <div class="col-12">
+                           <div class="col-6">
+                                <label for="swapEnabledMobile" class="form-label">启用 Swap</label>
+                                <select class="form-select" id="swapEnabledMobile" name="swap">
+                                    <option value="" selected>默认</option>
+                                    <option value="true">启用</option>
+                                    <option value="false">禁用</option>
+                                </select>
+                            </div>
+                            <div class="col-6">
+                               <label for="egressLimitMobile" class="form-label">出站带宽</label>
+                               <input type="text" class="form-control" id="egressLimitMobile" name="egress" placeholder="可选">
+                            </div>
+                             <div class="col-6">
+                               <label for="ingressLimitMobile" class="form-label">入站带宽</label>
+                               <input type="text" class="form-control" id="ingressLimitMobile" name="ingress" placeholder="可选">
+                            </div>
+                            <div class="col-12 mt-4">
                                 <button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button>
                             </div>
                         </div>
@@ -903,28 +810,37 @@ function showInfo(containerName, buttonElement) {
             let limitsHtml = '<h6>资源限制:</h6><ul class="list-unstyled">';
             let hasLimits = false;
             if (data.config && data.config['limits.cpu']) {
-                limitsHtml += `<li><strong>CPU 核心数:</strong> ${data.config['limits.cpu']}</li>`;
-                hasLimits = true;
+                limitsHtml += `<li><strong>CPU 核心数:</strong> ${data.config['limits.cpu']}</li>`; hasLimits = true;
             }
             if (data.config && data.config['limits.cpu.allowance']) {
-                limitsHtml += `<li><strong>CPU 占用率:</strong> ${data.config['limits.cpu.allowance']}</li>`;
-                hasLimits = true;
+                limitsHtml += `<li><strong>CPU 占用率:</strong> ${data.config['limits.cpu.allowance']}</li>`; hasLimits = true;
             }
              if (data.config && data.config['limits.memory']) {
-                limitsHtml += `<li><strong>内存:</strong> ${data.config['limits.memory']}</li>`;
-                hasLimits = true;
+                limitsHtml += `<li><strong>内存:</strong> ${data.config['limits.memory']}</li>`; hasLimits = true;
+            }
+            if (data.config && data.config['limits.swap']) {
+                limitsHtml += `<li><strong>Swap:</strong> ${data.config['limits.swap']}</li>`; hasLimits = true;
+            }
+            if (data.config && data.config['limits.egress']) {
+                limitsHtml += `<li><strong>出站带宽:</strong> ${data.config['limits.egress']}</li>`; hasLimits = true;
+            }
+            if (data.config && data.config['limits.ingress']) {
+                limitsHtml += `<li><strong>入站带宽:</strong> ${data.config['limits.ingress']}</li>`; hasLimits = true;
             }
             let rootDiskSize = '默认';
             if(data.devices && data.devices.root && data.devices.root.size) {
-                 rootDiskSize = data.devices.root.size;
-                 hasLimits = true;
+                 rootDiskSize = data.devices.root.size; hasLimits = true;
             }
             limitsHtml += `<li><strong>硬盘 (root):</strong> ${rootDiskSize}</li>`;
-
-            if (!hasLimits && rootDiskSize === '默认') {
-                 limitsHtml += '<li>未设置特定资源限制。</li>';
-            }
             limitsHtml += '</ul><hr>';
+
+            let securityHtml = '<h6>安全设置:</h6><ul class="list-unstyled">';
+            let hasSecurity = false;
+             if (data.config && data.config['security.nesting']) {
+                securityHtml += `<li><strong>允许嵌套:</strong> ${data.config['security.nesting']}</li>`; hasSecurity = true;
+            }
+            if (!hasSecurity) { securityHtml += '<li>未设置特定安全选项。</li>'; }
+            securityHtml += '</ul><hr>';
 
 
             let infoHtml = `
@@ -938,6 +854,7 @@ function showInfo(containerName, buttonElement) {
                  <p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p>
                 <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
                 ${limitsHtml}
+                ${securityHtml}
                  <p><small>${data.message}</small></p>
             `;
             basicInfoContent.html(infoHtml);
