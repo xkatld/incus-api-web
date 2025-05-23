@@ -5,8 +5,14 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Incus Web 管理器</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css" />
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.4/socket.io.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-attach@0.9.0/lib/xterm-addon-attach.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+
     <style>
         body { }
         #execOutput, #infoContent pre { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
@@ -27,7 +33,8 @@
             z-index: 1050;
         }
         .modal { z-index: 1050; }
-        .modal-backdrop { z-index: 1049; }
+        .modal-backdrop { z-index: 1049; } /* Ensure backdrop is behind modal */
+
         @media (min-width: 768px) {
              .container-list-mobile {
                 display: none;
@@ -173,7 +180,29 @@
             min-width: 80px;
             text-align: center;
         }
-
+        /* Terminal Modal Styles */
+        #terminalModal .modal-dialog {
+            max-width: 90vw; /* Use viewport width for responsiveness */
+        }
+        #terminalModal .modal-content {
+            height: 80vh; /* Use viewport height */
+        }
+        #terminalModal .modal-body {
+            padding: 0; /* Remove padding to allow terminal to fill */
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        #terminalContainer {
+            flex-grow: 1; /* Allow terminal to take available space */
+            background-color: #1e1e1e; /* Default dark background for terminal */
+            padding: 10px; /* Padding inside the terminal container */
+            overflow: hidden; /* Prevent scrollbars on the container itself */
+            height: 100%;
+        }
+        .xterm .xterm-viewport {
+             overflow-y: auto !important; /* Ensure viewport itself is scrollable if content exceeds */
+        }
     </style>
 </head>
 <body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% else %}bg-light{% endif %}">
@@ -256,7 +285,7 @@
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
-                                            <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
+                                            <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">打开终端</button></li> <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
                                             {% elif c.status == 'Stopped' %}
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
                                             {% endif %}
@@ -300,7 +329,7 @@
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
-                                        <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
+                                        <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">打开终端</button></li> <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
                                         {% elif c.status == 'Stopped' %}
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
                                         {% endif %}
@@ -318,8 +347,7 @@
                     {% endfor %}
                 </div>
             </div>
-
-            <div class="col-lg-5 col-md-6">
+             <div class="col-lg-5 col-md-6">
                 <div class="card create-container-card d-none d-md-block">
                     <div class="card-header">创建新容器 (带资源限制)</div>
                     <div class="card-body">
@@ -616,10 +644,34 @@
         </div>
     </div>
 
+    <div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl"> <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="terminalModalLabel">容器终端</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="terminalContainer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
 <script>
-let captchaAnswer = 0;
+// Global variables for terminal
+let term;
+let termSocket;
+let fitAddon;
+const termModalElement = document.getElementById('terminalModal');
+const termContainer = document.getElementById('terminalContainer');
+
+// Initialize Bootstrap Modal instance for terminal
+const bsTerminalModal = termModalElement ? new bootstrap.Modal(termModalElement) : null;
+
 
 function generateCaptcha() {
+    // ... (existing captcha logic)
     const num1 = Math.ceil(Math.random() * 9) + 1;
     const num2 = Math.ceil(Math.random() * 9) + 1;
     captchaAnswer = num1 + num2;
@@ -655,6 +707,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
 function showToast(message, type = 'info') {
+    // ... (existing toast logic)
     let toastType = 'info';
     if (type === 'success') {
         toastType = 'success';
@@ -684,6 +737,7 @@ function showToast(message, type = 'info') {
 }
 
 function setButtonProcessing(button, isProcessing) {
+    // ... (existing button processing logic)
     const $button = $(button);
     if (!$button.length) {
         return;
@@ -707,6 +761,7 @@ function setButtonProcessing(button, isProcessing) {
     }
 }
 
+// ... (existing modal and action functions: currentConfirmAction, showConfirmationModal, $('#confirmActionButton').click, etc.)
 let currentConfirmAction = null;
 let currentConfirmContainerName = null;
 let currentConfirmRuleId = null;
@@ -828,6 +883,7 @@ $('#confirmModal').on('hidden.bs.modal', function () {
     currentConfirmRuleId = null;
 });
 
+
 function handleCreateContainerFormSubmit(event) {
     event.preventDefault();
     const form = $(this);
@@ -906,6 +962,7 @@ function performAction(containerName, action, buttonElement) {
 }
 
 function showInfo(containerName, buttonElement) {
+    // ... (existing showInfo logic)
     const basicInfoContent = $('#basicInfoContent');
     const natRulesListContainer = $('#natRulesList');
     const natRulesContent = $('#natRulesContent');
@@ -1007,6 +1064,7 @@ function showInfo(containerName, buttonElement) {
 }
 
 function loadNatRules(containerName) {
+    // ... (existing loadNatRules logic)
     const natRulesContent = $('#natRulesContent');
      const natRulesError = $('#natRulesError');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
@@ -1059,6 +1117,7 @@ function deleteNatRule(ruleId, buttonElement) {
 }
 
 function openExecModal(containerName) {
+    // ... (existing openExecModal logic)
     $('#execContainerName').val(containerName);
     $('#execModalLabel').text(`在 ${containerName} 内执行命令`);
     $('#commandInput').val('');
@@ -1070,6 +1129,7 @@ function openExecModal(containerName) {
 }
 
 $('#execCommandForm').submit(function(event) {
+    // ... (existing execCommandForm submit logic)
     event.preventDefault();
     const form = $(this);
     const submitButton = $('#execButton', form);
@@ -1117,6 +1177,7 @@ $('#execCommandForm').submit(function(event) {
 });
 
 function openNatModal(containerName) {
+    // ... (existing openNatModal logic)
     $('#natContainerName').val(containerName);
     $('#natModalLabel').text(`为容器 ${containerName} 添加 NAT 规则`);
     $('#hostPort').val('');
@@ -1158,6 +1219,7 @@ function openNatModal(containerName) {
 }
 
 $('#addNatForm').submit(function(event) {
+    // ... (existing addNatForm submit logic)
     event.preventDefault();
     const form = $(this);
     const submitButton = $('#addNatButton', form);
@@ -1210,7 +1272,149 @@ $('#addNatForm').submit(function(event) {
     });
 });
 
+// Terminal Modal Logic
+function openTerminalModal(containerName) {
+    if (!bsTerminalModal || !termContainer) {
+        console.error("Terminal modal or container not initialized.");
+        showToast("无法打开终端：UI组件未找到。", "danger");
+        return;
+    }
+
+    $('#terminalModalLabel').text(`容器终端: ${containerName}`);
+
+    // Clear previous terminal instance if exists
+    if (term) {
+        term.dispose();
+    }
+    termContainer.innerHTML = ''; // Clear the container
+
+    // Initialize xterm.js
+    term = new Terminal({
+        cursorBlink: true,
+        rows: 24, // Default, FitAddon will adjust
+        cols: 80, // Default
+        fontSize: 14,
+        fontFamily: 'monospace',
+        theme: { // A basic dark theme
+            background: '#1e1e1e',
+            foreground: '#d0d0d0',
+            cursor: '#d0d0d0',
+            selectionBackground: '#555555'
+        }
+    });
+
+    // Initialize addons
+    fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+
+    // Open terminal in its container
+    term.open(termContainer);
+    try {
+        fitAddon.fit(); // Fit terminal to container size
+    } catch (e) {
+        console.error("Error fitting terminal:", e);
+    }
+    
+    term.focus();
+
+    // Establish WebSocket connection
+    // Ensure the protocol is ws or wss based on the current page's protocol
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${wsProtocol}//${window.location.host}/terminal/${containerName}`;
+
+    termSocket = io.connect(wsUrl, {
+        transports: ['websocket'] // Force WebSocket transport
+    });
+
+    const attachAddon = new AttachAddon.AttachAddon(termSocket);
+    term.loadAddon(attachAddon);
+
+
+    termSocket.on('connect', () => {
+        console.log(`WebSocket connected for ${containerName}`);
+        showToast(`终端已连接到 ${containerName}`, 'success');
+        // Send initial size to backend
+        termSocket.emit('resize', { cols: term.cols, rows: term.rows });
+    });
+
+    termSocket.on('disconnect', (reason) => {
+        console.log(`WebSocket disconnected for ${containerName}: ${reason}`);
+        if (term) { // Check if terminal still exists
+             term.write('\r\n\x1b[31m连接已断开。\x1b[0m\r\n');
+        }
+        showToast(`与 ${containerName} 的终端连接已断开`, 'warning');
+    });
+
+    termSocket.on('connect_error', (error) => {
+        console.error(`WebSocket connection error for ${containerName}:`, error);
+        if (term) {
+            term.write(`\r\n\x1b[31m连接错误: ${error.message || '未知错误'}\x1b[0m\r\n`);
+        }
+        showToast(`无法连接到 ${containerName} 的终端: ${error.message || '未知错误'}`, 'danger');
+    });
+    
+    // Handle resize events
+    // Debounce resize to avoid excessive calls
+    let resizeTimeout;
+    const debouncedFit = () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(() => {
+            try {
+                if (fitAddon && term && term.element) { // Ensure terminal is still valid
+                     fitAddon.fit();
+                     if (termSocket && termSocket.connected) {
+                        termSocket.emit('resize', { cols: term.cols, rows: term.rows });
+                     }
+                }
+            } catch (e) {
+                console.warn("Error during debounced fit/resize:", e);
+            }
+        }, 250);
+    };
+
+    // Listen to modal shown event to fit terminal, as dimensions are final then
+    $(termModalElement).off('shown.bs.modal').on('shown.bs.modal', () => {
+        if (term && term.element) { // Check if term is initialized
+            debouncedFit();
+            term.focus();
+        }
+    });
+    
+    // Also fit on window resize if modal is visible
+    $(window).off('resize.terminal').on('resize.terminal', () => {
+        if (bsTerminalModal && termModalElement.classList.contains('show') && term && term.element) {
+            debouncedFit();
+        }
+    });
+
+
+    bsTerminalModal.show();
+}
+
+
+// Cleanup when terminal modal is closed
+if (termModalElement) {
+    termModalElement.addEventListener('hidden.bs.modal', () => {
+        if (termSocket) {
+            termSocket.disconnect();
+            termSocket = null;
+        }
+        if (term) {
+            term.dispose();
+            term = null;
+        }
+        if (termContainer) {
+            termContainer.innerHTML = ''; // Clear the container
+        }
+        // Remove window resize listener specific to terminal
+        $(window).off('resize.terminal');
+        console.log("Terminal modal closed and resources cleaned up.");
+    });
+}
+
+
 $('#infoModal').on('hidden.bs.modal', function () {
+  // ... (existing infoModal hidden logic)
   $('#basicInfoContent').html('正在加载基础信息...');
   $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
   $('#natRulesError').addClass('d-none').text('');
@@ -1220,6 +1424,7 @@ $('#infoModal').on('hidden.bs.modal', function () {
 });
 
 $('#execModal').on('hidden.bs.modal', function () {
+  // ... (existing execModal hidden logic)
   $('#execContainerName').val('');
   $('#commandInput').val('');
   $('#execOutput').text('');
@@ -1229,6 +1434,7 @@ $('#execModal').on('hidden.bs.modal', function () {
 });
 
 $('#natModal').on('hidden.bs.modal', function () {
+    // ... (existing natModal hidden logic)
     $('#natContainerName').val('');
     $('#natContainerIP').val('');
     $('#hostPort').val('');
