@@ -26,7 +26,6 @@ app = Flask(__name__)
 app.debug = True
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
-# 修改: 使用 eventlet 作为异步模式
 socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 DATABASE_NAME = 'incus_manager.db'
@@ -1085,7 +1084,6 @@ def delete_nat_rule(rule_id):
 def _forward_pty_output(sid, master_fd):
     try:
         while True:
-            # 修改: 使用 eventlet.sleep(0.01) 代替 select, 适应 eventlet 模式
             socketio.sleep(0.01) 
             
             if sid not in pty_sessions or pty_sessions[sid]['fd'] != master_fd:
@@ -1098,16 +1096,14 @@ def _forward_pty_output(sid, master_fd):
                  break
 
             try:
-                # 使用 select 检查是否有数据可读, 避免阻塞
                 r, _, _ = select.select([master_fd], [], [], 0)
                 if not r:
-                    continue # 没有数据，继续循环
+                    continue
 
                 output = os.read(master_fd, 1024)
                 if not output:
                     app.logger.info(f"PTY for SID {sid} EOF, process exited.")
                     break
-                # 修改: 直接使用 socketio.emit
                 socketio.emit('pty_output', {'output': output.decode('utf-8', errors='replace')}, room=sid, namespace='/terminal')
             except OSError as e:
                 app.logger.error(f"OSError reading PTY for SID {sid}: {e}. Process likely exited.")
@@ -1134,13 +1130,13 @@ def _cleanup_pty_session(sid):
         session_data = pty_sessions.pop(sid)
         process = session_data.get('process')
         master_fd = session_data.get('fd')
-        read_thread = session_data.get('read_thread')
+        read_thread = session_data.get('read_thread') # This might be a GreenThread object with eventlet
 
         if process:
             try:
                 if process.poll() is None:
                     process.terminate()
-                    process.wait(timeout=2)
+                    process.wait(timeout=2) # subprocess.wait might not be fully eventlet-friendly
                 if process.poll() is None:
                     process.kill()
                     process.wait(timeout=1)
@@ -1155,8 +1151,12 @@ def _cleanup_pty_session(sid):
             except OSError as e:
                 app.logger.error(f"Error closing PTY master FD for SID {sid}: {e}")
         
-        if read_thread and read_thread.is_alive():
-            app.logger.info(f"PTY read thread for SID {sid} should exit soon.")
+        # For eventlet, background tasks are managed differently.
+        # We don't explicitly join threads in the same way.
+        # The task should end when its target function (_forward_pty_output) returns.
+        if read_thread: # In eventlet, this is the GreenThread object
+             app.logger.info(f"PTY read task for SID {sid} should be ending or already ended.")
+
 
         app.logger.info(f"Cleaned up PTY session for SID {sid} (container: {session_data.get('container_name')})")
 
@@ -1167,32 +1167,58 @@ def terminal_connect(auth_data=None):
     sid = request.sid
     app.logger.info(f"Terminal client connected: SID {sid}, attempting for container: {container_name}")
 
+    error_message_prefix = f"终端连接失败 (SID: {sid}, 容器: {container_name}): "
+
     if not session.get('logged_in'):
-        app.logger.warning(f"Unauthenticated terminal connection attempt for SID {sid}, container {container_name}. Disconnecting.")
-        emit('pty_output', {'output': '\r\n\x1b[31mAuthentication required. Disconnecting.\x1b[0m\r\n'}, room=sid)
-        disconnect(sid)
+        msg = "用户未认证。"
+        app.logger.warning(f"{error_message_prefix}{msg}")
+        emit('pty_output', {'output': f'\r\n\x1b[31m错误: {msg} 即将断开连接。\x1b[0m\r\n'}, room=sid)
+        # Pass data with disconnect for client's connect_error
+        disconnect(sid) # SocketIO's disconnect will trigger connect_error on client if connection was initiated
         return False
 
     if not container_name:
-        app.logger.error(f"Terminal connection for SID {sid} failed: containerName not provided in query.")
-        emit('pty_output', {'output': '\r\n\x1b[31mError: Container name not specified. Disconnecting.\x1b[0m\r\n'}, room=sid)
+        msg = "未提供容器名称。"
+        app.logger.error(f"{error_message_prefix}{msg}")
+        emit('pty_output', {'output': f'\r\n\x1b[31m错误: {msg} 即将断开连接。\x1b[0m\r\n'}, room=sid)
         disconnect(sid)
         return False
 
-    container_info, _ = _get_container_raw_info(container_name)
-    if not container_info or container_info.get('status') != 'Running':
-        status = container_info.get('status', 'Not Found') if container_info else 'Not Found'
-        app.logger.error(f"Terminal connection for SID {sid}, container {container_name} failed: Container not running or not found (Status: {status}).")
-        emit('pty_output', {'output': f'\r\n\x1b[31mError: Container "{container_name}" is not running or not found (Status: {status}). Disconnecting.\x1b[0m\r\n'}, room=sid)
+    app.logger.info(f"Terminal connect for SID {sid}: Authenticated and container name '{container_name}' provided. Checking container status...")
+    container_info, raw_info_error = _get_container_raw_info(container_name)
+
+    if raw_info_error: # _get_container_raw_info returned an error message
+        app.logger.error(f"{error_message_prefix}获取容器信息失败: {raw_info_error}")
+        emit('pty_output', {'output': f'\r\n\x1b[31m错误: 获取容器 "{container_name}" 信息失败: {raw_info_error} 即将断开连接。\x1b[0m\r\n'}, room=sid)
         disconnect(sid)
         return False
+
+    if not container_info or container_info.get('status') != 'Running':
+        status = container_info.get('status', '未找到') if container_info else '未找到'
+        msg = f"容器 '{container_name}' 未运行或未找到 (状态: {status})。"
+        app.logger.error(f"{error_message_prefix}{msg}")
+        emit('pty_output', {'output': f'\r\n\x1b[31m错误: {msg} 即将断开连接。\x1b[0m\r\n'}, room=sid)
+        disconnect(sid)
+        return False
+    
+    app.logger.info(f"Terminal connect for SID {sid}: Container '{container_name}' is Running. Proceeding with PTY setup.")
 
     cmd = ['incus', 'exec', container_name, '--env', 'TERM=xterm', '--env', 'LC_ALL=C.UTF-8', '--env', 'LANG=C.UTF-8', '--', '/bin/bash', '-i']
+    # Consider Alpine: cmd = ['incus', 'exec', container_name, '--env', 'TERM=xterm', '--', '/bin/sh', '-i']
 
     master_fd = None
     slave_fd = None
+    process = None
     try:
+        app.logger.info(f"Terminal connect for SID {sid}: Opening PTY for '{container_name}'.")
         master_fd, slave_fd = pty.openpty()
+        app.logger.info(f"Terminal connect for SID {sid}: PTY opened (master: {master_fd}, slave: {slave_fd}). Spawning process: {' '.join(cmd)}")
+
+        # Ensure LANG and LC_ALL are set for the subprocess environment as well
+        env = os.environ.copy()
+        env['LANG'] = 'C.UTF-8'
+        env['LC_ALL'] = 'C.UTF-8'
+        env['TERM'] = 'xterm' # Also ensure TERM is in the direct environment for incus exec
 
         process = subprocess.Popen(
             cmd,
@@ -1200,12 +1226,17 @@ def terminal_connect(auth_data=None):
             stdin=slave_fd,
             stdout=slave_fd,
             stderr=slave_fd,
-            close_fds=True
+            close_fds=True,
+            env=env
         )
+        app.logger.info(f"Terminal connect for SID {sid}: Process for '{container_name}' spawned with PID {process.pid}.")
+        
+        # Slave FD is only needed by the child process (incus exec)
+        # It should be closed in the parent immediately after Popen.
         os.close(slave_fd)
-        slave_fd = None
+        slave_fd = None # Mark as closed to prevent double closing in finally
+        app.logger.info(f"Terminal connect for SID {sid}: Slave FD {slave_fd if slave_fd is not None else 'already closed'} closed in parent.")
 
-        app.logger.info(f"Started PTY for SID {sid}, container {container_name}, PID {process.pid}, master FD {master_fd}")
 
         pty_sessions[sid] = {
             'process': process,
@@ -1214,30 +1245,40 @@ def terminal_connect(auth_data=None):
             'read_thread': None
         }
         
-        # 修改: 使用 socketio.start_background_task
-        read_thread = socketio.start_background_task(target=_forward_pty_output, sid=sid, master_fd=master_fd)
-        pty_sessions[sid]['read_thread'] = read_thread # Store thread/task object if needed, though cleanup might handle it
+        app.logger.info(f"Terminal connect for SID {sid}: Starting background task for PTY output forwarding for '{container_name}'.")
+        # Use socketio.start_background_task for eventlet compatibility
+        bg_task = socketio.start_background_task(target=_forward_pty_output, sid=sid, master_fd=master_fd)
+        pty_sessions[sid]['read_thread'] = bg_task 
 
         join_room(sid)
-        emit('pty_output', {'output': f'\x1b[32mConnected to container: {container_name}\x1b[0m\r\n'}, room=sid)
+        emit('pty_output', {'output': f'\x1b[32m已连接到容器: {container_name}\x1b[0m\r\n'}, room=sid)
         app.logger.info(f"Terminal session established for SID {sid}, container {container_name}")
+        return True # Successfully connected
 
     except Exception as e:
-        app.logger.error(f"Error starting PTY for SID {sid}, container {container_name}: {e}")
+        error_details = f"PTY/Process setup failed: {str(e)}"
+        app.logger.exception(f"{error_message_prefix}{error_details}") # Log full traceback
+        
+        if process and process.poll() is None: # If process started but then an error occurred
+            try:
+                process.kill()
+                process.wait()
+            except Exception as proc_kill_e:
+                app.logger.error(f"Error killing process during PTY setup failure for SID {sid}: {proc_kill_e}")
+
         if master_fd is not None:
             try:
                 os.close(master_fd)
-            except OSError:
-                pass
-        if slave_fd is not None:
+            except OSError: pass # Might be already closed or invalid
+        if slave_fd is not None: # If pty.openpty succeeded but Popen failed or error after
             try:
                 os.close(slave_fd)
-            except OSError:
-                pass
-        emit('pty_output', {'output': f'\r\n\x1b[31mError setting up terminal: {str(e)}\x1b[0m\r\n'}, room=sid)
-        disconnect(sid)
-        return False
-    return True
+            except OSError: pass
+        
+        # Emit a specific error message to the client before disconnecting
+        emit('pty_output', {'output': f'\r\n\x1b[31m错误: 无法设置终端会话: {error_details}\x1b[0m\r\n'}, room=sid)
+        disconnect(sid) # This should trigger connect_error on client
+        return False # Indicate connection failure
 
 
 @socketio.on('pty_input', namespace='/terminal')
@@ -1371,3 +1412,4 @@ if __name__ == '__main__':
 
     print("启动 Flask Web 服务器 (带 SocketIO - eventlet)...")
     socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=True if app.debug else False)
+
