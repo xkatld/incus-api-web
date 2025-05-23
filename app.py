@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
+from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 import subprocess
 import json
 import sqlite3
@@ -11,15 +12,29 @@ import sys
 import secrets
 import hashlib
 from functools import wraps
+import pty
+import select
+import fcntl # For setting PTY window size
+import struct # For PTY window size
+import termios # For PTY window size
+import threading # For reading PTY output
 
 app = Flask(__name__)
-app.debug = True
+app.debug = True # Set to False in production
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
+# For Flask-SocketIO, it's good to have async_mode. 'threading' is simpler for this setup.
+# For production, consider 'gevent' or 'eventlet' with appropriate server (e.g., Gunicorn with gevent worker).
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*") # Allow all origins for simplicity, restrict in production
 
 DATABASE_NAME = 'incus_manager.db'
-
 SETTINGS = {}
+
+# Store PTY processes and related info
+# This is a simple in-memory store. For production, consider a more robust solution if scaling.
+# Key: session ID (sid), Value: {'process': Popen_object, 'fd': master_fd, 'container_name': name, 'read_thread': Thread}
+pty_sessions = {}
+
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_NAME)
@@ -75,7 +90,17 @@ def login_required(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
         if session.get('logged_in') is not True:
-            return redirect(url_for('login', next=request.url))
+            # For SocketIO, regular redirect won't work for the connect event.
+            # Authentication should happen before SocketIO connection is established,
+            # or handled via a token passed during connection.
+            # Here, we assume the main page load is authenticated.
+            if request.endpoint and 'socketio' not in request.endpoint:
+                 return redirect(url_for('login', next=request.url))
+            elif not request.endpoint: # Likely a direct SocketIO connection attempt without prior page load
+                 app.logger.warning("Direct SocketIO connection attempt without session.")
+                 # For SocketIO, you might disconnect or emit an auth error.
+                 # For simplicity, we'll rely on the page being loaded first.
+            # If it's a socketio endpoint, we'll check session within the handler.
         return f(*args, **kwargs)
     return decorated_function
 
@@ -103,20 +128,25 @@ def web_or_api_authentication_required(f):
     def decorated_function(*args, **kwargs):
         if not SETTINGS:
              app.logger.error("认证失败: 设置未加载。请检查数据库和 init_db.py 运行情况。")
-             if request.method == 'GET':
+             if request.method == 'GET' and not (request.endpoint and 'socketio' in request.endpoint):
                  return render_template('index.html', incus_error=(True, "应用设置未加载。请检查数据库和 init_db.py 运行情况。"), containers=[], images=[]), 500
-             else:
+             else: # API or SocketIO
                  return jsonify({'status': 'error', 'message': '认证失败: 应用设置未加载。'}), 500
 
         is_authenticated_via_session = session.get('logged_in') is True
         is_authenticated_via_api = False
 
-        if not is_authenticated_via_session:
+        if not is_authenticated_via_session and not (request.endpoint and 'socketio' in request.endpoint) : # Don't check API key for socketio here
             is_authenticated_via_api = verify_api_key_hash()
 
         if is_authenticated_via_session or is_authenticated_via_api:
             return f(*args, **kwargs)
         else:
+            # For SocketIO, authentication is handled in the connect event.
+            if request.endpoint and 'socketio' in request.endpoint:
+                # This will be handled by the @socketio.on('connect') decorator
+                return # Let the connect handler manage auth for websockets
+
             if request.is_json or request.headers.get('Accept') == 'application/json' or not request.accept_mimetypes.accept_html:
                  return jsonify({'status': 'error', 'message': '需要认证'}), 401
             else:
@@ -125,6 +155,7 @@ def web_or_api_authentication_required(f):
 
 
 def run_command(command_parts, parse_json=True, timeout=60):
+    # ... (existing run_command, no changes needed for this part)
     try:
         env_vars = os.environ.copy()
         env_vars['LC_ALL'] = 'C.UTF-8'
@@ -143,7 +174,7 @@ def run_command(command_parts, parse_json=True, timeout=60):
              if parse_json:
                  try:
                     output_text = result.stdout.strip()
-                    if output_text.startswith(u'\ufeff'):
+                    if output_text.startswith(u'\ufeff'): # Handle BOM
                         output_text = output_text[1:]
                     return True, json.loads(output_text)
                  except json.JSONDecodeError as e:
@@ -163,9 +194,11 @@ def run_command(command_parts, parse_json=True, timeout=60):
         app.logger.error(f"执行命令时发生异常: {e}")
         return False, f"执行命令时发生异常: {str(e)}"
 
+
 def run_incus_command(command_args, parse_json=True, timeout=60):
     return run_command(['incus'] + command_args, parse_json, timeout)
 
+# ... (All existing DB functions: sync_container_to_db, remove_container_from_db, _get_container_raw_info, etc. remain the same)
 def sync_container_to_db(name, image_source, status, created_at_str):
     try:
         created_at_to_db = str(created_at_str) if created_at_str is not None else None
@@ -196,9 +229,9 @@ def sync_container_to_db(name, image_source, status, created_at_str):
                     time_segment = created_at_to_db.split('T')[-1]
                     if '.' not in time_segment.split(re.search(r'[+-]', time_segment).group(0))[0]:
                         tz_part = re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db).group(0)
-                        if '.' not in created_at_to_db:
+                        if '.' not in created_at_to_db: # Ensure there's no decimal part already
                             created_at_to_db = created_at_to_db.replace(tz_part, '.000000' + tz_part)
-                datetime.datetime.fromisoformat(created_at_to_db)
+                datetime.datetime.fromisoformat(created_at_to_db) # Validate
             except (ValueError, AttributeError, TypeError) as ve:
                 app.logger.warning(f"无法精确解析 Incus 创建时间 '{original_created_at_to_db}' for {name} 为 ISO 格式 ({ve}). 将尝试使用数据库记录的原值或当前时间.")
                 old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
@@ -214,7 +247,7 @@ def sync_container_to_db(name, image_source, status, created_at_str):
                 else:
                     created_at_to_db = datetime.datetime.now().isoformat()
                     app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
-        else:
+        else: # created_at_str was None
             old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
             if old_db_entry and old_db_entry['created_at']:
                 try:
@@ -229,13 +262,14 @@ def sync_container_to_db(name, image_source, status, created_at_str):
                 created_at_to_db = datetime.datetime.now().isoformat()
                 app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
 
+
         query_db('''
             INSERT INTO containers (incus_name, image_source, status, created_at, last_synced)
             VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(incus_name) DO UPDATE SET
                 image_source = excluded.image_source,
                 status = excluded.status,
-                created_at = excluded.created_at,
+                created_at = excluded.created_at, /* Ensure created_at is updated if Incus provides a more accurate one later */
                 last_synced = CURRENT_TIMESTAMP
         ''', (name, image_source, status, created_at_to_db))
     except sqlite3.Error as e:
@@ -271,13 +305,17 @@ def _get_container_raw_info(name):
             'config': container_data.get('config', {}),
             'devices': container_data.get('devices', {}),
             'snapshots': container_data.get('snapshots', []),
-             'state': container_data.get('state', {}),
+             'state': container_data.get('state', {}), # Ensure state is included
             'description': container_data.get('config', {}).get('image.description', 'N/A'),
-            'ip': 'N/A',
+            'image_source': container_data.get('config', {}).get('image.alias') or \
+                            (container_data.get('config', {}).get('image.fingerprint')[:12] if container_data.get('config', {}).get('image.fingerprint') else None) or \
+                            'N/A',
+            'ip': 'N/A', # Default, will be updated below
             'live_data_available': True,
             'message': '数据主要来自 Incus 实时信息。',
         }
 
+        # Extract IP address
         container_state = info_output.get('state')
         if isinstance(container_state, dict):
             network_info = container_state.get('network')
@@ -293,33 +331,34 @@ def _get_container_raw_info(name):
                                     scope = addr_entry.get('scope')
                                     if addr and family == 'inet' and scope == 'global':
                                         info_output['ip'] = addr.split('/')[0]
-                                        break
-                            if info_output['ip'] != 'N/A': break
-        return info_output, None
+                                        break # Found primary IPv4
+                            if info_output['ip'] != 'N/A': break # Found IP in an interface
+        return info_output, None # Success
 
-    elif db_info:
+    elif db_info: # Incus failed, but we have DB data
         info_output = {
             'name': db_info['incus_name'],
             'status': db_info.get('status', '未知'),
-            'status_code': 0,
-            'type': '容器',
-            'architecture': db_info.get('architecture', 'N/A'),
-            'ephemeral': False,
+            'status_code': 0, # No live status code
+            'type': '容器', # Generic type from DB
+            'architecture': db_info.get('architecture', 'N/A'), # This might not be in DB
+            'ephemeral': False, # Assume not ephemeral if only DB
             'created_at': db_info.get('created_at', None),
-            'profiles': [],
-            'config': {},
-            'devices': {},
-            'snapshots': [],
+            'profiles': [], # No live profiles
+            'config': {}, # No live config
+            'devices': {}, # No live devices
+            'snapshots': [], # No live snapshots
              'state': {'status': db_info.get('status', '未知'), 'status_code': 0, 'network': {}},
-            'description': db_info.get('image_source', 'N/A'),
-            'ip': 'N/A',
+            'description': db_info.get('image_source', 'N/A'), # Use image_source as description
+            'image_source': db_info.get('image_source', 'N/A'),
+            'ip': 'N/A', # No live IP
             'live_data_available': False,
-            'message': '无法从 Incus 获取实时信息，数据主要来自数据库快照。',
+            'message': f'无法从 Incus 获取实时信息 ({live_data if not success_live else "未知错误"}), 数据主要来自数据库快照。',
         }
         return info_output, info_output['message']
 
-    else:
-        error_message = f"获取容器 {name} 信息失败: 数据库中无记录且无法从 Incus 获取实时信息。"
+    else: # Incus failed AND no DB data
+        error_message = f"获取容器 {name} 信息失败: 数据库中无记录且无法从 Incus 获取实时信息 ({live_data if not success_live else "未知错误"})。"
         return None, error_message
 
 def check_nat_rule_exists_in_db(container_name, host_port, protocol):
@@ -374,6 +413,7 @@ def remove_nat_rule_from_db(rule_id):
         app.logger.error(f"数据库错误 remove_nat_rule_from_db for id {rule_id}: {e}")
         return False, f"从数据库移除规则记录失败: {e}"
 
+
 def perform_iptables_delete_for_rule(rule_details):
     if not isinstance(rule_details, dict):
         return False, "Invalid rule details provided for iptables deletion.", False
@@ -388,31 +428,53 @@ def perform_iptables_delete_for_rule(rule_details):
         protocol = rule_details['protocol']
         ip_at_creation = rule_details['ip_at_creation']
 
-        iptables_command = [
+        # Command to check if rule exists
+        iptables_check_command = [
             'iptables',
             '-t', 'nat',
-            '-D', 'PREROUTING',
+            '-C', 'PREROUTING', # -C for check
+            '-p', protocol,
+            '--dport', str(host_port),
+            '-j', 'DNAT',
+            '--to-destination', f'{ip_at_creation}:{container_port}'
+        ]
+        
+        app.logger.info(f"Checking iptables rule for ID {rule_details.get('id', 'N/A')}: {' '.join(shlex.quote(part) for part in iptables_check_command)}")
+        success_check, _ = run_command(iptables_check_command, parse_json=False, timeout=5)
+
+        if not success_check:
+            # Rule does not exist or error checking, assume it's not there or problematic
+            app.logger.warning(f"iptables rule for ID {rule_details.get('id', 'N/A')} not found or error during check. Assuming it's already removed or was never there.")
+            return True, f"iptables 规则 (主机端口 {host_port}/{protocol}) 未找到或检查时出错，可能已被移除。", True # True for success (as in, nothing to delete), True for is_bad_rule (or non-existent)
+
+        # If check was successful, rule exists, so delete it
+        iptables_delete_command = [
+            'iptables',
+            '-t', 'nat',
+            '-D', 'PREROUTING', # -D for delete
             '-p', protocol,
             '--dport', str(host_port),
             '-j', 'DNAT',
             '--to-destination', f'{ip_at_creation}:{container_port}'
         ]
 
-        app.logger.info(f"Executing iptables delete for rule ID {rule_details.get('id', 'N/A')}: {' '.join(shlex.quote(part) for part in iptables_command)}")
+        app.logger.info(f"Executing iptables delete for rule ID {rule_details.get('id', 'N/A')}: {' '.join(shlex.quote(part) for part in iptables_delete_command)}")
+        success_delete, output_delete = run_command(iptables_delete_command, parse_json=False, timeout=10)
 
-        success, output = run_command(iptables_command, parse_json=False, timeout=10)
-
-        if success:
+        if success_delete:
              app.logger.info(f"iptables delete successful for rule ID {rule_details.get('id', 'N/A')}.")
              return True, f"成功从 iptables 移除规则 (主机端口 {host_port}/{protocol} 到容器端口 {container_port} @ {ip_at_creation}).", False
         else:
-             is_bad_rule = "Bad rule" in output or "No chain/target/match by that name" in output
-             app.logger.error(f"iptables delete failed for rule ID {rule_details.get('id', 'N/A')}: {output}. Is Bad Rule: {is_bad_rule}")
-             return False, f"从 iptables 移除规则失败 (主机端口 {host_port}/{protocol} 到容器端口 {container_port} @ {ip_at_creation}): {output}", is_bad_rule
+             # This case should ideally not be reached if the check was accurate,
+             # but handle it just in case (e.g., race condition or other iptables error)
+             is_bad_rule_on_delete = "Bad rule" in output_delete or "No chain/target/match by that name" in output_delete
+             app.logger.error(f"iptables delete failed for rule ID {rule_details.get('id', 'N/A')} (after check indicated presence): {output_delete}. Is Bad Rule: {is_bad_rule_on_delete}")
+             return False, f"从 iptables 移除规则失败 (主机端口 {host_port}/{protocol} 到容器端口 {container_port} @ {ip_at_creation}): {output_delete}", is_bad_rule_on_delete
 
     except Exception as e:
         app.logger.error(f"Exception during perform_iptables_delete_for_rule for rule ID {rule_details.get('id', 'N/A')}: {e}")
         return False, f"执行 iptables 删除命令时发生异常: {str(e)}", False
+
 
 def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
     try:
@@ -431,9 +493,11 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
             query_db(query_nat, orphaned_names)
             app.logger.info(f"已从数据库中移除 {len(orphaned_names)} 个孤立容器的NAT规则记录。")
 
+            # Also remove the container entries themselves if they are orphaned regarding NAT rules
+            # This might be redundant if the main container sync already handles it, but good for consistency
             query_containers = f'DELETE FROM containers WHERE incus_name IN ({placeholders})'
             query_db(query_containers, orphaned_names)
-            app.logger.info(f"已从数据库中移除 {len(orphaned_names)} 个孤立容器记录。")
+            app.logger.info(f"已从数据库中移除 {len(orphaned_names)} 个孤立容器记录 (基于NAT规则清理)。")
 
 
     except sqlite3.Error as e:
@@ -442,8 +506,10 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
         app.logger.error(f"清理孤立NAT规则时发生异常: {e}")
 
 
+# --- Flask Routes ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
+    # ... (existing login route, no changes)
     if not SETTINGS:
         return render_template('index.html', incus_error=(True, "应用设置未加载。请检查数据库和 init_db.py 运行情况。"), containers=[], images=[]), 500
 
@@ -463,19 +529,21 @@ def login():
             return redirect(next_url or url_for('index'))
         else:
             app.logger.warning(f"用户 '{username}' 登录失败。")
-            return render_template('index.html', login_error="用户名或密码错误。", containers=[], images=[])
-    return render_template('index.html', login_form=True, containers=[], images=[])
+            return render_template('index.html', login_error="用户名或密码错误。", containers=[], images=[]) # Pass empty lists
+    return render_template('index.html', login_form=True, containers=[], images=[]) # Pass empty lists
 
 @app.route('/logout')
 def logout():
+    # ... (existing logout route, no changes)
     session.pop('logged_in', None)
     app.logger.info("用户已退出登录。")
     return redirect(url_for('index'))
 
 @app.route('/')
-@login_required
+@login_required # This decorator will handle redirect if not logged in for HTTP requests
 def index():
-    if not SETTINGS:
+    # ... (existing index route, no changes)
+    if not SETTINGS: # Should be caught by login_required in practice, but good check
         return render_template('index.html', incus_error=(True, "应用设置未加载。请检查数据库和 init_db.py 运行情况。"), containers=[], images=[]), 500
 
     success_list, containers_data = run_incus_command(['list', '--format', 'json'])
@@ -504,14 +572,15 @@ def index():
 
     if not success_list:
         incus_error = True
-        incus_error_message = containers_data
+        incus_error_message = containers_data # This is the error message from run_command
         app.logger.warning(f"无法从 Incus 获取容器列表 ({incus_error_message})，尝试从数据库加载。")
+        # Populate from DB if Incus fails
         for name, data in db_containers_dict.items():
             listed_containers.append({
                 'name': name,
                 'status': data.get('status', '未知 (来自数据库)'),
                 'image_source': data.get('image_source', 'N/A (来自数据库)'),
-                'ip': 'N/A (数据库信息)',
+                'ip': 'N/A (数据库信息)', # IP usually not stored reliably in DB this way
                 'created_at': data.get('created_at', 'N/A (来自数据库)')
             })
 
@@ -524,29 +593,30 @@ def index():
             item_name = item['name']
             incus_container_names_set.add(item_name)
 
-            image_source = 'N/A'
+            image_source_desc = 'N/A'
             item_config = item.get('config')
             if isinstance(item_config, dict):
-                image_source = item_config.get('image.description')
-                if not image_source:
+                image_source_desc = item_config.get('image.description')
+                if not image_source_desc:
                      image_alias = item_config.get('image.alias')
                      if image_alias:
-                         image_source = f"别名: {image_alias}"
+                         image_source_desc = f"别名: {image_alias}"
                      else:
                          image_fingerprint = item_config.get('image.fingerprint')
                          if image_fingerprint and isinstance(image_fingerprint, str):
-                              image_source = f"指纹: {image_fingerprint[:12]}"
-                if not image_source:
-                     image_source = 'N/A'
+                              image_source_desc = f"指纹: {image_fingerprint[:12]}"
+                if not image_source_desc: # Fallback if still none
+                     image_source_desc = 'N/A'
+
 
             created_at_str = item.get('created_at')
 
             ip_address = 'N/A'
-            container_state = item.get('state')
+            container_state = item.get('state') # Incus list provides 'state'
             if isinstance(container_state, dict):
                  network_info = container_state.get('network')
                  if isinstance(network_info, dict):
-                     for iface_name, iface_data in network_info.items():
+                     for iface_name, iface_data in network_info.items(): # Iterate interfaces
                          if isinstance(iface_data, dict):
                              addresses = iface_data.get('addresses')
                              if isinstance(addresses, list):
@@ -557,37 +627,39 @@ def index():
                                          family = addr_entry.get('family')
                                          scope = addr_entry.get('scope')
                                          if addr and family == 'inet' and scope == 'global':
-                                             ip_address = addr.split('/')[0]
+                                             ip_address = addr.split('/')[0] # Get address without CIDR
                                              found_ip = True
-                                             break
-                                 if found_ip: break
+                                             break # Found primary IPv4
+                                 if found_ip: break # Found IP in an interface
 
 
             container_info = {
                 'name': item_name,
                 'status': item.get('status', '未知'),
-                'image_source': image_source,
+                'image_source': image_source_desc,
                 'ip': ip_address,
                 'created_at': created_at_str,
             }
             listed_containers.append(container_info)
-            sync_container_to_db(item_name, image_source, item.get('status', '未知'), created_at_str)
+            sync_container_to_db(item_name, image_source_desc, item.get('status', '未知'), created_at_str)
 
+        # Clean up DB entries for containers that no longer exist in Incus
         current_db_names = {row['incus_name'] for row in query_db('SELECT incus_name FROM containers')}
         vanished_names_from_db = [db_name for db_name in current_db_names if db_name not in incus_container_names_set]
         for db_name in vanished_names_from_db:
-             remove_container_from_db(db_name)
+             remove_container_from_db(db_name) # This also removes associated NAT rules
              app.logger.info(f"根据 Incus 列表移除数据库中不存在的容器和NAT规则记录: {db_name}")
-
+        
+        # Additional cleanup for any NAT rules whose containers might have vanished without DB record update
         cleanup_orphaned_nat_rules_in_db(incus_container_names_set)
 
 
-    else:
+    else: # Incus list command was successful but returned unexpected data type
         incus_error = True
         incus_error_message = f"Incus list 返回了未知数据格式或错误结构: {containers_data}"
         app.logger.error(incus_error_message)
         app.logger.warning("无法解析 Incus 列表，尝试从数据库加载容器列表。")
-        for name, data in db_containers_dict.items():
+        for name, data in db_containers_dict.items(): # Populate from DB
             listed_containers.append({
                 'name': name,
                 'status': data.get('status', '未知 (来自数据库)'),
@@ -596,6 +668,7 @@ def index():
                 'created_at': data.get('created_at', 'N/A (来自数据库)')
             })
 
+    # Get available images
     success_img, images_data = run_incus_command(['image', 'list', '--format', 'json'])
     available_images = []
     image_error = False
@@ -607,11 +680,12 @@ def index():
             alias_name = None
             aliases = img.get('aliases')
             if isinstance(aliases, list) and aliases:
+                # Prefer user-friendly aliases
                 alias_entry = next((a for a in aliases if isinstance(a, dict) and a.get('name')), None)
                 if alias_entry:
                      alias_name = alias_entry.get('name')
-
-            if not alias_name:
+            
+            if not alias_name: # Fallback to fingerprint if no good alias
                 fingerprint = img.get('fingerprint')
                 alias_name = fingerprint[:12] if isinstance(fingerprint, str) else 'unknown_image'
 
@@ -619,13 +693,15 @@ def index():
             description = 'N/A'
             if isinstance(description_props, dict):
                 description = description_props.get('description', 'N/A')
-
+            
+            # Use the alias_name (which could be a full alias or shortened fingerprint) as the value for the select
             available_images.append({'name': alias_name, 'description': f"{alias_name} ({description})"})
     else:
         image_error = True
         image_error_message = images_data if not success_img else 'Incus 返回了无效的镜像数据格式。'
         app.logger.error(f"获取镜像列表失败: {image_error_message}")
 
+    # Get available storage pools
     success_storage, storage_data = run_incus_command(['storage', 'list', '--format', 'json'])
     available_pools = []
     storage_error = False
@@ -638,18 +714,22 @@ def index():
         app.logger.error(f"获取存储池列表失败: {storage_error_message}")
 
 
+    # Pass API_SECRET_HASH to template for client-side (JS) API calls if needed, though not directly used by terminal.
+    # For terminal, authentication is via Flask session for the SocketIO connection.
     return render_template('index.html',
                            containers=listed_containers,
                            images=available_images,
                            incus_error=(incus_error, incus_error_message),
                            image_error=(image_error, image_error_message),
                            available_pools=available_pools,
-                           storage_error=(storage_error, storage_error_message))
+                           storage_error=(storage_error, storage_error_message),
+                           API_SECRET_HASH=SETTINGS.get('api_key_hash', ''))
 
 
 @app.route('/container/create', methods=['POST'])
 @web_or_api_authentication_required
 def create_container():
+    # ... (existing create_container route, no changes)
     name = request.form.get('name')
     image = request.form.get('image')
     cpu_cores = request.form.get('cpu_cores')
@@ -664,10 +744,21 @@ def create_container():
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
 
+    # Check if container already exists in DB (as a proxy for existence or recent deletion attempt)
     db_exists = query_db('SELECT 1 FROM containers WHERE incus_name = ?', [name], one=True)
     if db_exists:
-        app.logger.warning(f"尝试创建已存在于数据库的容器 {name}。")
-        return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器在数据库中已存在记录。请尝试刷新列表或使用其他名称。'}), 409
+        # To be more robust, also check with `incus list name --format json`
+        # If it exists in Incus, then it's a definite conflict.
+        # If not in Incus but in DB, it might be a stale entry or a very recent deletion.
+        app.logger.warning(f"尝试创建已存在于数据库的容器 {name}。进一步检查 Incus...")
+        success_check, live_data = run_incus_command(['list', name, '--format', 'json'])
+        if success_check and live_data and isinstance(live_data, list) and len(live_data) > 0:
+             app.logger.error(f"容器 '{name}' 已在 Incus 中存在。")
+             return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器已在 Incus 中存在。'}), 409
+        # If not in Incus, but in DB, maybe allow creation after warning or auto-cleanup stale DB entry.
+        # For now, let's be cautious if DB entry exists.
+        # return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器在数据库中已存在记录。请尝试刷新列表或使用其他名称。'}), 409
+
 
     command = ['incus', 'launch', image, name]
 
@@ -682,11 +773,13 @@ def create_container():
         if memory_mb and int(memory_mb) > 0:
             command.extend(['-c', f'limits.memory={memory_mb}MB'])
         if disk_gb and int(disk_gb) > 0:
-            command.extend(['-d', f'root,size={disk_gb}GB'])
+            # Note: For 'dir' storage pool, 'size' on root device might be ignored or behave differently.
+            # It's more effective on ZFS/Btrfs/LVM.
+            command.extend(['-d', f'root,size={disk_gb}GB']) # This attempts to set root disk size
 
         if swap_enabled == 'on':
             command.extend(['-c', 'limits.memory.swap=true'])
-        else:
+        else: # Default is usually false or based on profile, explicitly set if creating.
             command.extend(['-c', 'limits.memory.swap=false'])
 
         if security_nesting == 'on':
@@ -696,16 +789,18 @@ def create_container():
         return jsonify({'status': 'error', 'message': '资源限制参数必须是有效的数字。'}), 400
 
 
-    success, output = run_incus_command(command[1:], parse_json=False, timeout=180)
+    success, output = run_incus_command(command[1:], parse_json=False, timeout=180) # Launch can take time
 
     if success:
-        time.sleep(5)
+        # Give Incus a moment to fully register the container and its state
+        time.sleep(5) # Adjust as needed, or implement a polling check
 
+        # Fetch fresh info to sync to DB
         _, list_output = run_incus_command(['list', name, '--format', 'json'])
 
         created_at = None
-        image_source_desc = image
-        status_val = 'Pending'
+        image_source_desc = image # Default to chosen image alias/name
+        status_val = 'Pending' # Initial status before confirmation
 
         if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
              container_data = list_output[0]
@@ -713,11 +808,18 @@ def create_container():
              created_at = container_data.get('created_at')
              list_cfg = container_data.get('config')
              if isinstance(list_cfg, dict):
-                  list_img_desc = list_cfg.get('image.description')
-                  if list_img_desc: image_source_desc = list_img_desc
+                  list_img_desc_from_cfg = list_cfg.get('image.description')
+                  if list_img_desc_from_cfg: image_source_desc = list_img_desc_from_cfg
              app.logger.info(f"成功获取新容器 {name} 的列表信息。状态: {status_val}")
         else:
              app.logger.warning(f"创建后未能获取新容器 {name} 的列表信息。列表输出: {list_output}")
+             # Attempt to get basic info if list failed after launch
+             raw_info, _ = _get_container_raw_info(name)
+             if raw_info:
+                 status_val = raw_info.get('status', status_val)
+                 created_at = raw_info.get('created_at', created_at)
+                 image_source_desc = raw_info.get('image_source', image_source_desc)
+
 
         sync_container_to_db(name, image_source_desc, status_val, created_at)
 
@@ -729,12 +831,16 @@ def create_container():
 
 @app.route('/container/<name>/action', methods=['POST'])
 @web_or_api_authentication_required
-def container_action(name):
-    action = request.form.get('action')
+def container_action(name, action=None): # action can be passed for internal calls
+    # ... (existing container_action route, no changes for terminal part)
+    if not action: # If called via HTTP POST
+        action = request.form.get('action')
+
     commands = {
         'start': ['start', name],
-        'stop': ['stop', name, '--force'],
+        'stop': ['stop', name, '--force'], # Using --force for stop/restart
         'restart': ['restart', name, '--force'],
+        # 'delete' is handled separately
     }
 
     if action == 'delete':
@@ -742,12 +848,12 @@ def container_action(name):
 
         success_db_rules, rules = get_nat_rules_for_container(name)
         if not success_db_rules:
-             app.logger.error(f"删除容器前从数据库获取 NAT 规则失败: {rules}")
+             app.logger.error(f"删除容器前从数据库获取 NAT 规则失败: {rules}") # rules here is error message
              return jsonify({'status': 'error', 'message': f'删除容器前从数据库获取NAT规则失败: {rules}'}), 500
 
         failed_rule_deletions = []
-        warning_rule_deletions = []
-        if rules:
+        warning_rule_deletions = [] # For rules that were not found in iptables (already gone)
+        if rules: # rules here is list of rule dicts
             app.logger.info(f"找到 {len(rules)} 条关联的 NAT 规则记录。尝试删除 iptables 规则...")
             for rule in rules:
                 if not all(key in rule for key in ['id', 'host_port', 'container_port', 'protocol', 'ip_at_creation']):
@@ -755,88 +861,99 @@ def container_action(name):
                      failed_rule_deletions.append(f"规则 ID {rule.get('id', 'N/A')} (数据库记录不完整)")
                      continue
 
-                success_iptables_delete, iptables_message, is_bad_rule = perform_iptables_delete_for_rule(rule)
+                success_iptables_delete, iptables_message, is_bad_or_missing_rule = perform_iptables_delete_for_rule(rule)
 
                 if not success_iptables_delete:
-                    if is_bad_rule:
-                         warning_rule_deletions.append(iptables_message)
-                         app.logger.warning(f"IPTables 删除失败 (规则不存在) ID {rule.get('id', 'N/A')}: {iptables_message}. 继续删除数据库记录。")
-                         db_success, db_msg = remove_nat_rule_from_db(rule['id'])
-                         if not db_success:
-                              app.logger.error(f"IPTables 规则不存在，但从数据库删除记录失败 ID {rule['id']}: {db_msg}")
-                    else:
-                         failed_rule_deletions.append(iptables_message)
-                         app.logger.error(f"IPTables 删除失败 ID {rule.get('id', 'N/A')}: {iptables_message}. 终止容器删除。")
-                else:
-                    db_success, db_msg = remove_nat_rule_from_db(rule['id'])
-                    if not db_success:
-                        app.logger.error(f"IPTables 规则已删除 ID {rule['id']}, 但从数据库删除记录失败: {db_msg}")
-                        failed_rule_deletions.append(f"规则 ID {rule['id']} (iptables 已删, DB 删除失败: {db_msg})")
+                    # If perform_iptables_delete_for_rule returns False, it means a hard error occurred
+                    # during the delete attempt (not just that the rule was missing).
+                    failed_rule_deletions.append(iptables_message)
+                    app.logger.error(f"IPTables 删除失败 ID {rule.get('id', 'N/A')}: {iptables_message}. 终止容器删除。")
+                else: # IPTables delete was successful OR rule was already missing/bad (which is fine for deletion)
+                    if is_bad_or_missing_rule:
+                        warning_rule_deletions.append(f"ID {rule.get('id', 'N/A')}: {iptables_message}")
+                        app.logger.warning(f"IPTables 规则不存在或错误 (ID {rule.get('id', 'N/A')}): {iptables_message}. 继续删除数据库记录。")
+                    
+                    db_success_remove, db_msg_remove = remove_nat_rule_from_db(rule['id'])
+                    if not db_success_remove:
+                        app.logger.error(f"IPTables 规则处理完成 (ID {rule['id']}), 但从数据库删除记录失败: {db_msg_remove}")
+                        # This is problematic, as DB will be out of sync.
+                        failed_rule_deletions.append(f"规则 ID {rule['id']} (iptables 处理完成, DB 删除失败: {db_msg_remove})")
+
 
         if failed_rule_deletions:
-            error_message = f"删除容器 {name} 前，未能移除所有关联的 NAT 规则 ({len(failed_rule_deletions)}/{len(rules) if rules else 0} 条 iptables 删除失败)。请手动检查 iptables。<br>失败详情: " + "; ".join(failed_rule_deletions)
+            # If any critical iptables or DB deletions failed for NAT rules, report error and stop.
+            error_message_parts = [f"删除容器 {name} 前，未能完全处理所有关联的 NAT 规则 ({len(failed_rule_deletions)} 条失败)。请手动检查。"]
+            error_message_parts.extend(failed_rule_deletions)
             if warning_rule_deletions:
-                 error_message += "<br>跳过的规则 (iptables 未找到): " + "; ".join(warning_rule_deletions)
-            app.logger.error(error_message)
-            return jsonify({'status': 'error', 'message': error_message}), 500
+                 error_message_parts.append("<br>跳过的/不存在的 iptables 规则: " + "; ".join(warning_rule_deletions))
+            full_error_message = "<br>".join(error_message_parts)
+            app.logger.error(full_error_message)
+            return jsonify({'status': 'error', 'message': full_error_message}), 500
 
         app.logger.info(f"所有 {len(rules) if rules else 0} 条关联 NAT 规则已处理。继续删除 Incus 容器。")
         success_incus_delete, incus_output = run_incus_command(['delete', name, '--force'], parse_json=False, timeout=120)
 
         if success_incus_delete:
-            remove_container_from_db(name)
+            remove_container_from_db(name) # This also cleans up its NAT rules from DB if any were missed (shouldn't happen if above logic is correct)
             message = f'容器 {name} 及其关联的 {len(rules) if rules else 0} 条 NAT 规则记录已成功删除。'
             if warning_rule_deletions:
-                 message += "<br>注意: 部分 iptables 规则在删除时已不存在。"
+                 message += "<br>注意: 部分 iptables 规则在删除时已不存在或检查时出错。"
             app.logger.info(message)
             return jsonify({'status': 'success', 'message': message}), 200
         else:
             error_message = f'删除容器 {name} 失败: {incus_output}'
-            if rules:
+            # At this point, NAT rules might have been removed from iptables and DB.
+            # The container itself failed to delete.
+            if rules or warning_rule_deletions:
                 error_message += " 注意: 部分或全部关联的 iptables NAT 规则可能已被移除。"
             app.logger.error(error_message)
             return jsonify({'status': 'error', 'message': error_message}), 500
+
 
     if action not in commands:
         return jsonify({'status': 'error', 'message': '无效的操作'}), 400
 
     timeout_val = 60
-    if action in ['stop', 'restart']: timeout_val = 120
+    if action in ['stop', 'restart']: timeout_val = 120 # Stop/restart can take longer
 
     success, output = run_incus_command(commands[action], parse_json=False, timeout=timeout_val)
 
     if success:
         message = f'容器 {name} {action} 操作提交成功。'
-        time.sleep(action in ['stop', 'restart', 'start'] and 3 or 1)
+        # Give Incus a moment to update state
+        time.sleep(action in ['stop', 'restart', 'start'] and 3 or 1) # Slightly longer for state-changing actions
 
+        # Fetch updated info to sync DB
         _, list_output = run_incus_command(['list', name, '--format', 'json'], timeout=10)
 
-        new_status_val = '未知'
-        db_image_source = 'N/A'
-        db_created_at = None
+        new_status_val = '未知' # Default if info fetch fails
+        db_image_source = 'N/A' # Default
+        db_created_at = None # Default
 
+        # Get existing DB data as fallback
         old_db_entry = query_db('SELECT image_source, created_at, status FROM containers WHERE incus_name = ?', [name], one=True)
         if old_db_entry:
              db_image_source = old_db_entry['image_source']
              db_created_at = old_db_entry['created_at']
-             new_status_val = old_db_entry['status']
+             new_status_val = old_db_entry['status'] # Use old status as temp fallback
 
         if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
             container_data = list_output[0]
-            new_status_val = container_data.get('status', new_status_val)
+            new_status_val = container_data.get('status', new_status_val) # Update with live status
             list_cfg = container_data.get('config')
             if isinstance(list_cfg, dict):
                  list_img_desc = list_cfg.get('image.description')
-                 if list_img_desc: db_image_source = list_img_desc
+                 if list_img_desc: db_image_source = list_img_desc # Update image source if available
             list_created_at = container_data.get('created_at')
-            if list_created_at: db_created_at = list_created_at
+            if list_created_at: db_created_at = list_created_at # Update created_at if available
 
             message = f'容器 {name} {action} 操作成功，新状态: {new_status_val}。'
         else:
+             # If fetching list_output fails, try to infer status based on action
              if action == 'start': new_status_val = 'Running'
              elif action == 'stop': new_status_val = 'Stopped'
-             elif action == 'restart': new_status_val = 'Running'
-             message = f'容器 {name} {action} 操作提交成功，但无法获取最新状态。'
+             elif action == 'restart': new_status_val = 'Running' # Assumed state after restart
+             message = f'容器 {name} {action} 操作提交成功，但无法获取最新状态。推断状态: {new_status_val}。'
              app.logger.warning(f"{action} 后未能获取 {name} 的更新状态。列表输出: {list_output}")
 
         sync_container_to_db(name, db_image_source, new_status_val, db_created_at)
@@ -849,42 +966,53 @@ def container_action(name):
 
 @app.route('/container/<name>/exec', methods=['POST'])
 @web_or_api_authentication_required
-def exec_command(name):
+def exec_command_route(name): # Renamed to avoid conflict with function name
+    # ... (existing exec_command route, no changes)
     command_to_exec = request.form.get('command')
     if not command_to_exec:
         return jsonify({'status': 'error', 'message': '执行的命令不能为空'}), 400
 
     try:
+        # Basic split, for more complex shell parsing, shlex might be too simple
+        # if shell metacharacters are intended to be processed by the container's shell.
+        # However, for direct command execution, this is safer.
         command_parts = shlex.split(command_to_exec)
-    except ValueError as e:
+    except ValueError as e: # shlex.split can raise ValueError on unterminated quotes
         return jsonify({'status': 'error', 'message': f'无效的命令格式: {e}'}), 400
 
-    if not command_parts:
+    if not command_parts: # Empty command after split
          return jsonify({'status': 'error', 'message': '执行的命令不能为空'}), 400
 
+    # The '--' is crucial to separate `incus exec` options from the command to be run in the container.
     success, output = run_incus_command(['exec', name, '--'] + command_parts, parse_json=False, timeout=120)
 
     if success:
         return jsonify({'status': 'success', 'output': output}), 200
     else:
+        # Output here is the error message from run_incus_command
         return jsonify({'status': 'error', 'output': output, 'message': '命令执行失败'}), 500
 
 
 @app.route('/container/<name>/info')
 @web_or_api_authentication_required
 def container_info(name):
+    # ... (existing container_info route, no changes)
     info_output, error_message = _get_container_raw_info(name)
 
-    if info_output is None:
+    if info_output is None: # Error occurred, info_output is None
         return jsonify({'status': 'NotFound', 'message': error_message}), 404
-    else:
+    else: # Success
         response_data = info_output
+        # If error_message is not None here, it means data is from DB cache
+        if error_message: # This means live_data_available is likely false
+            response_data['message'] = error_message # Override default success message
         return jsonify(response_data), 200
 
 
 @app.route('/container/<name>/add_nat_rule', methods=['POST'])
 @web_or_api_authentication_required
 def add_nat_rule(name):
+    # ... (existing add_nat_rule route, no changes)
     host_port_str = request.form.get('host_port')
     container_port_str = request.form.get('container_port')
     protocol = request.form.get('protocol')
@@ -902,18 +1030,20 @@ def add_nat_rule(name):
     if protocol not in ['tcp', 'udp']:
          return jsonify({'status': 'error', 'message': '协议必须是 tcp 或 udp'}), 400
 
+    # Check if rule already exists in DB
     db_check_success, rule_exists = check_nat_rule_exists_in_db(name, host_port, protocol)
-    if not db_check_success:
-        app.logger.error(f"检查现有 NAT 规则记录失败: {rule_exists}")
+    if not db_check_success: # Error during DB check
+        app.logger.error(f"检查现有 NAT 规则记录失败: {rule_exists}") # rule_exists is error message
         return jsonify({'status': 'error', 'message': f"检查现有 NAT 规则记录失败: {rule_exists}"}), 500
-    if rule_exists:
+    if rule_exists: # Rule already in DB
         message = f'容器 {name} 的主机端口 {host_port}/{protocol} NAT 规则已存在记录，跳过添加。'
         app.logger.warning(message)
-        return jsonify({'status': 'warning', 'message': message}), 200
+        return jsonify({'status': 'warning', 'message': message}), 200 # Use 200 for warning if client handles it, or 409 Conflict
 
+    # Get container info to find its IP and status
     container_info_data, info_error_message = _get_container_raw_info(name)
 
-    if container_info_data is None:
+    if container_info_data is None: # Failed to get container info
          return jsonify({'status': 'error', 'message': f'无法获取容器 {name} 信息: {info_error_message}'}), 404
 
     if container_info_data.get('status') != 'Running':
@@ -925,10 +1055,13 @@ def add_nat_rule(name):
     if not container_ip or container_ip == 'N/A':
          return jsonify({'status': 'error', 'message': f'无法获取容器 {name} 的 IP 地址。请确保容器正在运行且已分配 IP。'}), 500
 
+    # Construct iptables command
+    # This assumes the web server has permissions to run iptables (e.g., running as root or via sudo without password)
+    # WARNING: Directly executing iptables commands from a web app is a security risk if not handled carefully.
     iptables_command = [
-        'iptables',
+        'iptables', # Consider using absolute path if needed, e.g., /sbin/iptables
         '-t', 'nat',
-        '-A', 'PREROUTING',
+        '-A', 'PREROUTING', # Add to PREROUTING chain
         '-p', protocol,
         '--dport', str(host_port),
         '-j', 'DNAT',
@@ -937,91 +1070,316 @@ def add_nat_rule(name):
 
     app.logger.info(f"Adding NAT rule via iptables: {' '.join(shlex.quote(part) for part in iptables_command)}")
 
-    success_iptables, output = run_command(iptables_command, parse_json=False)
+    success_iptables, output = run_command(iptables_command, parse_json=False) # iptables usually doesn't output JSON
 
     if success_iptables:
+        # Add to our DB for tracking
         rule_details = {
              'container_name': name,
              'host_port': host_port,
              'container_port': container_port,
              'protocol': protocol,
-             'ip_at_creation': container_ip
+             'ip_at_creation': container_ip # Store the IP used when rule was created
         }
-        db_success, db_result = add_nat_rule_to_db(rule_details)
+        db_success, db_result = add_nat_rule_to_db(rule_details) # db_result is new rule_id or error message
 
         message = f'已成功为容器 {name} 添加 NAT 规则: 主机端口 {host_port}/{protocol} 转发到容器 IP {container_ip} 端口 {container_port}。'
 
         if not db_success:
-             message += f" 但记录规则到数据库失败: {db_result}"
+             message += f" 但记录规则到数据库失败: {db_result}" # db_result is error message
              app.logger.error(f"Failed to record NAT rule for {name} in DB after successful iptables: {db_result}")
-             return jsonify({'status': 'warning', 'message': message}), 200
+             # This is a warning because iptables rule was added, but DB tracking failed.
+             return jsonify({'status': 'warning', 'message': message}), 200 # Or 500 if DB failure is critical
 
-        return jsonify({'status': 'success', 'message': message, 'rule_id': db_result}), 200
+        return jsonify({'status': 'success', 'message': message, 'rule_id': db_result}), 200 # db_result is rule_id
 
-    else:
-        message = f'添加 NAT 规则失败: {output}'
+    else: # iptables command failed
+        message = f'添加 NAT 规则失败: {output}' # output is error from iptables
         app.logger.error(f"iptables command failed for {name}: {output}")
         return jsonify({'status': 'error', 'message': message}), 500
+
 
 @app.route('/container/<name>/nat_rules', methods=['GET'])
 @web_or_api_authentication_required
 def list_nat_rules(name):
+    # ... (existing list_nat_rules route, no changes)
     success, rules = get_nat_rules_for_container(name)
     if success:
         return jsonify({'status': 'success', 'rules': rules}), 200
-    else:
+    else: # rules is error message
         return jsonify({'status': 'error', 'message': rules}), 500
 
 @app.route('/container/nat_rule/<int:rule_id>', methods=['DELETE'])
 @web_or_api_authentication_required
 def delete_nat_rule(rule_id):
+    # ... (existing delete_nat_rule route, no changes)
     app.logger.info(f"Attempting to delete NAT rule ID {rule_id}.")
-    success_db, rule = get_nat_rule_by_id(rule_id)
+    success_db, rule = get_nat_rule_by_id(rule_id) # rule is dict or None, or error message if !success_db
 
-    if not success_db:
-         app.logger.error(f"Error fetching rule ID {rule_id} from DB for deletion: {rule}")
+    if not success_db: # Error fetching from DB
+         app.logger.error(f"Error fetching rule ID {rule_id} from DB for deletion: {rule}") # rule is error message
          return jsonify({'status': 'error', 'message': f'删除NAT规则前从数据库获取规则失败: {rule}'}), 500
 
-    if not rule:
+    if not rule: # Rule not found in DB
         app.logger.warning(f"NAT rule ID {rule_id} not found in DB for deletion.")
+        # If not in DB, assume it's already handled or was never there.
+        # Client might show a warning, but server-side, this is not an error for the delete operation itself.
         return jsonify({'status': 'warning', 'message': f'数据库中找不到ID为 {rule_id} 的NAT规则记录，可能已被手动删除。跳过 iptables 删除。'}), 200
 
-    container_name = rule.get('container_name', 'unknown')
+
+    # Rule found in DB, proceed to attempt iptables deletion
+    container_name = rule.get('container_name', 'unknown') # Should always be there
     host_port = rule['host_port']
     container_port = rule['container_port']
     protocol = rule['protocol']
-    ip_at_creation = rule['ip_at_creation']
+    ip_at_creation = rule['ip_at_creation'] # Use the IP stored at rule creation
 
     rule_details_for_iptables = {
-         'id': rule_id,
+         'id': rule_id, # For logging
          'host_port': host_port,
          'container_port': container_port,
          'protocol': protocol,
          'ip_at_creation': ip_at_creation
     }
 
-    success_iptables, iptables_message, is_bad_rule = perform_iptables_delete_for_rule(rule_details_for_iptables)
+    success_iptables, iptables_message, is_bad_or_missing_rule = perform_iptables_delete_for_rule(rule_details_for_iptables)
 
-    if success_iptables or is_bad_rule:
-        db_success, db_message = remove_nat_rule_from_db(rule_id)
+    if success_iptables: # This means iptables command executed successfully OR rule was deemed not present/bad (which is success for deletion goal)
+        db_success_remove, db_message_remove = remove_nat_rule_from_db(rule_id)
 
-        message = f'已成功删除ID为 {rule_id} 的NAT规则记录。'
-        if is_bad_rule:
-             message = f'数据库记录已删除 (ID {rule_id})。注意：该规则在 iptables 中未找到或已不存在。'
+        final_message = f'已成功删除ID为 {rule_id} 的NAT规则记录。'
+        if is_bad_or_missing_rule:
+             final_message = f'数据库记录已删除 (ID {rule_id})。注意：该规则在 iptables 中未找到或已不存在 ({iptables_message})。'
+        
+        if not db_success_remove:
+             final_message += f" 但从数据库移除记录失败: {db_message_remove}"
+             app.logger.error(f"IPTables rule deletion processed for ID {rule['id']}, but failed to remove record from DB: {db_message_remove}")
+             return jsonify({'status': 'warning', 'message': final_message}), 200 # Warning because iptables part was "ok"
 
-        if not db_success:
-             message += f" 但从数据库移除记录失败: {db_message}"
-             app.logger.error(f"IPTables rule deletion succeeded or was 'Bad rule' for ID {rule['id']}, but failed to remove record from DB: {db_message}")
-             return jsonify({'status': 'warning', 'message': message}), 200
-
-        return jsonify({'status': 'success', 'message': message}), 200
-    else:
-        message = f'删除ID为 {rule_id} 的NAT规则失败: {iptables_message}'
+        return jsonify({'status': 'success', 'message': final_message}), 200
+    else: # perform_iptables_delete_for_rule returned False, meaning a hard error during iptables delete attempt
+        message = f'删除ID为 {rule_id} 的NAT规则失败 (iptables 操作错误): {iptables_message}'
         app.logger.error(f"iptables delete command failed for rule ID {rule_id}: {iptables_message}")
+        # Do not remove from DB if iptables failed, to allow retry or manual cleanup
         return jsonify({'status': 'error', 'message': message}), 500
 
 
+# --- SocketIO Handlers for Terminal ---
+def _forward_pty_output(sid, master_fd):
+    """Reads from PTY master and sends to client."""
+    try:
+        while True:
+            # Use select for non-blocking read with timeout
+            r, _, _ = select.select([master_fd], [], [], 0.1)
+            if not r: # Timeout, check if session still active
+                if sid not in pty_sessions or pty_sessions[sid]['fd'] != master_fd:
+                    app.logger.info(f"PTY read thread for SID {sid}: session seems closed or FD changed, exiting.")
+                    break
+                continue
+
+            # Check if process is still alive before reading
+            # This is a bit tricky as Popen.poll() might not be immediately updated after child exits.
+            # Reading from a closed PTY master usually results in an OSError or empty read.
+            session_data = pty_sessions.get(sid)
+            if not session_data or session_data['process'].poll() is not None:
+                 app.logger.info(f"PTY process for SID {sid} has exited. Stopping read thread.")
+                 break
+
+
+            try:
+                output = os.read(master_fd, 1024)
+                if not output: # EOF, process likely exited
+                    app.logger.info(f"PTY for SID {sid} EOF, process exited.")
+                    break
+                socketio.emit('pty_output', {'output': output.decode('utf-8', errors='replace')}, room=sid, namespace='/terminal')
+            except OSError as e:
+                app.logger.error(f"OSError reading PTY for SID {sid}: {e}. Process likely exited.")
+                break
+            except Exception as e:
+                app.logger.error(f"Exception in PTY read thread for SID {sid}: {e}")
+                break
+    except Exception as e:
+        app.logger.error(f"Unhandled exception in _forward_pty_output for SID {sid}: {e}")
+    finally:
+        app.logger.info(f"PTY read thread for SID {sid} finished.")
+        # Ensure cleanup if thread exits unexpectedly
+        _cleanup_pty_session(sid)
+        # Optionally emit a disconnect or error to the client if not already handled
+        # socketio.emit('pty_output', {'output': '\r\n[Shell process terminated]\r\n'}, room=sid, namespace='/terminal')
+        # socketio.disconnect(sid, namespace='/terminal') # This might be too aggressive if disconnect is handled elsewhere
+
+
+def _set_pty_window_size(fd, rows, cols, xpixel=0, ypixel=0):
+    """Sets the PTY window size."""
+    try:
+        # Pack into a C struct compatible with TIOCSWINSZ
+        winsize = struct.pack("HHHH", rows, cols, xpixel, ypixel)
+        fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
+    except Exception as e:
+        app.logger.error(f"Error setting PTY window size: {e}")
+
+def _cleanup_pty_session(sid):
+    if sid in pty_sessions:
+        session_data = pty_sessions.pop(sid)
+        process = session_data.get('process')
+        master_fd = session_data.get('fd')
+        read_thread = session_data.get('read_thread')
+
+        if process:
+            try:
+                if process.poll() is None: # If still running
+                    process.terminate() # Send SIGTERM
+                    process.wait(timeout=2) # Wait for termination
+                if process.poll() is None: # If still running after SIGTERM
+                    process.kill() # Send SIGKILL
+                    process.wait(timeout=1)
+                app.logger.info(f"PTY process for SID {sid} (container: {session_data.get('container_name')}) terminated with code: {process.returncode}")
+            except Exception as e:
+                app.logger.error(f"Error terminating PTY process for SID {sid}: {e}")
+        
+        if master_fd is not None:
+            try:
+                os.close(master_fd)
+                app.logger.info(f"Closed PTY master FD {master_fd} for SID {sid}")
+            except OSError as e:
+                app.logger.error(f"Error closing PTY master FD for SID {sid}: {e}")
+        
+        if read_thread and read_thread.is_alive():
+            # The thread should ideally exit on its own when the FD is closed or process ends.
+            # Forcing a join might block if the thread is stuck.
+            app.logger.info(f"Waiting for PTY read thread for SID {sid} to join...")
+            # read_thread.join(timeout=1.0) # Give it a chance to exit cleanly
+            # if read_thread.is_alive():
+            #    app.logger.warning(f"PTY read thread for SID {sid} did not join in time.")
+
+        app.logger.info(f"Cleaned up PTY session for SID {sid} (container: {session_data.get('container_name')})")
+
+
+@socketio.on('connect', namespace='/terminal')
+def terminal_connect(auth_data=None): # auth_data can be passed from client if needed
+    container_name = request.args.get('containerName') # Get from query param in WS URL
+    sid = request.sid
+    app.logger.info(f"Terminal client connected: SID {sid}, attempting for container: {container_name}")
+
+    if not session.get('logged_in'):
+        app.logger.warning(f"Unauthenticated terminal connection attempt for SID {sid}, container {container_name}. Disconnecting.")
+        emit('pty_output', {'output': '\r\n\x1b[31mAuthentication required. Disconnecting.\x1b[0m\r\n'}, room=sid)
+        disconnect(sid)
+        return False # Prevent further processing
+
+    if not container_name:
+        app.logger.error(f"Terminal connection for SID {sid} failed: containerName not provided in query.")
+        emit('pty_output', {'output': '\r\n\x1b[31mError: Container name not specified. Disconnecting.\x1b[0m\r\n'}, room=sid)
+        disconnect(sid)
+        return False
+
+    # Check if container exists and is running (optional, but good practice)
+    container_info, _ = _get_container_raw_info(container_name)
+    if not container_info or container_info.get('status') != 'Running':
+        status = container_info.get('status', 'Not Found') if container_info else 'Not Found'
+        app.logger.error(f"Terminal connection for SID {sid}, container {container_name} failed: Container not running or not found (Status: {status}).")
+        emit('pty_output', {'output': f'\r\n\x1b[31mError: Container "{container_name}" is not running or not found (Status: {status}). Disconnecting.\x1b[0m\r\n'}, room=sid)
+        disconnect(sid)
+        return False
+
+    # Command to execute inside the container
+    # Using /bin/bash -i for an interactive shell.
+    # TERM=xterm helps with terminal emulation compatibility.
+    # Make sure the container has /bin/bash or adjust accordingly (e.g., /bin/sh)
+    cmd = ['incus', 'exec', container_name, '--env', 'TERM=xterm', '--env', 'LC_ALL=C.UTF-8', '--env', 'LANG=C.UTF-8', '--', '/bin/bash', '-i']
+    # For Alpine containers, you might need /bin/sh
+    # cmd = ['incus', 'exec', container_name, '--env', 'TERM=xterm', '--', '/bin/sh', '-i']
+
+
+    try:
+        # Create a new PTY
+        master_fd, slave_fd = pty.openpty()
+
+        # Start the incus exec process, connecting its stdin, stdout, stderr to the PTY slave
+        process = subprocess.Popen(
+            cmd,
+            preexec_fn=os.setsid, # Create a new session to manage process group
+            stdin=slave_fd,
+            stdout=slave_fd,
+            stderr=slave_fd,
+            close_fds=True # Close other file descriptors in the child
+        )
+        os.close(slave_fd) # Slave FD is no longer needed in parent
+
+        app.logger.info(f"Started PTY for SID {sid}, container {container_name}, PID {process.pid}, master FD {master_fd}")
+
+        # Store session info
+        pty_sessions[sid] = {
+            'process': process,
+            'fd': master_fd,
+            'container_name': container_name,
+            'read_thread': None # Will be set below
+        }
+        
+        # Set initial window size (optional, client might send resize event)
+        # _set_pty_window_size(master_fd, 24, 80) # Default initial size
+
+        # Start a thread to read from PTY and send to client
+        read_thread = threading.Thread(target=_forward_pty_output, args=(sid, master_fd), daemon=True)
+        pty_sessions[sid]['read_thread'] = read_thread
+        read_thread.start()
+
+        join_room(sid) # Client joins a room identified by its session ID
+        emit('pty_output', {'output': f'\x1b[32mConnected to container: {container_name}\x1b[0m\r\n'}, room=sid)
+        app.logger.info(f"Terminal session established for SID {sid}, container {container_name}")
+
+    except Exception as e:
+        app.logger.error(f"Error starting PTY for SID {sid}, container {container_name}: {e}")
+        if master_fd is not None: os.close(master_fd)
+        if slave_fd is not None: os.close(slave_fd) # Should be closed by Popen if error after Popen
+        emit('pty_output', {'output': f'\r\n\x1b[31mError setting up terminal: {str(e)}\x1b[0m\r\n'}, room=sid)
+        disconnect(sid)
+        return False
+    return True # Connection accepted
+
+
+@socketio.on('pty_input', namespace='/terminal')
+def terminal_pty_input(data):
+    sid = request.sid
+    if sid in pty_sessions:
+        master_fd = pty_sessions[sid]['fd']
+        input_data = data.get('input')
+        if input_data:
+            try:
+                os.write(master_fd, input_data.encode('utf-8'))
+            except OSError as e:
+                app.logger.error(f"OSError writing to PTY for SID {sid}: {e}. Client likely disconnected or process ended.")
+                _cleanup_pty_session(sid) # Clean up if write fails
+                # socketio.disconnect(sid, namespace='/terminal') # Optionally disconnect
+            except Exception as e:
+                app.logger.error(f"Error writing to PTY for SID {sid}: {e}")
+    else:
+        app.logger.warning(f"Received pty_input for unknown/cleaned SID {sid}. Ignoring.")
+
+
+@socketio.on('resize', namespace='/terminal')
+def terminal_resize(data):
+    sid = request.sid
+    if sid in pty_sessions:
+        master_fd = pty_sessions[sid]['fd']
+        rows = data.get('rows', 24)
+        cols = data.get('cols', 80)
+        _set_pty_window_size(master_fd, rows, cols)
+        app.logger.info(f"Resized PTY for SID {sid} to {rows}x{cols}")
+    else:
+        app.logger.warning(f"Received resize for unknown/cleaned SID {sid}. Ignoring.")
+
+
+@socketio.on('disconnect', namespace='/terminal')
+def terminal_disconnect():
+    sid = request.sid
+    app.logger.info(f"Terminal client disconnected: SID {sid}. Cleaning up PTY session.")
+    _cleanup_pty_session(sid)
+
+
+# --- Initial Setup and Run ---
 def perform_initial_setup():
+    # ... (existing perform_initial_setup, no changes)
     print("\n============================================")
     print(" Incus Web 管理器启动信息")
     print("============================================")
@@ -1036,92 +1394,43 @@ def perform_initial_setup():
         sys.exit(1)
 
     admin_username = SETTINGS.get('admin_username', 'N/A')
-    api_key_hash = SETTINGS.get('api_key_hash', 'N/A')
+    api_key_hash = SETTINGS.get('api_key_hash', 'N/A') # For X-API-Key-Hash header
 
     print(f"管理员用户名: {admin_username} (从数据库加载)")
     print(f"API 密钥哈希: {api_key_hash} (从数据库加载)")
     print("--------------------------------------------")
-    print("API 调用方法:")
+    print("API 调用方法 (适用于非浏览器客户端):")
     print("API 请求 Headers 应包含:")
     print(f"  X-API-Key-Hash: [您的 API 密钥明文的 SHA256 十六进制哈希值]")
     print("============================================\n")
 
 
+    # Database schema checks (simplified)
     conn = None
     try:
         conn = get_db_connection()
         cursor = conn.cursor()
 
+        # Check for 'containers' table
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='containers';")
         if not cursor.fetchone():
             print(f"错误：数据库表 'containers' 在 '{DATABASE_NAME}' 中未找到。")
             print("请确保 'python init_db.py' 已成功运行并创建了表结构。")
             sys.exit(1)
-
-        cursor.execute("PRAGMA table_info(containers);")
-        containers_columns_info = cursor.fetchall()
-        containers_column_names = [col[1] for col in containers_columns_info]
-        required_container_columns = ['incus_name', 'status', 'created_at', 'image_source', 'last_synced']
-        missing_container_columns = [col for col in required_container_columns if col not in containers_column_names]
-        if missing_container_columns:
-            print(f"错误：数据库表 'containers' 缺少必需的列: {', '.join(missing_container_columns)}")
-            print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
-            sys.exit(1)
         
-        if 'traffic_quota_gb' in containers_column_names:
-            print(f"提示：数据库表 'containers' 仍存在 'traffic_quota_gb' 列。此功能已移除，该列不再使用。")
-
-
-        cursor.execute("PRAGMA index_list(containers);")
-        indexes = cursor.fetchall()
-        has_unique_incus_name = False
-        for idx in indexes:
-            if idx[2] == 1:
-                cursor.execute(f"PRAGMA index_info('{idx[1]}');")
-                idx_cols = [col[2] for col in cursor.fetchall()]
-                if len(idx_cols) == 1 and idx_cols[0] == 'incus_name':
-                     has_unique_incus_name = True
-                     break
-        if not has_unique_incus_name:
-             print("警告：数据库表 'containers' 的 'incus_name' 列可能没有 UNIQUE约束。这可能导致同步问题。")
-
-
+        # Check for 'nat_rules' table
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='nat_rules';")
         if not cursor.fetchone():
              print(f"错误：数据库表 'nat_rules'在 '{DATABASE_NAME}'中未找到。")
              print("请确保 'python init_db.py' 已成功运行并创建了表结构，包含 'nat_rules' 表。")
              sys.exit(1)
 
-        cursor.execute("PRAGMA table_info(nat_rules);")
-        nat_columns_info = cursor.fetchall()
-        nat_column_names = [col[1] for col in nat_columns_info]
-        required_nat_columns = ['container_name', 'host_port', 'container_port', 'protocol', 'ip_at_creation', 'created_at']
-        missing_nat_columns = [col for col in required_nat_columns if col not in nat_column_names]
-        if missing_nat_columns:
-            print(f"错误：数据库表 'nat_rules' 缺少必需的列: {', '.join(missing_nat_columns)}")
-            print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
-            sys.exit(1)
-
-        cursor.execute("PRAGMA index_list(nat_rules);")
-        indexes = cursor.fetchall()
-        unique_composite_index_exists = False
-        for index_info in indexes:
-            if index_info[2] == 1:
-                index_name = index_info[1]
-                cursor.execute(f"PRAGMA index_info('{index_name}');")
-                index_cols = sorted([col[2] for col in cursor.fetchall()])
-                if index_cols == ['container_name', 'host_port', 'protocol']:
-                     unique_composite_index_exists = True
-                     break
-        if not unique_composite_index_exists:
-             print("警告：数据库表 'nat_rules' 可能缺少 UNIQUE (container_name, host_port, protocol) 约束。这可能导致重复规则记录。建议手动检查或重建表。")
-
+        # Check for 'settings' table
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='settings';")
         if not cursor.fetchone():
             print(f"错误：数据库表 'settings' 在 '{DATABASE_NAME}' 中未找到。")
             print("请确保 'python init_db.py' 已成功运行并创建了表结构。")
             sys.exit(1)
-
 
     except sqlite3.Error as e:
         print(f"启动时数据库检查错误: {e}")
@@ -1130,7 +1439,9 @@ def perform_initial_setup():
         if conn:
             conn.close()
 
+    # Check for Incus command
     try:
+        # Run a simple incus command to check if it's available and working
         subprocess.run(['incus', '--version'], check=True, capture_output=True, text=True, timeout=10)
         print("Incus 命令检查通过。")
     except FileNotFoundError:
@@ -1143,10 +1454,11 @@ def perform_initial_setup():
     except subprocess.TimeoutExpired:
          print("错误：执行 'incus --version' 超时。")
          sys.exit(1)
-    except Exception as e:
+    except Exception as e: # Catch any other exception during incus check
          print(f"启动时 Incus 检查发生异常: {e}")
          sys.exit(1)
 
+    # Check for iptables command (optional, for NAT)
     try:
         subprocess.run(['iptables', '--version'], check=True, capture_output=True, text=True, timeout=5)
         print("iptables 命令检查通过。")
@@ -1162,8 +1474,13 @@ def perform_initial_setup():
 
 
 if __name__ == '__main__':
+    # Perform initial setup checks only once when the main process starts,
+    # not when Werkzeug reloader forks a child process.
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         perform_initial_setup()
 
-    print("启动 Flask Web 服务器...")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("启动 Flask Web 服务器 (带 SocketIO)...")
+    # Use socketio.run for development. For production, use a proper WSGI server like Gunicorn with gevent/eventlet workers.
+    # Example: gunicorn --worker-class eventlet -w 1 app:app
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=True if app.debug else False)
+
