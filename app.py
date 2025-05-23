@@ -667,7 +667,7 @@ def create_container():
     disk_gb = request.form.get('disk_gb')
     storage_pool = request.form.get('storage_pool')
     swap_mb = request.form.get('swap_mb')
-    egress_mbit = request.form.get('egress_mbit')
+    bandwidth_mbit = request.form.get('bandwidth_mbit')
 
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
@@ -693,8 +693,6 @@ def create_container():
             command.extend(['-d', f'root,size={disk_gb}GB'])
         if swap_mb and int(swap_mb) >= 0:
             command.extend(['-c', f'limits.swap={swap_mb}MB'])
-        if egress_mbit and int(egress_mbit) > 0:
-            command.extend(['-c', f'limits.egress={egress_mbit}Mbit'])
 
         command.extend(['-c', 'security.nesting=true'])
 
@@ -711,6 +709,7 @@ def create_container():
         created_at = None
         image_source_desc = image
         status_val = 'Pending'
+        container_running = False
 
         if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
              container_data = list_output[0]
@@ -721,11 +720,39 @@ def create_container():
                   list_img_desc = list_cfg.get('image.description')
                   if list_img_desc: image_source_desc = list_img_desc
              app.logger.info(f"成功获取新容器 {name} 的列表信息。")
+             if status_val == 'Running':
+                 container_running = True
         else:
              app.logger.warning(f"创建后未能获取新容器 {name} 的列表信息。列表输出: {list_output}")
+
         sync_container_to_db(name, image_source_desc, status_val, created_at)
 
-        return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。'}), 200
+        tc_message = ""
+        if container_running and bandwidth_mbit:
+            try:
+                rate_kbit = int(bandwidth_mbit) * 1000
+                if rate_kbit > 0:
+                    tc_command_str = f"tc qdisc del dev eth0 root 2>/dev/null; tc qdisc add dev eth0 root tbf rate {rate_kbit}kbit burst 100k latency 50ms"
+                    app.logger.info(f"为 {name} 应用 TC 规则: {tc_command_str}")
+                    tc_success, tc_output = run_incus_command(
+                        ['exec', name, '--', 'sh', '-c', tc_command_str],
+                        parse_json=False,
+                        timeout=30
+                    )
+                    if tc_success:
+                        app.logger.info(f"成功为 {name} 应用 TC 规则。")
+                        tc_message = f" TC 带宽限制 ({bandwidth_mbit} Mbit) 已尝试应用。"
+                    else:
+                        app.logger.warning(f"为 {name} 应用 TC 规则失败: {tc_output}. 请确保容器内已安装 iproute2。")
+                        tc_message = f" TC 带宽限制应用失败 (详情查看日志)。"
+            except ValueError:
+                app.logger.error(f"为 {name} 应用 TC 规则失败: 无效的带宽值 '{bandwidth_mbit}'。")
+                tc_message = f" TC 带宽限制应用失败 (无效值)。"
+            except Exception as e:
+                app.logger.error(f"为 {name} 应用 TC 规则时发生异常: {e}")
+                tc_message = f" TC 带宽限制应用失败 (异常)。"
+
+        return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。{tc_message}'}), 200
     else:
         app.logger.error(f"启动容器 {name} 失败: {output}")
         return jsonify({'status': 'error', 'message': f'创建容器 {name} 失败: {output}'}), 500
