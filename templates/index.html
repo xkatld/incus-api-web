@@ -100,12 +100,12 @@
             font-weight: bold;
         }
         .truncate-text {
-            max-width: 100%; 
+            max-width: 100%;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-            display: inline-block; 
-            vertical-align: middle; 
+            display: inline-block;
+            vertical-align: middle;
         }
         .actions-dropdown .dropdown-menu {
             min-width: auto;
@@ -114,12 +114,11 @@
             padding: .25rem 1rem;
         }
 
-        /* Custom adaptive table styles for container list */
         .custom-container-list-row {
             display: flex;
-            align-items: center; 
-            padding: 0.5rem 0; 
-            border-bottom: 1px solid #eee; 
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #eee;
         }
         .custom-container-list-row:last-child {
             border-bottom: none;
@@ -131,51 +130,54 @@
             font-weight: bold;
             background-color: #f8f9fa;
             border-bottom: 2px solid #dee2e6;
-            padding: 0.5rem 0; 
+            padding: 0.5rem 0;
         }
 
         .custom-col {
-            padding: 0 0.75rem; 
+            padding: 0 0.75rem;
             box-sizing: border-box;
-            word-break: break-word; 
+            word-break: break-word;
         }
 
-        /* Updated flex ratios: 1:2:2:3:2:1 */
-        .custom-col-name { /* 名称 */
-            flex: 1; 
-            min-width: 90px; 
+        .custom-col-name {
+            flex: 1;
+            min-width: 90px;
         }
 
-        .custom-col-status { /* 状态 */
+        .custom-col-status {
             flex: 2;
-            min-width: 80px; 
-            text-align: center; 
+            min-width: 80px;
+            text-align: center;
         }
-        .custom-col-status .badge { 
+        .custom-col-status .badge {
             display: inline-block;
         }
 
-        .custom-col-ip { /* IP 地址 */
-            flex: 2; 
-            min-width: 120px; 
+        .custom-col-ip {
+            flex: 2;
+            min-width: 120px;
         }
 
-        .custom-col-image { /* 镜像来源 */
-            flex: 3; 
-            min-width: 180px; 
+        .custom-col-image {
+            flex: 3;
+            min-width: 180px;
         }
 
-        .custom-col-created { /* 创建时间 */
-            flex: 2; 
-            min-width: 120px; 
+        .custom-col-created {
+            flex: 2;
+            min-width: 120px;
         }
 
-        .custom-col-actions { /* 操作 */
-            flex: 1; 
-            min-width: 80px; 
+        .custom-col-actions {
+            flex: 1;
+            min-width: 80px;
             text-align: center;
         }
-
+        .resource-limits-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+        }
     </style>
 </head>
 <body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% else %}bg-light{% endif %}">
@@ -329,11 +331,11 @@
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label for="containerName" class="form-label">容器名称</label>
-                                    <input type="text" class="form-control" id="containerName" name="name" required>
+                                    <input type="text" class="form-control form-control-sm" id="containerName" name="name" required>
                                 </div>
                                 <div class="col-12">
                                     <label for="containerImage" class="form-label">选择镜像</label>
-                                    <select class="form-select" id="containerImage" name="image" required>
+                                    <select class="form-select form-select-sm" id="containerImage" name="image" required>
                                         <option value="" selected disabled>请选择一个镜像</option>
                                         {% for image in images %}
                                         <option value="{{ image.name }}">{{ image.description }}</option>
@@ -343,14 +345,58 @@
                                     <div class="form-text text-danger">{{ image_error[1] }}</div>
                                     {% endif %}
                                 </div>
+
+                                <div class="col-12 mt-3">
+                                    <h6>资源限制 (可选)</h6>
+                                </div>
+
+                                <div class="col-md-6">
+                                    <label for="limitsCpu" class="form-label">CPU 核心数</label>
+                                    <input type="number" class="form-control form-control-sm" id="limitsCpu" name="limits_cpu" placeholder="例如: 2">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="limitsCpuAllowance" class="form-label">CPU 占用率</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsCpuAllowance" name="limits_cpu_allowance" placeholder="例如: 50% 或 100ms/200ms">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="limitsMemory" class="form-label">内存限制</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsMemory" name="limits_memory" placeholder="例如: 512MB, 1GB">
+                                </div>
+                                 <div class="col-md-6">
+                                    <label for="rootDiskSize" class="form-label">根磁盘大小</label>
+                                    <input type="text" class="form-control form-control-sm" id="rootDiskSize" name="root_disk_size" placeholder="例如: 10GB">
+                                </div>
                                 <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="limitsMemorySwap" name="limits_memory_swap" value="true">
+                                        <label class="form-check-label" for="limitsMemorySwap">
+                                            启用 Swap
+                                        </label>
+                                    </div>
+                                </div>
+                                <div class="col-md-6" id="swapPriorityGroup" style="display: none;">
+                                    <label for="limitsMemorySwapPriority" class="form-label">Swap 优先级</label>
+                                    <input type="number" class="form-control form-control-sm" id="limitsMemorySwapPriority" name="limits_memory_swap_priority" min="0" max="10" placeholder="0-10 (默认0)">
+                                </div>
+
+
+                                <div class="col-md-6">
+                                    <label for="limitsIngress" class="form-label">网络入口速率</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsIngress" name="limits_ingress" placeholder="例如: 10Mbit/s">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="limitsEgress" class="form-label">网络出口速率</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsEgress" name="limits_egress" placeholder="例如: 10Mbit/s">
+                                </div>
+
+                                <div class="col-12 mt-3">
                                     <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
                                 </div>
                             </div>
                         </form>
                     </div>
                 </div>
-                </div>
+            </div>
         </div>
     </div>
     {% else %}
@@ -494,7 +540,7 @@
     </div>
 
     <div class="modal fade" id="createContainerModalMobile" tabindex="-1" aria-labelledby="createContainerModalMobileLabel" aria-hidden="true">
-        <div class="modal-dialog">
+        <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="createContainerModalMobileLabel">创建新容器</h5>
@@ -502,14 +548,14 @@
                 </div>
                 <div class="modal-body">
                     <form id="createContainerFormMobile">
-                        <div class="row g-3">
+                         <div class="row g-3">
                             <div class="col-12">
                                 <label for="containerNameMobile" class="form-label">容器名称</label>
-                                <input type="text" class="form-control" id="containerNameMobile" name="name" required>
+                                <input type="text" class="form-control form-control-sm" id="containerNameMobile" name="name" required>
                             </div>
                             <div class="col-12">
                                 <label for="containerImageMobile" class="form-label">选择镜像</label>
-                                <select class="form-select" id="containerImageMobile" name="image" required>
+                                <select class="form-select form-select-sm" id="containerImageMobile" name="image" required>
                                     <option value="" selected disabled>请选择一个镜像</option>
                                     {% for image in images %}
                                     <option value="{{ image.name }}">{{ image.description }}</option>
@@ -519,7 +565,49 @@
                                 <div class="form-text text-danger">{{ image_error[1] }}</div>
                                 {% endif %}
                             </div>
-                            <div class="col-12">
+
+                            <div class="col-12 mt-3">
+                                <h6>资源限制 (可选)</h6>
+                            </div>
+                            <div class="resource-limits-grid">
+                                <div>
+                                    <label for="limitsCpuMobile" class="form-label">CPU 核心数</label>
+                                    <input type="number" class="form-control form-control-sm" id="limitsCpuMobile" name="limits_cpu" placeholder="例如: 2">
+                                </div>
+                                <div>
+                                    <label for="limitsCpuAllowanceMobile" class="form-label">CPU 占用率</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsCpuAllowanceMobile" name="limits_cpu_allowance" placeholder="例如: 50%">
+                                </div>
+                                <div>
+                                    <label for="limitsMemoryMobile" class="form-label">内存限制</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsMemoryMobile" name="limits_memory" placeholder="例如: 512MB">
+                                </div>
+                                <div>
+                                    <label for="rootDiskSizeMobile" class="form-label">根磁盘大小</label>
+                                    <input type="text" class="form-control form-control-sm" id="rootDiskSizeMobile" name="root_disk_size" placeholder="例如: 10GB">
+                                </div>
+                                <div class="col-12">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="limitsMemorySwapMobile" name="limits_memory_swap" value="true">
+                                        <label class="form-check-label" for="limitsMemorySwapMobile">
+                                            启用 Swap
+                                        </label>
+                                    </div>
+                                </div>
+                                <div id="swapPriorityGroupMobile" style="display: none;">
+                                    <label for="limitsMemorySwapPriorityMobile" class="form-label">Swap 优先级</label>
+                                    <input type="number" class="form-control form-control-sm" id="limitsMemorySwapPriorityMobile" name="limits_memory_swap_priority" min="0" max="10" placeholder="0-10">
+                                </div>
+                                <div>
+                                    <label for="limitsIngressMobile" class="form-label">网络入口速率</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsIngressMobile" name="limits_ingress" placeholder="例如: 10Mbit/s">
+                                </div>
+                                <div>
+                                    <label for="limitsEgressMobile" class="form-label">网络出口速率</label>
+                                    <input type="text" class="form-control form-control-sm" id="limitsEgressMobile" name="limits_egress" placeholder="例如: 10Mbit/s">
+                                </div>
+                            </div>
+                            <div class="col-12 mt-3">
                                 <button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button>
                             </div>
                         </div>
@@ -564,6 +652,29 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
+    function toggleSwapPriority(swapCheckboxId, swapPriorityGroupId) {
+        const swapCheckbox = document.getElementById(swapCheckboxId);
+        const swapPriorityGroup = document.getElementById(swapPriorityGroupId);
+        if (swapCheckbox && swapPriorityGroup) {
+            swapPriorityGroup.style.display = swapCheckbox.checked ? 'block' : 'none';
+            if (!swapCheckbox.checked) {
+                const priorityInput = swapPriorityGroup.querySelector('input');
+                if (priorityInput) priorityInput.value = '';
+            }
+        }
+    }
+
+    $('#limitsMemorySwap').change(function() {
+        toggleSwapPriority('limitsMemorySwap', 'swapPriorityGroup');
+    });
+    $('#limitsMemorySwapMobile').change(function() {
+        toggleSwapPriority('limitsMemorySwapMobile', 'swapPriorityGroupMobile');
+    });
+
+    toggleSwapPriority('limitsMemorySwap', 'swapPriorityGroup');
+    toggleSwapPriority('limitsMemorySwapMobile', 'swapPriorityGroupMobile');
+
 });
 
 
@@ -756,6 +867,8 @@ function handleCreateContainerFormSubmit(event) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
                 form[0].reset();
+                $('#swapPriorityGroup').hide();
+                $('#swapPriorityGroupMobile').hide();
                 if (form.attr('id') === 'createContainerFormMobile') {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('createContainerModalMobile'));
                     if (modal) modal.hide();
