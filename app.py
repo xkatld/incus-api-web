@@ -504,7 +504,9 @@ def index():
                                containers=[],
                                images=[],
                                incus_error=(incus_error, incus_error_message),
-                               image_error=(True, "无法加载可用镜像列表."))
+                               image_error=(True, "无法加载可用镜像列表."),
+                               available_pools=[],
+                               storage_error=(True, "无法加载存储池列表."))
 
 
     incus_container_names_set = set()
@@ -633,11 +635,25 @@ def index():
         image_error_message = images_data if not success_img else 'Incus 返回了无效的镜像数据格式。'
         app.logger.error(f"获取镜像列表失败: {image_error_message}")
 
+    success_storage, storage_data = run_incus_command(['storage', 'list', '--format', 'json'])
+    available_pools = []
+    storage_error = False
+    storage_error_message = None
+    if success_storage and isinstance(storage_data, list):
+        available_pools = [pool['name'] for pool in storage_data if isinstance(pool, dict) and 'name' in pool]
+    else:
+        storage_error = True
+        storage_error_message = storage_data if not success_storage else "获取存储池列表失败或格式无效。"
+        app.logger.error(f"获取存储池列表失败: {storage_error_message}")
+
+
     return render_template('index.html',
                            containers=listed_containers,
                            images=available_images,
                            incus_error=(incus_error, incus_error_message),
-                           image_error=(image_error, image_error_message))
+                           image_error=(image_error, image_error_message),
+                           available_pools=available_pools,
+                           storage_error=(storage_error, storage_error_message))
 
 
 @app.route('/container/create', methods=['POST'])
@@ -649,6 +665,7 @@ def create_container():
     cpu_allowance = request.form.get('cpu_allowance')
     memory_mb = request.form.get('memory_mb')
     disk_gb = request.form.get('disk_gb')
+    storage_pool = request.form.get('storage_pool')
 
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
@@ -659,6 +676,9 @@ def create_container():
         return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器在数据库中已存在记录。请尝试刷新列表或使用其他名称。'}), 409
 
     command = ['incus', 'launch', image, name]
+
+    if storage_pool:
+        command.extend(['-s', storage_pool])
 
     try:
         if cpu_cores and int(cpu_cores) > 0:
@@ -673,7 +693,7 @@ def create_container():
         return jsonify({'status': 'error', 'message': '资源限制参数必须是有效的数字。'}), 400
 
 
-    success, output = run_incus_command(command[1:], parse_json=False, timeout=180) # 使用 command[1:] 因为 run_incus_command 会自动添加 'incus'
+    success, output = run_incus_command(command[1:], parse_json=False, timeout=180)
 
     if success:
         time.sleep(5)
