@@ -173,11 +173,7 @@
             min-width: 80px;
             text-align: center;
         }
-        .resource-limits-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-        }
+
     </style>
 </head>
 <body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% else %}bg-light{% endif %}">
@@ -325,17 +321,17 @@
 
             <div class="col-lg-5 col-md-6">
                 <div class="card create-container-card d-none d-md-block">
-                    <div class="card-header">创建新容器</div>
+                    <div class="card-header">创建新容器 (带资源限制)</div>
                     <div class="card-body">
                         <form id="createContainerForm">
                             <div class="row g-3">
                                 <div class="col-12">
                                     <label for="containerName" class="form-label">容器名称</label>
-                                    <input type="text" class="form-control form-control-sm" id="containerName" name="name" required>
+                                    <input type="text" class="form-control" id="containerName" name="name" required>
                                 </div>
                                 <div class="col-12">
                                     <label for="containerImage" class="form-label">选择镜像</label>
-                                    <select class="form-select form-select-sm" id="containerImage" name="image" required>
+                                    <select class="form-select" id="containerImage" name="image" required>
                                         <option value="" selected disabled>请选择一个镜像</option>
                                         {% for image in images %}
                                         <option value="{{ image.name }}">{{ image.description }}</option>
@@ -345,58 +341,30 @@
                                     <div class="form-text text-danger">{{ image_error[1] }}</div>
                                     {% endif %}
                                 </div>
-
-                                <div class="col-12 mt-3">
-                                    <h6>资源限制 (可选)</h6>
+                                <div class="col-6">
+                                    <label for="cpuCores" class="form-label">CPU 核心数 (可选)</label>
+                                    <input type="number" class="form-control" id="cpuCores" name="cpu_cores" min="1" placeholder="例如: 2">
                                 </div>
-
-                                <div class="col-md-6">
-                                    <label for="limitsCpu" class="form-label">CPU 核心数</label>
-                                    <input type="number" class="form-control form-control-sm" id="limitsCpu" name="limits_cpu" placeholder="例如: 2">
+                                <div class="col-6">
+                                    <label for="cpuAllowance" class="form-label">CPU 占用率 % (可选)</label>
+                                    <input type="number" class="form-control" id="cpuAllowance" name="cpu_allowance" min="1" max="100" placeholder="例如: 50">
                                 </div>
-                                <div class="col-md-6">
-                                    <label for="limitsCpuAllowance" class="form-label">CPU 占用率</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsCpuAllowance" name="limits_cpu_allowance" placeholder="例如: 50% 或 100ms/200ms">
+                                <div class="col-6">
+                                    <label for="memoryMB" class="form-label">内存 (MB) (可选)</label>
+                                    <input type="number" class="form-control" id="memoryMB" name="memory_mb" min="64" placeholder="例如: 1024">
                                 </div>
-                                <div class="col-md-6">
-                                    <label for="limitsMemory" class="form-label">内存限制</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsMemory" name="limits_memory" placeholder="例如: 512MB, 1GB">
-                                </div>
-                                 <div class="col-md-6">
-                                    <label for="rootDiskSize" class="form-label">根磁盘大小</label>
-                                    <input type="text" class="form-control form-control-sm" id="rootDiskSize" name="root_disk_size" placeholder="例如: 10GB">
+                                <div class="col-6">
+                                    <label for="diskGB" class="form-label">硬盘 (GB) (可选)</label>
+                                    <input type="number" class="form-control" id="diskGB" name="disk_gb" min="1" placeholder="例如: 10">
                                 </div>
                                 <div class="col-12">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="limitsMemorySwap" name="limits_memory_swap" value="true">
-                                        <label class="form-check-label" for="limitsMemorySwap">
-                                            启用 Swap
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-md-6" id="swapPriorityGroup" style="display: none;">
-                                    <label for="limitsMemorySwapPriority" class="form-label">Swap 优先级</label>
-                                    <input type="number" class="form-control form-control-sm" id="limitsMemorySwapPriority" name="limits_memory_swap_priority" min="0" max="10" placeholder="0-10 (默认0)">
-                                </div>
-
-
-                                <div class="col-md-6">
-                                    <label for="limitsIngress" class="form-label">网络入口速率</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsIngress" name="limits_ingress" placeholder="例如: 10Mbit/s">
-                                </div>
-                                <div class="col-md-6">
-                                    <label for="limitsEgress" class="form-label">网络出口速率</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsEgress" name="limits_egress" placeholder="例如: 10Mbit/s">
-                                </div>
-
-                                <div class="col-12 mt-3">
                                     <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
                                 </div>
                             </div>
                         </form>
                     </div>
                 </div>
-            </div>
+                </div>
         </div>
     </div>
     {% else %}
@@ -540,22 +508,22 @@
     </div>
 
     <div class="modal fade" id="createContainerModalMobile" tabindex="-1" aria-labelledby="createContainerModalMobileLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title" id="createContainerModalMobileLabel">创建新容器</h5>
+                    <h5 class="modal-title" id="createContainerModalMobileLabel">创建新容器 (带资源限制)</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <form id="createContainerFormMobile">
-                         <div class="row g-3">
+                        <div class="row g-3">
                             <div class="col-12">
                                 <label for="containerNameMobile" class="form-label">容器名称</label>
-                                <input type="text" class="form-control form-control-sm" id="containerNameMobile" name="name" required>
+                                <input type="text" class="form-control" id="containerNameMobile" name="name" required>
                             </div>
                             <div class="col-12">
                                 <label for="containerImageMobile" class="form-label">选择镜像</label>
-                                <select class="form-select form-select-sm" id="containerImageMobile" name="image" required>
+                                <select class="form-select" id="containerImageMobile" name="image" required>
                                     <option value="" selected disabled>请选择一个镜像</option>
                                     {% for image in images %}
                                     <option value="{{ image.name }}">{{ image.description }}</option>
@@ -565,49 +533,23 @@
                                 <div class="form-text text-danger">{{ image_error[1] }}</div>
                                 {% endif %}
                             </div>
-
-                            <div class="col-12 mt-3">
-                                <h6>资源限制 (可选)</h6>
+                            <div class="col-6">
+                                <label for="cpuCoresMobile" class="form-label">CPU 核数</label>
+                                <input type="number" class="form-control" id="cpuCoresMobile" name="cpu_cores" min="1" placeholder="可选">
                             </div>
-                            <div class="resource-limits-grid">
-                                <div>
-                                    <label for="limitsCpuMobile" class="form-label">CPU 核心数</label>
-                                    <input type="number" class="form-control form-control-sm" id="limitsCpuMobile" name="limits_cpu" placeholder="例如: 2">
-                                </div>
-                                <div>
-                                    <label for="limitsCpuAllowanceMobile" class="form-label">CPU 占用率</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsCpuAllowanceMobile" name="limits_cpu_allowance" placeholder="例如: 50%">
-                                </div>
-                                <div>
-                                    <label for="limitsMemoryMobile" class="form-label">内存限制</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsMemoryMobile" name="limits_memory" placeholder="例如: 512MB">
-                                </div>
-                                <div>
-                                    <label for="rootDiskSizeMobile" class="form-label">根磁盘大小</label>
-                                    <input type="text" class="form-control form-control-sm" id="rootDiskSizeMobile" name="root_disk_size" placeholder="例如: 10GB">
-                                </div>
-                                <div class="col-12">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="limitsMemorySwapMobile" name="limits_memory_swap" value="true">
-                                        <label class="form-check-label" for="limitsMemorySwapMobile">
-                                            启用 Swap
-                                        </label>
-                                    </div>
-                                </div>
-                                <div id="swapPriorityGroupMobile" style="display: none;">
-                                    <label for="limitsMemorySwapPriorityMobile" class="form-label">Swap 优先级</label>
-                                    <input type="number" class="form-control form-control-sm" id="limitsMemorySwapPriorityMobile" name="limits_memory_swap_priority" min="0" max="10" placeholder="0-10">
-                                </div>
-                                <div>
-                                    <label for="limitsIngressMobile" class="form-label">网络入口速率</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsIngressMobile" name="limits_ingress" placeholder="例如: 10Mbit/s">
-                                </div>
-                                <div>
-                                    <label for="limitsEgressMobile" class="form-label">网络出口速率</label>
-                                    <input type="text" class="form-control form-control-sm" id="limitsEgressMobile" name="limits_egress" placeholder="例如: 10Mbit/s">
-                                </div>
+                            <div class="col-6">
+                                <label for="cpuAllowanceMobile" class="form-label">CPU %</label>
+                                <input type="number" class="form-control" id="cpuAllowanceMobile" name="cpu_allowance" min="1" max="100" placeholder="可选">
                             </div>
-                            <div class="col-12 mt-3">
+                            <div class="col-6">
+                                <label for="memoryMBMobile" class="form-label">内存(MB)</label>
+                                <input type="number" class="form-control" id="memoryMBMobile" name="memory_mb" min="64" placeholder="可选">
+                            </div>
+                            <div class="col-6">
+                                <label for="diskGBMobile" class="form-label">硬盘(GB)</label>
+                                <input type="number" class="form-control" id="diskGBMobile" name="disk_gb" min="1" placeholder="可选">
+                            </div>
+                            <div class="col-12">
                                 <button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button>
                             </div>
                         </div>
@@ -652,29 +594,6 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
-
-    function toggleSwapPriority(swapCheckboxId, swapPriorityGroupId) {
-        const swapCheckbox = document.getElementById(swapCheckboxId);
-        const swapPriorityGroup = document.getElementById(swapPriorityGroupId);
-        if (swapCheckbox && swapPriorityGroup) {
-            swapPriorityGroup.style.display = swapCheckbox.checked ? 'block' : 'none';
-            if (!swapCheckbox.checked) {
-                const priorityInput = swapPriorityGroup.querySelector('input');
-                if (priorityInput) priorityInput.value = '';
-            }
-        }
-    }
-
-    $('#limitsMemorySwap').change(function() {
-        toggleSwapPriority('limitsMemorySwap', 'swapPriorityGroup');
-    });
-    $('#limitsMemorySwapMobile').change(function() {
-        toggleSwapPriority('limitsMemorySwapMobile', 'swapPriorityGroupMobile');
-    });
-
-    toggleSwapPriority('limitsMemorySwap', 'swapPriorityGroup');
-    toggleSwapPriority('limitsMemorySwapMobile', 'swapPriorityGroupMobile');
-
 });
 
 
@@ -867,8 +786,6 @@ function handleCreateContainerFormSubmit(event) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
                 form[0].reset();
-                $('#swapPriorityGroup').hide();
-                $('#swapPriorityGroupMobile').hide();
                 if (form.attr('id') === 'createContainerFormMobile') {
                     const modal = bootstrap.Modal.getInstance(document.getElementById('createContainerModalMobile'));
                     if (modal) modal.hide();
@@ -957,6 +874,34 @@ function showInfo(containerName, buttonElement) {
                  natRulesListContainer.hide();
                  return;
              }
+
+            let limitsHtml = '<h6>资源限制:</h6><ul class="list-unstyled">';
+            let hasLimits = false;
+            if (data.config && data.config['limits.cpu']) {
+                limitsHtml += `<li><strong>CPU 核心数:</strong> ${data.config['limits.cpu']}</li>`;
+                hasLimits = true;
+            }
+            if (data.config && data.config['limits.cpu.allowance']) {
+                limitsHtml += `<li><strong>CPU 占用率:</strong> ${data.config['limits.cpu.allowance']}</li>`;
+                hasLimits = true;
+            }
+             if (data.config && data.config['limits.memory']) {
+                limitsHtml += `<li><strong>内存:</strong> ${data.config['limits.memory']}</li>`;
+                hasLimits = true;
+            }
+            let rootDiskSize = '默认';
+            if(data.devices && data.devices.root && data.devices.root.size) {
+                 rootDiskSize = data.devices.root.size;
+                 hasLimits = true;
+            }
+            limitsHtml += `<li><strong>硬盘 (root):</strong> ${rootDiskSize}</li>`;
+
+            if (!hasLimits && rootDiskSize === '默认') {
+                 limitsHtml += '<li>未设置特定资源限制。</li>';
+            }
+            limitsHtml += '</ul><hr>';
+
+
             let infoHtml = `
                 <p><strong>名称:</strong> ${data.name}</p>
                 <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p>
@@ -967,6 +912,7 @@ function showInfo(containerName, buttonElement) {
                 <p><strong>类型:</strong> ${data.type}</p>
                  <p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p>
                 <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
+                ${limitsHtml}
                  <p><small>${data.message}</small></p>
             `;
             basicInfoContent.html(infoHtml);
