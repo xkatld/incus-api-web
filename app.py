@@ -80,11 +80,11 @@ def login_required(f):
     return decorated_function
 
 def verify_api_key_hash():
-    api_key_hash_header = request.headers.get('X-API-Hash')
+    api_key_hash_header = request.headers.get('X-API-Key-Hash')
     stored_api_key_hash = SETTINGS.get('api_key_hash')
 
     if not api_key_hash_header:
-        app.logger.warning(f"API认证失败: 缺少 'X-API-Hash' 请求头 from {request.remote_addr}")
+        app.logger.warning(f"API认证失败: 缺少 'X-API-Key-Hash' 请求头 from {request.remote_addr}")
         return False
 
     if not stored_api_key_hash:
@@ -157,7 +157,6 @@ def run_command(command_parts, parse_json=True, timeout=60):
         app.logger.error(f"命令未找到: {command_name}")
         return False, f"命令 '{command_name}' 未找到。请确保它已安装并在系统 PATH 中。"
     except subprocess.TimeoutExpired:
-        log_command = ' '.join(shlex.quote(part) for part in command_parts)
         app.logger.error(f"命令超时 (>{timeout}s): {log_command}")
         return False, f"命令执行超时 (>{timeout}秒)。"
     except Exception as e:
@@ -667,10 +666,10 @@ def create_container():
     memory_mb = request.form.get('memory_mb')
     disk_gb = request.form.get('disk_gb')
     storage_pool = request.form.get('storage_pool')
-    swap = request.form.get('swap')
-    egress = request.form.get('egress')
-    ingress = request.form.get('ingress')
-
+    swap_mb = request.form.get('swap_mb')
+    egress_mbit = request.form.get('egress_mbit')
+    ingress_mbit = request.form.get('ingress_mbit')
+    nesting = request.form.get('nesting')
 
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
@@ -685,8 +684,6 @@ def create_container():
     if storage_pool:
         command.extend(['-s', storage_pool])
 
-    command.extend(['-c', 'security.nesting=true'])
-
     try:
         if cpu_cores and int(cpu_cores) > 0:
             command.extend(['-c', f'limits.cpu={cpu_cores}'])
@@ -696,16 +693,17 @@ def create_container():
             command.extend(['-c', f'limits.memory={memory_mb}MB'])
         if disk_gb and int(disk_gb) > 0:
             command.extend(['-d', f'root,size={disk_gb}GB'])
-        if swap in ['true', 'false']:
-            command.extend(['-c', f'limits.swap={swap}'])
-        if egress:
-            command.extend(['-c', f'limits.egress={egress}'])
-        if ingress:
-            command.extend(['-c', f'limits.ingress={ingress}'])
+        if swap_mb and int(swap_mb) >= 0:
+            command.extend(['-c', f'limits.swap={swap_mb}MB'])
+        if egress_mbit and int(egress_mbit) > 0:
+            command.extend(['-c', f'limits.egress={egress_mbit}Mbit'])
+        if ingress_mbit and int(ingress_mbit) > 0:
+            command.extend(['-c', f'limits.ingress={ingress_mbit}Mbit'])
+        if nesting == 'on':
+            command.extend(['-c', 'security.nesting=true'])
 
     except ValueError:
         return jsonify({'status': 'error', 'message': '资源限制参数必须是有效的数字。'}), 400
-
 
     success, output = run_incus_command(command[1:], parse_json=False, timeout=180)
 
@@ -1053,7 +1051,7 @@ def perform_initial_setup():
     print("--------------------------------------------")
     print("API 调用方法:")
     print("API 请求 Headers 应包含:")
-    print(f"  X-API-Hash: [您的 API 密钥明文的 SHA256 十六进制哈希值]")
+    print(f"  X-API-Key-Hash: [您的 API 密钥明文的 SHA256 十六进制哈希值]")
     print("============================================\n")
 
 
