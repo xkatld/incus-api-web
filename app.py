@@ -1,3 +1,6 @@
+import eventlet
+eventlet.monkey_patch() # 必须在其他模块导入前调用
+
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
 import subprocess
@@ -23,7 +26,8 @@ app = Flask(__name__)
 app.debug = True
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
-socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
+# 修改: 使用 eventlet 作为异步模式
+socketio = SocketIO(app, async_mode='eventlet', cors_allowed_origins="*")
 
 DATABASE_NAME = 'incus_manager.db'
 SETTINGS = {}
@@ -1081,24 +1085,29 @@ def delete_nat_rule(rule_id):
 def _forward_pty_output(sid, master_fd):
     try:
         while True:
-            r, _, _ = select.select([master_fd], [], [], 0.1)
-            if not r:
-                if sid not in pty_sessions or pty_sessions[sid]['fd'] != master_fd:
-                    app.logger.info(f"PTY read thread for SID {sid}: session seems closed or FD changed, exiting.")
-                    break
-                continue
+            # 修改: 使用 eventlet.sleep(0.01) 代替 select, 适应 eventlet 模式
+            socketio.sleep(0.01) 
+            
+            if sid not in pty_sessions or pty_sessions[sid]['fd'] != master_fd:
+                app.logger.info(f"PTY read thread for SID {sid}: session seems closed or FD changed, exiting.")
+                break
 
             session_data = pty_sessions.get(sid)
             if not session_data or session_data['process'].poll() is not None:
                  app.logger.info(f"PTY process for SID {sid} has exited. Stopping read thread.")
                  break
 
-
             try:
+                # 使用 select 检查是否有数据可读, 避免阻塞
+                r, _, _ = select.select([master_fd], [], [], 0)
+                if not r:
+                    continue # 没有数据，继续循环
+
                 output = os.read(master_fd, 1024)
                 if not output:
                     app.logger.info(f"PTY for SID {sid} EOF, process exited.")
                     break
+                # 修改: 直接使用 socketio.emit
                 socketio.emit('pty_output', {'output': output.decode('utf-8', errors='replace')}, room=sid, namespace='/terminal')
             except OSError as e:
                 app.logger.error(f"OSError reading PTY for SID {sid}: {e}. Process likely exited.")
@@ -1147,7 +1156,7 @@ def _cleanup_pty_session(sid):
                 app.logger.error(f"Error closing PTY master FD for SID {sid}: {e}")
         
         if read_thread and read_thread.is_alive():
-            app.logger.info(f"Waiting for PTY read thread for SID {sid} to join...")
+            app.logger.info(f"PTY read thread for SID {sid} should exit soon.")
 
         app.logger.info(f"Cleaned up PTY session for SID {sid} (container: {session_data.get('container_name')})")
 
@@ -1180,8 +1189,8 @@ def terminal_connect(auth_data=None):
 
     cmd = ['incus', 'exec', container_name, '--env', 'TERM=xterm', '--env', 'LC_ALL=C.UTF-8', '--env', 'LANG=C.UTF-8', '--', '/bin/bash', '-i']
 
-    master_fd = None # Initialize to None
-    slave_fd = None # Initialize to None
+    master_fd = None
+    slave_fd = None
     try:
         master_fd, slave_fd = pty.openpty()
 
@@ -1193,8 +1202,8 @@ def terminal_connect(auth_data=None):
             stderr=slave_fd,
             close_fds=True
         )
-        os.close(slave_fd) # slave_fd is not needed in parent after Popen
-        slave_fd = None # Mark as closed
+        os.close(slave_fd)
+        slave_fd = None
 
         app.logger.info(f"Started PTY for SID {sid}, container {container_name}, PID {process.pid}, master FD {master_fd}")
 
@@ -1205,9 +1214,9 @@ def terminal_connect(auth_data=None):
             'read_thread': None
         }
         
-        read_thread = threading.Thread(target=_forward_pty_output, args=(sid, master_fd), daemon=True)
-        pty_sessions[sid]['read_thread'] = read_thread
-        read_thread.start()
+        # 修改: 使用 socketio.start_background_task
+        read_thread = socketio.start_background_task(target=_forward_pty_output, sid=sid, master_fd=master_fd)
+        pty_sessions[sid]['read_thread'] = read_thread # Store thread/task object if needed, though cleanup might handle it
 
         join_room(sid)
         emit('pty_output', {'output': f'\x1b[32mConnected to container: {container_name}\x1b[0m\r\n'}, room=sid)
@@ -1219,8 +1228,8 @@ def terminal_connect(auth_data=None):
             try:
                 os.close(master_fd)
             except OSError:
-                pass # Ignore error if already closed or invalid
-        if slave_fd is not None: # This slave_fd would be from pty.openpty() if Popen failed
+                pass
+        if slave_fd is not None:
             try:
                 os.close(slave_fd)
             except OSError:
@@ -1360,6 +1369,6 @@ if __name__ == '__main__':
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         perform_initial_setup()
 
-    print("启动 Flask Web 服务器 (带 SocketIO)...")
+    print("启动 Flask Web 服务器 (带 SocketIO - eventlet)...")
     socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=True if app.debug else False)
 
