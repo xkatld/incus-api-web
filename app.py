@@ -175,69 +175,59 @@ def sync_container_to_db(name, image_source, status, created_at_str):
             try:
                 if created_at_to_db.endswith('Z'):
                    created_at_to_db = created_at_to_db[:-1] + '+00:00'
-
                 tz_match_hhmm = re.search(r'([+-])(\d{4})$', created_at_to_db)
                 if tz_match_hhmm:
                     sign = tz_match_hhmm.group(1)
                     hhmm = tz_match_hhmm.group(2)
                     created_at_to_db = created_at_to_db[:-4] + f"{sign}{hhmm[:2]}:{hhmm[2:]}"
-
                 parts = created_at_to_db.split('.')
                 if len(parts) > 1:
                     time_tz_part = parts[1]
                     tz_start_match = re.search(r'[+-]\d', time_tz_part)
                     if tz_start_match:
-                         micro_part = time_tz_part[:tz_start_match.start()]
-                         tz_part = time_tz_part[tz_start_match.start():]
-                         if len(micro_part) > 6:
-                            micro_part = micro_part[:6]
-                         time_tz_part = micro_part + tz_part
+                        micro_part = time_tz_part[:tz_start_match.start()]
+                        tz_part = time_tz_part[tz_start_match.start():]
+                        if len(micro_part) > 6: micro_part = micro_part[:6]
+                        time_tz_part = micro_part + tz_part
                     else:
-                        if len(time_tz_part) > 6:
-                            time_tz_part = time_tz_part[:6]
-
+                        if len(time_tz_part) > 6: time_tz_part = time_tz_part[:6]
                     created_at_to_db = parts[0] + '.' + time_tz_part
                 elif re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db):
-                     time_segment = created_at_to_db.split('T')[-1]
-                     if '.' not in time_segment.split(re.search(r'[+-]', time_segment).group(0))[0]:
-                           tz_part = re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db).group(0)
-                           if '.' not in created_at_to_db:
-                              created_at_to_db = created_at_to_db.replace(tz_part, '.000000' + tz_part)
-
-
+                    time_segment = created_at_to_db.split('T')[-1]
+                    if '.' not in time_segment.split(re.search(r'[+-]', time_segment).group(0))[0]:
+                        tz_part = re.search(r'[+-]\d{2}:?\d{2}$', created_at_to_db).group(0)
+                        if '.' not in created_at_to_db:
+                            created_at_to_db = created_at_to_db.replace(tz_part, '.000000' + tz_part)
                 datetime.datetime.fromisoformat(created_at_to_db)
-
             except (ValueError, AttributeError, TypeError) as ve:
                 app.logger.warning(f"无法精确解析 Incus 创建时间 '{original_created_at_to_db}' for {name} 为 ISO 格式 ({ve}). 将尝试使用数据库记录的原值或当前时间.")
                 old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
                 if old_db_entry and old_db_entry['created_at']:
-                     try:
-                          datetime.datetime.fromisoformat(old_db_entry['created_at'])
-                          created_at_to_db = old_db_entry['created_at']
-                          app.logger.info(f"使用数据库记录的创建时间 '{created_at_to_db}' for {name}.")
-                     except (ValueError, TypeError):
-                          app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式.")
-                          created_at_to_db = datetime.datetime.now().isoformat()
-                          app.logger.info(f"使用当前时间作为创建时间 for {name}.")
+                    try:
+                        datetime.datetime.fromisoformat(old_db_entry['created_at'])
+                        created_at_to_db = old_db_entry['created_at']
+                        app.logger.info(f"使用数据库记录的创建时间 '{created_at_to_db}' for {name}.")
+                    except (ValueError, TypeError):
+                        app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式.")
+                        created_at_to_db = datetime.datetime.now().isoformat()
+                        app.logger.info(f"使用当前时间作为创建时间 for {name}.")
                 else:
-                     created_at_to_db = datetime.datetime.now().isoformat()
-                     app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
-
+                    created_at_to_db = datetime.datetime.now().isoformat()
+                    app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
         else:
-             old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
-             if old_db_entry and old_db_entry['created_at']:
-                 try:
-                      datetime.datetime.fromisoformat(old_db_entry['created_at'])
-                      created_at_to_db = old_db_entry['created_at']
-                      app.logger.info(f"使用数据库记录的创建时间 '{created_at_to_db}' for {name} (Incus did not provide created_at).")
-                 except (ValueError, TypeError):
-                      app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式 (Incus did not provide created_at).")
-                      created_at_to_db = datetime.datetime.now().isoformat()
-                      app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
-             else:
-                  created_at_to_db = datetime.datetime.now().isoformat()
-                  app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
-
+            old_db_entry = query_db('SELECT created_at FROM containers WHERE incus_name = ?', [name], one=True)
+            if old_db_entry and old_db_entry['created_at']:
+                try:
+                    datetime.datetime.fromisoformat(old_db_entry['created_at'])
+                    created_at_to_db = old_db_entry['created_at']
+                    app.logger.info(f"使用数据库记录的创建时间 '{created_at_to_db}' for {name} (Incus did not provide created_at).")
+                except (ValueError, TypeError):
+                    app.logger.warning(f"数据库记录的创建时间 '{old_db_entry['created_at']}' for {name} 也是无效 ISO 格式 (Incus did not provide created_at).")
+                    created_at_to_db = datetime.datetime.now().isoformat()
+                    app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
+            else:
+                created_at_to_db = datetime.datetime.now().isoformat()
+                app.logger.info(f"使用当前时间作为创建时间 for {name} (Incus did not provide created_at).")
 
         query_db('''
             INSERT INTO containers (incus_name, image_source, status, created_at, last_synced)
@@ -250,6 +240,8 @@ def sync_container_to_db(name, image_source, status, created_at_str):
         ''', (name, image_source, status, created_at_to_db))
     except sqlite3.Error as e:
         app.logger.error(f"数据库错误 sync_container_to_db for {name}: {e}")
+    except Exception as e:
+        app.logger.error(f"sync_container_to_db 中发生未知错误 for {name}: {e}")
 
 
 def remove_container_from_db(name):
@@ -303,7 +295,6 @@ def _get_container_raw_info(name):
                                         info_output['ip'] = addr.split('/')[0]
                                         break
                             if info_output['ip'] != 'N/A': break
-
         return info_output, None
 
     elif db_info:
@@ -436,14 +427,14 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
         if orphaned_names:
             app.logger.warning(f"检测到数据库中存在孤立的NAT规则记录，对应的容器已不存在于Incus: {orphaned_names}")
             placeholders = ','.join('?' * len(orphaned_names))
-            query = f'DELETE FROM nat_rules WHERE container_name IN ({placeholders})'
-            query_db(query, orphaned_names)
-            app.logger.info(f"已从数据库中移除 {len(orphaned_names)} 个孤立容器 ({len(db_rule_container_names) - len(orphaned_names)} 个现有容器) 的NAT规则记录。")
+            query_nat = f'DELETE FROM nat_rules WHERE container_name IN ({placeholders})'
+            query_db(query_nat, orphaned_names)
+            app.logger.info(f"已从数据库中移除 {len(orphaned_names)} 个孤立容器的NAT规则记录。")
 
-            container_placeholders = ','.join('?' * len(orphaned_names))
-            container_query = f'DELETE FROM containers WHERE incus_name IN ({container_placeholders})'
-            query_db(container_query, orphaned_names)
-            app.logger.info(f"已从数据库中移除 {len(orphaned_names)} 个孤立容器的容器记录 (如果存在)。")
+            query_containers = f'DELETE FROM containers WHERE incus_name IN ({placeholders})'
+            query_db(query_containers, orphaned_names)
+            app.logger.info(f"已从数据库中移除 {len(orphaned_names)} 个孤立容器记录。")
+
 
     except sqlite3.Error as e:
         app.logger.error(f"数据库错误 cleanup_orphaned_nat_rules_in_db: {e}")
@@ -666,8 +657,9 @@ def create_container():
     memory_mb = request.form.get('memory_mb')
     disk_gb = request.form.get('disk_gb')
     storage_pool = request.form.get('storage_pool')
-    swap_mb = request.form.get('swap_mb')
-    bandwidth_mbit = request.form.get('bandwidth_mbit')
+    swap_enabled = request.form.get('swap_enabled')
+    security_nesting = request.form.get('security_nesting')
+
 
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
@@ -691,13 +683,18 @@ def create_container():
             command.extend(['-c', f'limits.memory={memory_mb}MB'])
         if disk_gb and int(disk_gb) > 0:
             command.extend(['-d', f'root,size={disk_gb}GB'])
-        if swap_mb and int(swap_mb) >= 0:
-            command.extend(['-c', f'limits.swap={swap_mb}MB'])
 
-        command.extend(['-c', 'security.nesting=true'])
+        if swap_enabled == 'on':
+            command.extend(['-c', 'limits.memory.swap=true'])
+        else:
+            command.extend(['-c', 'limits.memory.swap=false'])
+
+        if security_nesting == 'on':
+            command.extend(['-c', 'security.nesting=true'])
 
     except ValueError:
         return jsonify({'status': 'error', 'message': '资源限制参数必须是有效的数字。'}), 400
+
 
     success, output = run_incus_command(command[1:], parse_json=False, timeout=180)
 
@@ -709,7 +706,6 @@ def create_container():
         created_at = None
         image_source_desc = image
         status_val = 'Pending'
-        container_running = False
 
         if isinstance(list_output, list) and len(list_output) > 0 and isinstance(list_output[0], dict):
              container_data = list_output[0]
@@ -719,40 +715,13 @@ def create_container():
              if isinstance(list_cfg, dict):
                   list_img_desc = list_cfg.get('image.description')
                   if list_img_desc: image_source_desc = list_img_desc
-             app.logger.info(f"成功获取新容器 {name} 的列表信息。")
-             if status_val == 'Running':
-                 container_running = True
+             app.logger.info(f"成功获取新容器 {name} 的列表信息。状态: {status_val}")
         else:
              app.logger.warning(f"创建后未能获取新容器 {name} 的列表信息。列表输出: {list_output}")
 
         sync_container_to_db(name, image_source_desc, status_val, created_at)
 
-        tc_message = ""
-        if container_running and bandwidth_mbit:
-            try:
-                rate_kbit = int(bandwidth_mbit) * 1000
-                if rate_kbit > 0:
-                    tc_command_str = f"tc qdisc del dev eth0 root 2>/dev/null; tc qdisc add dev eth0 root tbf rate {rate_kbit}kbit burst 100k latency 50ms"
-                    app.logger.info(f"为 {name} 应用 TC 规则: {tc_command_str}")
-                    tc_success, tc_output = run_incus_command(
-                        ['exec', name, '--', 'sh', '-c', tc_command_str],
-                        parse_json=False,
-                        timeout=30
-                    )
-                    if tc_success:
-                        app.logger.info(f"成功为 {name} 应用 TC 规则。")
-                        tc_message = f" TC 带宽限制 ({bandwidth_mbit} Mbit) 已尝试应用。"
-                    else:
-                        app.logger.warning(f"为 {name} 应用 TC 规则失败: {tc_output}. 请确保容器内已安装 iproute2。")
-                        tc_message = f" TC 带宽限制应用失败 (详情查看日志)。"
-            except ValueError:
-                app.logger.error(f"为 {name} 应用 TC 规则失败: 无效的带宽值 '{bandwidth_mbit}'。")
-                tc_message = f" TC 带宽限制应用失败 (无效值)。"
-            except Exception as e:
-                app.logger.error(f"为 {name} 应用 TC 规则时发生异常: {e}")
-                tc_message = f" TC 带宽限制应用失败 (异常)。"
-
-        return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。{tc_message}'}), 200
+        return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。'}), 200
     else:
         app.logger.error(f"启动容器 {name} 失败: {output}")
         return jsonify({'status': 'error', 'message': f'创建容器 {name} 失败: {output}'}), 500
@@ -1098,6 +1067,10 @@ def perform_initial_setup():
             print(f"错误：数据库表 'containers' 缺少必需的列: {', '.join(missing_container_columns)}")
             print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
             sys.exit(1)
+        
+        if 'traffic_quota_gb' in containers_column_names:
+            print(f"提示：数据库表 'containers' 仍存在 'traffic_quota_gb' 列。此功能已移除，该列不再使用。")
+
 
         cursor.execute("PRAGMA index_list(containers);")
         indexes = cursor.fetchall()
