@@ -637,8 +637,7 @@ def index():
                            containers=listed_containers,
                            images=available_images,
                            incus_error=(incus_error, incus_error_message),
-                           image_error=(image_error, image_error_message),
-                           API_SECRET_HASH=SETTINGS.get('api_key_hash', ''))
+                           image_error=(image_error, image_error_message))
 
 
 @app.route('/container/create', methods=['POST'])
@@ -646,58 +645,41 @@ def index():
 def create_container():
     name = request.form.get('name')
     image = request.form.get('image')
+    cpu_cores = request.form.get('cpu_cores')
+    cpu_allowance = request.form.get('cpu_allowance')
+    memory_mb = request.form.get('memory_mb')
+    disk_gb = request.form.get('disk_gb')
 
     if not name or not image:
         return jsonify({'status': 'error', 'message': '容器名称和镜像不能为空'}), 400
 
     db_exists = query_db('SELECT 1 FROM containers WHERE incus_name = ?', [name], one=True)
     if db_exists:
-        app.logger.warning(f"Attempted to create container {name} which already exists in DB.")
+        app.logger.warning(f"尝试创建已存在于数据库的容器 {name}。")
         return jsonify({'status': 'error', 'message': f'名称为 "{name}" 的容器在数据库中已存在记录。请尝试刷新列表或使用其他名称。'}), 409
 
-    limits_cpu = request.form.get('limits_cpu')
-    limits_cpu_allowance = request.form.get('limits_cpu_allowance')
-    limits_memory = request.form.get('limits_memory')
-    limits_memory_swap = request.form.get('limits_memory_swap') 
-    limits_memory_swap_priority = request.form.get('limits_memory_swap_priority')
-    root_disk_size = request.form.get('root_disk_size')
-    limits_ingress = request.form.get('limits_ingress')
-    limits_egress = request.form.get('limits_egress')
+    command = ['incus', 'launch', image, name]
 
-    launch_command = ['incus', 'launch', image, name]
-    config_options = []
-    device_options = []
-
-    if limits_cpu:
-        config_options.extend(['-c', f'limits.cpu={limits_cpu}'])
-    if limits_cpu_allowance:
-        config_options.extend(['-c', f'limits.cpu.allowance={limits_cpu_allowance}'])
-    if limits_memory:
-        config_options.extend(['-c', f'limits.memory={limits_memory}'])
-
-    if limits_memory_swap == 'true':
-        config_options.extend(['-c', 'limits.memory.swap=true'])
-        if limits_memory_swap_priority:
-            config_options.extend(['-c', f'limits.memory.swap.priority={limits_memory_swap_priority}'])
-    else:
-        config_options.extend(['-c', 'limits.memory.swap=false'])
+    try:
+        if cpu_cores and int(cpu_cores) > 0:
+            command.extend(['-c', f'limits.cpu={cpu_cores}'])
+        if cpu_allowance and 0 < int(cpu_allowance) <= 100:
+            command.extend(['-c', f'limits.cpu.allowance={cpu_allowance}%'])
+        if memory_mb and int(memory_mb) > 0:
+            command.extend(['-c', f'limits.memory={memory_mb}MB'])
+        if disk_gb and int(disk_gb) > 0:
+            command.extend(['-d', f'root,size={disk_gb}GB'])
+    except ValueError:
+        return jsonify({'status': 'error', 'message': '资源限制参数必须是有效的数字。'}), 400
 
 
-    if root_disk_size:
-        device_options.extend(['-d', f'root,size={root_disk_size}'])
-    if limits_ingress:
-        config_options.extend(['-c', f'limits.ingress={limits_ingress}'])
-    if limits_egress:
-        config_options.extend(['-c', f'limits.egress={limits_egress}'])
-
-    launch_command.extend(config_options)
-    launch_command.extend(device_options)
-
-    success, output = run_command(launch_command, parse_json=False, timeout=180)
+    success, output = run_incus_command(command[1:], parse_json=False, timeout=180) # 使用 command[1:] 因为 run_incus_command 会自动添加 'incus'
 
     if success:
         time.sleep(5)
+
         _, list_output = run_incus_command(['list', name, '--format', 'json'])
+
         created_at = None
         image_source_desc = image
         status_val = 'Pending'
@@ -710,13 +692,14 @@ def create_container():
              if isinstance(list_cfg, dict):
                   list_img_desc = list_cfg.get('image.description')
                   if list_img_desc: image_source_desc = list_img_desc
-             app.logger.info(f"Successfully got list info for new container {name} after launch.")
+             app.logger.info(f"成功获取新容器 {name} 的列表信息。")
         else:
-             app.logger.warning(f"Failed to get list info for new container {name} after launch. list output: {list_output}")
+             app.logger.warning(f"创建后未能获取新容器 {name} 的列表信息。列表输出: {list_output}")
         sync_container_to_db(name, image_source_desc, status_val, created_at)
-        return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。状态将很快同步。'}), 200
+
+        return jsonify({'status': 'success', 'message': f'容器 {name} 创建并启动操作已提交。'}), 200
     else:
-        app.logger.error(f"Failed to launch container {name}: {output}")
+        app.logger.error(f"启动容器 {name} 失败: {output}")
         return jsonify({'status': 'error', 'message': f'创建容器 {name} 失败: {output}'}), 500
 
 
@@ -731,21 +714,21 @@ def container_action(name):
     }
 
     if action == 'delete':
-        app.logger.info(f"Attempting to delete container {name} and its associated NAT rules.")
+        app.logger.info(f"尝试删除容器 {name} 及其关联的 NAT 规则。")
 
         success_db_rules, rules = get_nat_rules_for_container(name)
         if not success_db_rules:
-             app.logger.error(f"Failed to fetch NAT rules for container {name} before deletion: {rules}")
+             app.logger.error(f"删除容器前从数据库获取 NAT 规则失败: {rules}")
              return jsonify({'status': 'error', 'message': f'删除容器前从数据库获取NAT规则失败: {rules}'}), 500
 
         failed_rule_deletions = []
         warning_rule_deletions = []
         if rules:
-            app.logger.info(f"Found {len(rules)} associated NAT rules in DB for {name}. Attempting iptables delete...")
+            app.logger.info(f"找到 {len(rules)} 条关联的 NAT 规则记录。尝试删除 iptables 规则...")
             for rule in rules:
                 if not all(key in rule for key in ['id', 'host_port', 'container_port', 'protocol', 'ip_at_creation']):
-                     app.logger.error(f"Incomplete NAT rule details in DB for deletion, skipping iptables delete for rule: {rule}")
-                     failed_rule_deletions.append(f"Rule ID {rule.get('id', 'N/A')} (数据库记录不完整)")
+                     app.logger.error(f"数据库中 NAT 规则记录不完整，跳过 iptables 删除: {rule}")
+                     failed_rule_deletions.append(f"规则 ID {rule.get('id', 'N/A')} (数据库记录不完整)")
                      continue
 
                 success_iptables_delete, iptables_message, is_bad_rule = perform_iptables_delete_for_rule(rule)
@@ -753,18 +736,18 @@ def container_action(name):
                 if not success_iptables_delete:
                     if is_bad_rule:
                          warning_rule_deletions.append(iptables_message)
-                         app.logger.warning(f"IPTables delete failed with 'Bad rule' for rule ID {rule.get('id', 'N/A')}: {iptables_message}. Proceeding with DB delete.")
+                         app.logger.warning(f"IPTables 删除失败 (规则不存在) ID {rule.get('id', 'N/A')}: {iptables_message}. 继续删除数据库记录。")
                          db_success, db_msg = remove_nat_rule_from_db(rule['id'])
                          if not db_success:
-                              app.logger.error(f"IPTables rule deletion reported 'Bad rule' for ID {rule['id']}, but failed to remove record from DB: {db_msg}")
+                              app.logger.error(f"IPTables 规则不存在，但从数据库删除记录失败 ID {rule['id']}: {db_msg}")
                     else:
                          failed_rule_deletions.append(iptables_message)
-                         app.logger.error(f"IPTables delete failed (not Bad rule) for rule ID {rule.get('id', 'N/A')}: {iptables_message}. Aborting container delete attempt for this rule.")
+                         app.logger.error(f"IPTables 删除失败 ID {rule.get('id', 'N/A')}: {iptables_message}. 终止容器删除。")
                 else:
                     db_success, db_msg = remove_nat_rule_from_db(rule['id'])
                     if not db_success:
-                        app.logger.error(f"IPTables rule deleted for ID {rule['id']}, but failed to remove record from DB: {db_msg}")
-                        failed_rule_deletions.append(f"Rule ID {rule['id']} (iptables deleted, DB delete failed: {db_msg})")
+                        app.logger.error(f"IPTables 规则已删除 ID {rule['id']}, 但从数据库删除记录失败: {db_msg}")
+                        failed_rule_deletions.append(f"规则 ID {rule['id']} (iptables 已删, DB 删除失败: {db_msg})")
 
         if failed_rule_deletions:
             error_message = f"删除容器 {name} 前，未能移除所有关联的 NAT 规则 ({len(failed_rule_deletions)}/{len(rules) if rules else 0} 条 iptables 删除失败)。请手动检查 iptables。<br>失败详情: " + "; ".join(failed_rule_deletions)
@@ -773,7 +756,7 @@ def container_action(name):
             app.logger.error(error_message)
             return jsonify({'status': 'error', 'message': error_message}), 500
 
-        app.logger.info(f"All {len(rules) if rules else 0} associated NAT rules for {name} successfully handled for iptables delete (or none existed). Proceeding with Incus container deletion.")
+        app.logger.info(f"所有 {len(rules) if rules else 0} 条关联 NAT 规则已处理。继续删除 Incus 容器。")
         success_incus_delete, incus_output = run_incus_command(['delete', name, '--force'], parse_json=False, timeout=120)
 
         if success_incus_delete:
@@ -829,14 +812,14 @@ def container_action(name):
              if action == 'start': new_status_val = 'Running'
              elif action == 'stop': new_status_val = 'Stopped'
              elif action == 'restart': new_status_val = 'Running'
-             message = f'容器 {name} {action} 操作提交成功，但无法获取最新状态（list命令失败或容器状态未立即更新）。'
-             app.logger.warning(f"Failed to get updated status for {name} after {action}. list output: {list_output}")
+             message = f'容器 {name} {action} 操作提交成功，但无法获取最新状态。'
+             app.logger.warning(f"{action} 后未能获取 {name} 的更新状态。列表输出: {list_output}")
 
         sync_container_to_db(name, db_image_source, new_status_val, db_created_at)
 
         return jsonify({'status': 'success', 'message': message}), 200
     else:
-        app.logger.error(f"Incus action '{action}' failed for {name}: {output}")
+        app.logger.error(f"Incus 操作 '{action}' 失败 for {name}: {output}")
         return jsonify({'status': 'error', 'message': f'容器 {name} {action} 操作失败: {output}'}), 500
 
 
