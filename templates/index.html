@@ -370,13 +370,21 @@
                                     <label for="diskGB" class="form-label">硬盘 (GB) (可选)</label>
                                     <input type="number" class="form-control" id="diskGB" name="disk_gb" min="1" placeholder="例如: 10">
                                 </div>
-                                <div class="col-6">
-                                    <label for="swapMB" class="form-label">SWAP (MB) (可选)</label>
-                                    <input type="number" class="form-control" id="swapMB" name="swap_mb" min="0" placeholder="例如: 512">
+                                <div class="col-6 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="swapEnabled" name="swap_enabled">
+                                        <label class="form-check-label" for="swapEnabled">
+                                            启用 Swap
+                                        </label>
+                                    </div>
                                 </div>
-                                <div class="col-6">
-                                    <label for="bandwidthMbit" class="form-label">带宽 (Mbit) (可选)</label>
-                                    <input type="number" class="form-control" id="bandwidthMbit" name="bandwidth_mbit" min="1" placeholder="例如: 100">
+                                <div class="col-6 d-flex align-items-end">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="securityNesting" name="security_nesting">
+                                        <label class="form-check-label" for="securityNesting">
+                                            允许嵌套
+                                        </label>
+                                    </div>
                                 </div>
                                 <div class="col-12">
                                     <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
@@ -582,13 +590,21 @@
                                 <label for="diskGBMobile" class="form-label">硬盘(GB)</label>
                                 <input type="number" class="form-control" id="diskGBMobile" name="disk_gb" min="1" placeholder="可选">
                             </div>
-                            <div class="col-6">
-                                <label for="swapMBMobile" class="form-label">SWAP(MB)</label>
-                                <input type="number" class="form-control" id="swapMBMobile" name="swap_mb" min="0" placeholder="可选">
+                            <div class="col-6 d-flex align-items-center">
+                                 <div class="form-check">
+                                     <input class="form-check-input" type="checkbox" id="swapEnabledMobile" name="swap_enabled">
+                                     <label class="form-check-label" for="swapEnabledMobile">
+                                         启用 Swap
+                                     </label>
+                                 </div>
                             </div>
-                             <div class="col-6">
-                                <label for="bandwidthMbitMobile" class="form-label">带宽(Mbit)</label>
-                                <input type="number" class="form-control" id="bandwidthMbitMobile" name="bandwidth_mbit" min="1" placeholder="可选">
+                            <div class="col-6 d-flex align-items-center">
+                                 <div class="form-check">
+                                     <input class="form-check-input" type="checkbox" id="securityNestingMobile" name="security_nesting">
+                                     <label class="form-check-label" for="securityNestingMobile">
+                                         允许嵌套
+                                     </label>
+                                 </div>
                             </div>
                             <div class="col-12">
                                 <button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button>
@@ -928,6 +944,14 @@ function showInfo(containerName, buttonElement) {
             }
              if (data.config && data.config['limits.memory']) {
                 limitsHtml += `<li><strong>内存:</strong> ${data.config['limits.memory']}</li>`;
+                hasLimits = true;
+            }
+             if (data.config && data.config['limits.memory.swap']) {
+                limitsHtml += `<li><strong>启用 Swap:</strong> ${data.config['limits.memory.swap']}</li>`;
+                hasLimits = true;
+            }
+            if (data.config && data.config['security.nesting']) {
+                limitsHtml += `<li><strong>允许嵌套:</strong> ${data.config['security.nesting']}</li>`;
                 hasLimits = true;
             }
             let rootDiskSize = '默认';
