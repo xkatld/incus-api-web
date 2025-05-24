@@ -97,7 +97,7 @@
                     <div id="containerListDesktopItems">
                         {% if containers %}
                             {% for c in containers %}
-                            <div class="custom-container-list-row">
+                            <div class="custom-container-list-row" data-container-ip="{{ c.ip if c.ip and c.ip != 'N/A' else '' }}">
                                 <div class="custom-col custom-col-name"><div class="truncate-text" title="{{ c.name }}">{{ c.name }}</div></div>
                                 <div class="custom-col custom-col-status"><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></div>
                                 <div class="custom-col custom-col-ip"><div class="truncate-text" title="{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}">{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</div></div>
@@ -112,7 +112,7 @@
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
-                                            <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">在线终端</button></li>
+                                            <li><button class="dropdown-item" type="button" onclick="openSshModal('{{ c.name }}', '{{ c.ip if c.ip and c.ip != 'N/A' else '' }}')">在线 SSH</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
                                             {% elif c.status == 'Stopped' %}
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
@@ -149,7 +149,7 @@
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
-                                        <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">在线终端</button></li>
+                                        <li><button class="dropdown-item" type="button" onclick="openSshModal('{{ c.name }}', '{{ c.ip if c.ip and c.ip != 'N/A' else '' }}')">在线 SSH</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
                                         {% elif c.status == 'Stopped' %}
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
@@ -327,10 +327,49 @@
             </div>
         </div>
     </div>
+
+    <div class="modal fade" id="sshModal" tabindex="-1" aria-labelledby="sshModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sshModalLabel">SSH 连接信息</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="sshConnectForm">
+                        <div class="alert alert-info" role="alert">
+                           请输入容器的 SSH 连接信息。请确保容器已启动 SSH 服务，并且网络可达。
+                        </div>
+                        <input type="hidden" id="sshContainerName">
+                        <div class="mb-3">
+                            <label for="sshHost" class="form-label">主机 IP 地址</label>
+                            <input type="text" class="form-control" id="sshHost" name="host" required>
+                            <div class="form-text">通常是容器列表中显示的 IP 地址。</div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sshPort" class="form-label">端口</label>
+                            <input type="number" class="form-control" id="sshPort" name="port" value="22" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sshUser" class="form-label">用户名</label>
+                            <input type="text" class="form-control" id="sshUser" name="user" value="root" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="sshPassword" class="form-label">密码</label>
+                            <input type="password" class="form-control" id="sshPassword" name="password" required>
+                             <div class="form-text text-warning">密码将通过 WebSocket 传输，请确保连接安全 (如使用 HTTPS)。</div>
+                        </div>
+                        <button type="submit" class="btn btn-primary w-100">连接</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-xl">
             <div class="modal-content">
-                <div class="modal-header"><h5 class="modal-title" id="terminalModalLabel">在线终端</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-header"><h5 class="modal-title" id="terminalModalLabel">在线 SSH</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body"><div id="terminal"></div></div>
                 <div class="modal-footer"><span id="terminalStatus" class="me-auto text-muted small">未连接</span><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button></div>
             </div>
@@ -773,48 +812,129 @@ $('#infoModal').on('hidden.bs.modal', function () { $('#basicInfoContent').html(
 $('#execModal').on('hidden.bs.modal', function () { $('#execContainerName').val(''); $('#commandInput').val(''); $('#execOutput').text('').removeClass('success error'); $('#execModalLabel').text('在容器内执行命令'); setButtonProcessing($('#execButton'), false); });
 $('#natModal').on('hidden.bs.modal', function () { $('#natContainerName').val(''); $('#natContainerIP').val(''); $('#hostPort').val(''); $('#containerPort').val(''); $('#protocol').val('tcp'); $('#natModalLabel').text('为容器添加 NAT 规则'); setButtonProcessing($('#addNatButton'), false); $('#addNatButton').prop('disabled', false).text('添加规则'); });
 
+// --- SSH 终端相关代码 ---
 let term = null;
 let fitAddon = null;
 let socket = null;
 const terminalModalElement = document.getElementById('terminalModal');
 const terminalContainer = document.getElementById('terminal');
 const terminalStatus = document.getElementById('terminalStatus');
+const sshModalElement = document.getElementById('sshModal');
+const sshConnectForm = document.getElementById('sshConnectForm');
+let currentContainerName = null;
 
-function openTerminalModal(containerName) {
-    $('#terminalModalLabel').text(`在线终端: ${containerName}`);
+function openSshModal(containerName, containerIp) {
+    currentContainerName = containerName;
+    $('#sshModalLabel').text(`连接到 ${containerName} (SSH)`);
+    $('#sshContainerName').val(containerName);
+    $('#sshHost').val(containerIp || ''); // 尝试预填充 IP
+    $('#sshPassword').val('');
+    const sshModal = new bootstrap.Modal(sshModalElement);
+    sshModal.show();
+}
+
+sshConnectForm.addEventListener('submit', function(event) {
+    event.preventDefault();
+    const host = $('#sshHost').val();
+    const port = $('#sshPort').val();
+    const user = $('#sshUser').val();
+    const password = $('#sshPassword').val();
+
+    bootstrap.Modal.getInstance(sshModalElement).hide();
+    startSshSession(currentContainerName, host, port, user, password);
+});
+
+function startSshSession(containerName, host, port, user, password) {
+    $('#terminalModalLabel').text(`在线 SSH: ${containerName}`);
     terminalStatus.textContent = '正在连接...';
+
     const terminalModal = new bootstrap.Modal(terminalModalElement);
+
     if (term) { term.dispose(); term = null; }
     if (socket && socket.connected) { socket.disconnect(); socket = null; }
+
     term = new Terminal({ cursorBlink: true, rows: 25, cols: 80, fontFamily: 'monospace, "Courier New", Courier', fontSize: 14, theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4', selectionBackground: '#555555' }, allowTransparency: true, convertEol: true });
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     term.open(terminalContainer);
     terminalModal.show();
+
     setTimeout(() => { try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error:", e); } }, 250);
+
     socket = io({ transports: ['websocket'] });
-    socket.on('connect', () => { console.log('Socket.IO 已连接:', socket.id); terminalStatus.textContent = '已连接，等待认证...'; });
-    socket.on('auth_success', () => {
-        console.log('Socket.IO 认证成功，正在启动终端...');
-        terminalStatus.textContent = '认证成功，启动终端...';
-        socket.emit('start_terminal', { container_name: containerName });
-        setTimeout(() => { if (socket && socket.connected) { socket.emit('resize', { rows: term.rows, cols: term.cols }); } }, 100);
+
+    socket.on('connect', () => {
+        console.log('Socket.IO 已连接:', socket.id);
+        terminalStatus.textContent = '已连接，等待认证...';
     });
-    socket.on('terminal_ready', (data) => { console.log('终端已就绪:', data.message); terminalStatus.textContent = `已连接到 ${containerName}`; term.focus(); });
-    socket.on('terminal_output', (data) => { term.write(data.output); });
-    socket.on('terminal_closed', (data) => { console.warn('终端已关闭:', data.message); terminalStatus.textContent = `连接已关闭: ${data.message}`; term.write(`\r\n\r\n--- ${data.message} ---\r\n`); if (socket) socket.disconnect(); });
-    socket.on('disconnect', () => { console.log('Socket.IO 已断开连接。'); if(terminalStatus.textContent.indexOf('关闭') === -1) { terminalStatus.textContent = '连接已断开。'; if (term) { term.write('\r\n\r\n--- 连接已断开 ---\r\n'); } } });
-    socket.on('connect_error', (err) => { console.error('Socket.IO 连接错误:', err); terminalStatus.textContent = `连接错误: ${err.message}`; if (term) { term.write(`\r\n\r\n--- 连接错误: ${err.message} ---\r\n`); } });
-    term.onData((data) => { if (socket && socket.connected) { socket.emit('terminal_input', { 'input': data }); } });
-    term.onResize(({ cols, rows }) => { if (socket && socket.connected) { console.log(`调整大小为 ${rows}x${cols}`); socket.emit('resize', { rows: rows, cols: cols }); } });
-    terminalModalElement.addEventListener('shown.bs.modal', () => { try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error on show:", e); } });
+
+    socket.on('auth_success', () => {
+        console.log('Socket.IO 认证成功，正在连接 SSH...');
+        terminalStatus.textContent = '正在连接 SSH...';
+        socket.emit('ssh_connect', { host: host, port: port, user: user, password: password });
+    });
+
+    socket.on('ssh_ready', (data) => {
+        console.log('SSH 已就绪:', data.message);
+        terminalStatus.textContent = `已连接到 ${containerName}`;
+        term.focus();
+        socket.emit('ssh_resize', { rows: term.rows, cols: term.cols });
+    });
+
+    socket.on('terminal_output', (data) => {
+        term.write(data.output);
+    });
+
+    socket.on('terminal_closed', (data) => {
+        console.warn('连接已关闭:', data.message);
+        terminalStatus.textContent = `连接已关闭: ${data.message}`;
+        term.write(`\r\n\r\n--- ${data.message} ---\r\n`);
+        if (socket) socket.disconnect();
+    });
+
+    socket.on('disconnect', () => {
+        console.log('Socket.IO 已断开连接。');
+        if(terminalStatus.textContent.indexOf('关闭') === -1) {
+            terminalStatus.textContent = '连接已断开。';
+            if (term) { term.write('\r\n\r\n--- 连接已断开 ---\r\n'); }
+        }
+    });
+
+    socket.on('connect_error', (err) => {
+        console.error('Socket.IO 连接错误:', err);
+        terminalStatus.textContent = `连接错误: ${err.message}`;
+        if (term) { term.write(`\r\n\r\n--- 连接错误: ${err.message} ---\r\n`); }
+    });
+
+    term.onData((data) => {
+        if (socket && socket.connected) {
+            socket.emit('terminal_input', { 'input': data });
+        }
+    });
+
+    term.onResize(({ cols, rows }) => {
+        if (socket && socket.connected) {
+            console.log(`调整大小为 ${rows}x${cols}`);
+            socket.emit('ssh_resize', { rows: rows, cols: cols });
+        }
+    });
+
+    terminalModalElement.addEventListener('shown.bs.modal', () => {
+        try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error on show:", e); }
+    });
+
     terminalModalElement.addEventListener('hidden.bs.modal', () => {
         if (socket) { socket.disconnect(); socket = null; }
         if (term) { term.dispose(); term = null; }
         terminalStatus.textContent = '未连接';
         console.log("终端模态框已关闭，资源已释放。");
     });
-    $(window).on('resize', function(){ if (term && fitAddon && $('#terminalModal').is(':visible')) { try { fitAddon.fit(); } catch(e) { console.error("Fit addon error on window resize:", e); } } });
+
+    $(window).on('resize', function(){
+        if (term && fitAddon && $('#terminalModal').is(':visible')) {
+            try { fitAddon.fit(); } catch(e) { console.error("Fit addon error on window resize:", e); }
+        }
+    });
 }
 </script>
 </body>
