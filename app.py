@@ -1,5 +1,12 @@
+try:
+    from gevent import monkey
+    monkey.patch_all()
+    print("Gevent monkey-patching applied.")
+except ImportError:
+    print("警告: 未找到 Gevent，跳过猴子补丁。SocketIO 可能无法正常工作。")
+
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
-from flask_socketio import SocketIO, emit # 添加 SocketIO
+from flask_socketio import SocketIO, emit
 import subprocess
 import json
 import sqlite3
@@ -12,31 +19,20 @@ import sys
 import secrets
 import hashlib
 from functools import wraps
-# 添加 PTY 和相关模块
-import pty
-import fcntl
-import termios
-import struct
-import select
-import threading
-import signal
-
+import paramiko # 引入 paramiko
+import threading # 使用 threading (gevent会打补丁) 或直接 gevent.spawn
 
 app = Flask(__name__)
 app.debug = True
-
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
-
-# 初始化 SocketIO，使用 gevent 模式
 socketio = SocketIO(app, async_mode='gevent')
-
 DATABASE_NAME = 'incus_manager.db'
-
 SETTINGS = {}
 
-# 存储活动的 PTY 进程和文件描述符
-pty_procs = {}
+# 存储活动的 SSH 连接
+ssh_connections = {}
 
+# --- (数据库和辅助函数，保持不变) ---
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_NAME)
     conn.row_factory = sqlite3.Row
@@ -457,7 +453,7 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
     except Exception as e:
         app.logger.error(f"清理孤立NAT规则时发生异常: {e}")
 
-
+# --- (Flask 路由，保持不变) ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if not SETTINGS:
@@ -1036,253 +1032,139 @@ def delete_nat_rule(rule_id):
         app.logger.error(f"iptables delete command failed for rule ID {rule_id}: {iptables_message}")
         return jsonify({'status': 'error', 'message': message}), 500
 
+# --- SSH SocketIO 功能 ---
+def cleanup_ssh(sid):
+    """清理 SSH 连接资源"""
+    if sid in ssh_connections:
+        app.logger.info(f"正在清理 SID {sid} 的 SSH 连接。")
+        connection = ssh_connections.pop(sid, None)
+        if connection:
+            try:
+                if connection.get('ssh_channel'):
+                    connection['ssh_channel'].close()
+            except Exception as e:
+                app.logger.warning(f"关闭 SSH 通道 {sid} 时出错: {e}")
+            try:
+                if connection.get('ssh_client'):
+                    connection['ssh_client'].close()
+            except Exception as e:
+                app.logger.warning(f"关闭 SSH 客户端 {sid} 时出错: {e}")
+        app.logger.info(f"SID {sid} 的 SSH 清理完成。")
 
-# --- 新增 SocketIO PTY 功能 ---
-
-def set_winsize(fd, row, col, xpix=0, ypix=0):
-    """设置 PTY 的窗口大小"""
-    winsize = struct.pack("HHHH", row, col, xpix, ypix)
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
-
-def read_and_forward_pty_output(sid, master_fd):
-    """读取 PTY 输出并转发到客户端"""
-    while True:
-        try:
-            # 检查会话是否存在
-            if sid not in pty_procs:
-                app.logger.info(f"Session {sid} gone (dict entry removed). Stopping read thread.")
-                break
-
-            proc_info = pty_procs.get(sid)
-            if not proc_info or not proc_info.get('proc'):
-                app.logger.warning(f"Session {sid} info incomplete or missing proc. Stopping thread.")
-                break
-
-            # 检查进程是否存在 (poll 返回 True 表示已终止)
-            if proc_info['proc'].poll():
-                app.logger.info(f"PTY process {proc_info.get('pid', 'N/A')} for session {sid} gone (poll returned True). Stopping read thread.")
-                break
-
-            # 使用 select 实现非阻塞读取
-            r, _, _ = select.select([master_fd], [], [], 0.1)
-            if r:
-                try:
-                    output = os.read(master_fd, 1024)
-                    if not output:
-                        app.logger.info(f"PTY output empty for {sid}. Assuming closure.")
-                        break
-                    # 发送到特定的客户端 (room=sid)
-                    socketio.emit('terminal_output', {'output': output.decode('utf-8', errors='replace')}, room=sid)
-                except OSError as e: # 捕获 os.read 可能的错误
-                    app.logger.error(f"读取 PTY 时发生 OS 错误 {sid}: {e}")
-                    break
-            else:
-                time.sleep(0.01) # 短暂休眠，避免 CPU 占用过高
-
-        except Exception as e:
-            app.logger.error(f"读取 PTY 时发生意外错误 {sid}: {e}")
-            break
-
-    app.logger.info(f"PTY 读取线程 {sid} 结束。")
+def forward_ssh_to_ws(sid, chan):
+    """从 SSH 读取数据并转发到 WebSocket"""
     try:
-        # 通知客户端关闭，并尝试清理
-        socketio.emit('terminal_closed', {'message': '终端会话已关闭。'}, room=sid)
-        if sid in pty_procs:
-            proc_info = pty_procs[sid]
-            pid = proc_info.get('pid')
-            fd = proc_info.get('fd')
-
-            if fd:
-                try: os.close(fd)
-                except: pass
-
-            if pid:
-                try:
-                    pgid = os.getpgid(pid)
-                    os.killpg(pgid, signal.SIGTERM)
-                    time.sleep(0.1)
-                    try:
-                         os.killpg(pgid, 0) # 检查进程组是否存在
-                         os.killpg(pgid, signal.SIGKILL)
-                    except ProcessLookupError: pass # 如果不存在，则跳过
-                except ProcessLookupError:
-                     app.logger.info(f"清理时进程 {pid} (SID: {sid}) 已不存在。")
-                except Exception as kill_e:
-                    app.logger.error(f"杀死 PTY 进程组 {pid} (SID: {sid}) 时出错: {kill_e}")
-                    try: # 后备方案: 直接杀死 PID
-                        os.kill(pid, signal.SIGKILL)
-                    except: pass
-            
-            # 确保从字典中移除
-            if sid in pty_procs:
-                del pty_procs[sid]
-
-    except Exception as cleanup_e:
-        app.logger.error(f"清理 PTY {sid} 时出错: {cleanup_e}")
-        # 即使清理出错也要确保移除
-        if sid in pty_procs:
-            del pty_procs[sid]
-
+        while chan.active and sid in ssh_connections:
+            data = chan.recv(4096)
+            if not data:
+                app.logger.info(f"SSH 通道 {sid} 返回空数据，连接可能已关闭。")
+                break
+            socketio.emit('terminal_output', {'output': data.decode('utf-8', errors='replace')}, room=sid)
+    except Exception as e:
+        app.logger.error(f"SSH -> WS 转发错误 {sid}: {e}")
+    finally:
+        socketio.emit('terminal_closed', {'message': 'SSH 连接已关闭。'}, room=sid)
+        cleanup_ssh(sid)
 
 @socketio.on('connect')
 def handle_connect():
     """处理新的 SocketIO 连接，检查认证"""
+    sid = request.sid
+    app.logger.info(f"SocketIO 客户端已连接: {sid}")
     if not session.get('logged_in'):
-        app.logger.warning(f"未经身份验证的 SocketIO 连接尝试来自 {request.sid}。正在断开。")
+        app.logger.warning(f"未经身份验证的 SocketIO 连接尝试来自 {sid}。正在断开。")
         emit('terminal_closed', {'message': '认证失败。请重新登录。'})
         return False # 拒绝连接
-    app.logger.info(f"SocketIO 客户端已连接: {request.sid}")
+    app.logger.info(f"SocketIO 认证成功 for {sid}, 发送 auth_success。")
     emit('auth_success', {'message': '认证成功，准备启动终端。'})
 
-@socketio.on('start_terminal')
-def handle_start_terminal(data):
-    """为容器启动 'incus exec' PTY 进程"""
+@socketio.on('ssh_connect')
+def handle_ssh_connect(data):
+    """处理 SSH 连接请求"""
+    sid = request.sid
+    app.logger.info(f"SID {sid} received ssh_connect.") # 添加日志
+
     if not session.get('logged_in'):
+        app.logger.warning(f"SID {sid} ssh_connect 认证失败。")
         emit('terminal_closed', {'message': '认证失败。'})
         return
 
-    container_name = data.get('container_name')
-    sid = request.sid
+    host = data.get('host')
+    port = int(data.get('port', 22))
+    user = data.get('user')
+    password = data.get('password')
 
-    if not container_name:
-        emit('terminal_closed', {'message': '未提供容器名称。'})
-        return
-    if sid in pty_procs:
-        emit('terminal_closed', {'message': '此会话已有一个终端在运行。'})
-        return
+    app.logger.info(f"SID {sid} 正在尝试连接 SSH 到 {user}@{host}:{port}")
 
-    app.logger.info(f"正在为容器启动终端: {container_name}, SID: {sid}")
+    if not all([host, user, password]):
+        app.logger.warning(f"SID {sid} 提供的 SSH 参数不足。")
+        emit('terminal_output', {'output': '\r\n错误：主机、用户名和密码不能为空。\r\n'})
+        emit('terminal_closed', {'message': '连接参数不足。'})
+        return
 
     try:
-        pid, master_fd = pty.fork()
-    except OSError as e:
-        app.logger.error(f"为 {container_name} fork PTY 失败: {e}")
-        emit('terminal_closed', {'message': f'创建终端失败: {e}'})
-        return
+        client = paramiko.SSHClient()
+        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        app.logger.info(f"SID {sid} - 正在调用 paramiko.connect...")
+        client.connect(hostname=host, port=port, username=user, password=password, timeout=15, look_for_keys=False)
+        app.logger.info(f"SID {sid} - paramiko.connect 成功。")
+        chan = client.invoke_shell(term='xterm-256color', width=80, height=24)
+        app.logger.info(f"SID {sid} - SSH 通道已调用。")
 
-    if pid == pty.CHILD:
-        # 子进程：执行 incus exec
-        try:
-            os.setsid() # 创建新会话和进程组
+        ssh_connections[sid] = {'ssh_client': client, 'ssh_channel': chan}
 
-            env = os.environ.copy()
-            env['TERM'] = 'xterm-256color'
-            env['LANG'] = 'zh_CN.UTF-8' # 设置为中文环境
-            command = ['incus', 'exec', container_name, '--', '/bin/bash', '-l']
-            app.logger.info(f"子进程 (PID: {os.getpid()}) 正在执行: {' '.join(command)}")
-            os.execvpe(command[0], command, env)
-        except FileNotFoundError:
-             app.logger.error(f"子进程执行 'incus' 失败: 命令未找到。PATH: {os.environ.get('PATH')}")
-             os._exit(127)
-        except Exception as e:
-            app.logger.error(f"子进程执行 'incus' 失败: {e}")
-            os._exit(1)
-    else:
-        # 父进程：管理 PTY 和 WebSocket
-        try:
-            set_winsize(master_fd, 24, 80) # 设置默认大小
-            # 存储进程和 fd
-            pty_procs[sid] = {'pid': pid, 'fd': master_fd, 'proc': None}
+        socketio.start_background_task(target=forward_ssh_to_ws, sid=sid, chan=chan)
 
-            # 改进 poll 检查
-            def poll_check(p_id):
-                try:
-                    res_pid, status = os.waitpid(p_id, os.WNOHANG)
-                    return res_pid != 0 # True if terminated
-                except OSError as e:
-                    app.logger.warning(f"waitpid 错误 for PID {p_id} (SID: {sid}): {e}")
-                    return True # Assume terminated if waitpid fails
+        emit('ssh_ready', {'message': 'SSH 连接成功！'})
+        app.logger.info(f"SID {sid} SSH 连接成功，已发送 ssh_ready。")
 
-            class DummyProc: pass
-            proc = DummyProc()
-            proc.pid = pid
-            proc.poll = lambda: poll_check(pid)
-            pty_procs[sid]['proc'] = proc
-
-
-            # 启动一个线程来读取 PTY 输出
-            thread = threading.Thread(target=read_and_forward_pty_output, args=(sid, master_fd))
-            thread.daemon = True
-            thread.start()
-
-            emit('terminal_ready', {'message': f'终端已就绪 {container_name}。'})
-            app.logger.info(f"PTY 进程 {pid} 已为 {container_name} (SID: {sid}) 启动。")
-
-        except Exception as e:
-            app.logger.error(f"父 PTY 设置 {sid} 出错: {e}")
-            emit('terminal_closed', {'message': f'设置终端时出错: {e}'})
-            if pid:
-                try: os.kill(pid, signal.SIGKILL)
-                except: pass
-            if sid in pty_procs: del pty_procs[sid]
+    except paramiko.AuthenticationException:
+        app.logger.warning(f"SSH 认证失败 {sid} for {user}@{host}")
+        emit('terminal_output', {'output': '\r\nSSH 认证失败：用户名或密码错误。\r\n'})
+        emit('terminal_closed', {'message': '认证失败。'})
+    except Exception as e:
+        app.logger.error(f"SSH 连接失败 {sid} to {user}@{host}: {e}")
+        emit('terminal_output', {'output': f'\r\nSSH 连接失败: {e}\r\n'})
+        emit('terminal_closed', {'message': f'连接失败: {e}。'})
 
 
 @socketio.on('terminal_input')
 def handle_terminal_input(data):
-    """将客户端输入转发到 PTY"""
+    """将客户端输入转发到 SSH"""
     sid = request.sid
-    if sid in pty_procs:
+    if sid in ssh_connections:
         try:
-            os.write(pty_procs[sid]['fd'], data['input'].encode('utf-8'))
-        except OSError as e:
-            app.logger.error(f"写入 PTY {sid} 时出错: {e}")
+            ssh_connections[sid]['ssh_channel'].send(data['input'].encode('utf-8'))
+        except Exception as e:
+            app.logger.error(f"写入 SSH {sid} 时出错: {e}")
+            cleanup_ssh(sid)
     else:
-        app.logger.warning(f"收到未知 SID 的终端输入: {sid}")
+         app.logger.warning(f"收到未知或已关闭 SID {sid} 的终端输入。")
 
-@socketio.on('resize')
-def handle_resize(data):
-    """调整 PTY 窗口大小"""
+
+@socketio.on('ssh_resize')
+def handle_ssh_resize(data):
+    """调整 SSH 终端大小"""
     sid = request.sid
-    if sid in pty_procs:
+    if sid in ssh_connections:
         try:
             rows = int(data['rows'])
             cols = int(data['cols'])
-            set_winsize(pty_procs[sid]['fd'], rows, cols)
-            app.logger.debug(f"已将 {sid} 的 PTY 调整为 {rows}x{cols}")
-        except (OSError, KeyError, ValueError) as e:
-            app.logger.error(f"调整 PTY {sid} 大小时出错: {e}")
+            ssh_connections[sid]['ssh_channel'].resize_pty(width=cols, height=rows)
+            app.logger.debug(f"已将 {sid} 的 SSH PTY 调整为 {rows}x{cols}")
+        except Exception as e:
+            app.logger.error(f"调整 SSH PTY {sid} 大小时出错: {e}")
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """当客户端断开连接时清理 PTY"""
+    """当客户端断开连接时清理 SSH"""
     sid = request.sid
     app.logger.info(f"SocketIO 客户端已断开: {sid}")
-    if sid in pty_procs:
-        app.logger.info(f"正在为断开连接的 SID 清理 PTY: {sid}")
-        proc_info = pty_procs[sid] # 获取信息
-        pid = proc_info.get('pid')
-        fd = proc_info.get('fd')
+    cleanup_ssh(sid)
 
-        # 先从字典中移除，通知读取线程停止
-        del pty_procs[sid]
+# --- 结束 SSH SocketIO 功能 ---
 
-        if fd:
-            try: os.close(fd)
-            except: pass
-        
-        if pid:
-            try:
-                pgid = os.getpgid(pid)
-                os.killpg(pgid, signal.SIGTERM)
-                time.sleep(0.1)
-                try:
-                    os.killpg(pgid, 0) # 检查
-                    os.killpg(pgid, signal.SIGKILL)
-                except ProcessLookupError: pass
-            except ProcessLookupError:
-                 app.logger.info(f"断开连接时进程 {pid} (SID: {sid}) 已不存在。")
-            except Exception as e:
-                app.logger.error(f"断开连接时杀死 PTY 进程/组 {pid} (SID: {sid}) 时出错: {e}")
-                try: # 后备方案
-                    os.kill(pid, signal.SIGKILL)
-                except: pass
-
-        app.logger.info(f"PTY 清理完成 {sid}。")
-
-
-# --- 结束新增 SocketIO PTY 功能 ---
-
-
+# --- (启动和设置代码，保持不变) ---
 def perform_initial_setup():
     print("\n============================================")
     print(" Incus Web 管理器启动信息")
