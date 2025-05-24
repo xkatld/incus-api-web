@@ -1048,26 +1048,37 @@ def read_and_forward_pty_output(sid, master_fd):
     """读取 PTY 输出并转发到客户端"""
     while True:
         try:
-            # 检查会话和进程是否存在
-            if sid not in pty_procs or pty_procs[sid]['proc'].poll() is not None:
-                app.logger.info(f"PTY process or session {sid} gone. Stopping read thread.")
+            # 检查会话是否存在
+            if sid not in pty_procs:
+                app.logger.info(f"Session {sid} gone (dict entry removed). Stopping read thread.")
+                break
+
+            proc_info = pty_procs.get(sid)
+            if not proc_info or not proc_info.get('proc'):
+                app.logger.warning(f"Session {sid} info incomplete or missing proc. Stopping thread.")
+                break
+
+            # 检查进程是否存在 (poll 返回 True 表示已终止)
+            if proc_info['proc'].poll():
+                app.logger.info(f"PTY process {proc_info.get('pid', 'N/A')} for session {sid} gone (poll returned True). Stopping read thread.")
                 break
 
             # 使用 select 实现非阻塞读取
             r, _, _ = select.select([master_fd], [], [], 0.1)
             if r:
-                output = os.read(master_fd, 1024)
-                if not output:
-                    app.logger.info(f"PTY output empty for {sid}. Assuming closure.")
+                try:
+                    output = os.read(master_fd, 1024)
+                    if not output:
+                        app.logger.info(f"PTY output empty for {sid}. Assuming closure.")
+                        break
+                    # 发送到特定的客户端 (room=sid)
+                    socketio.emit('terminal_output', {'output': output.decode('utf-8', errors='replace')}, room=sid)
+                except OSError as e: # 捕获 os.read 可能的错误
+                    app.logger.error(f"读取 PTY 时发生 OS 错误 {sid}: {e}")
                     break
-                # 发送到特定的客户端 (room=sid)
-                socketio.emit('terminal_output', {'output': output.decode('utf-8', errors='replace')}, room=sid)
             else:
                 time.sleep(0.01) # 短暂休眠，避免 CPU 占用过高
 
-        except OSError as e:
-            app.logger.error(f"读取 PTY 时发生 OS 错误 {sid}: {e}")
-            break
         except Exception as e:
             app.logger.error(f"读取 PTY 时发生意外错误 {sid}: {e}")
             break
@@ -1078,21 +1089,39 @@ def read_and_forward_pty_output(sid, master_fd):
         socketio.emit('terminal_closed', {'message': '终端会话已关闭。'}, room=sid)
         if sid in pty_procs:
             proc_info = pty_procs[sid]
-            proc = proc_info['proc']
-            fd = proc_info['fd']
-            try: os.close(fd)
-            except: pass
-            if proc.poll() is None:
+            pid = proc_info.get('pid')
+            fd = proc_info.get('fd')
+
+            if fd:
+                try: os.close(fd)
+                except: pass
+
+            if pid:
                 try:
-                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    pgid = os.getpgid(pid)
+                    os.killpg(pgid, signal.SIGTERM)
                     time.sleep(0.1)
-                    if proc.poll() is None:
-                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                    try:
+                         os.killpg(pgid, 0) # 检查进程组是否存在
+                         os.killpg(pgid, signal.SIGKILL)
+                    except ProcessLookupError: pass # 如果不存在，则跳过
+                except ProcessLookupError:
+                     app.logger.info(f"清理时进程 {pid} (SID: {sid}) 已不存在。")
                 except Exception as kill_e:
-                    app.logger.error(f"杀死 PTY 进程 {sid} 时出错: {kill_e}")
-            del pty_procs[sid]
+                    app.logger.error(f"杀死 PTY 进程组 {pid} (SID: {sid}) 时出错: {kill_e}")
+                    try: # 后备方案: 直接杀死 PID
+                        os.kill(pid, signal.SIGKILL)
+                    except: pass
+            
+            # 确保从字典中移除
+            if sid in pty_procs:
+                del pty_procs[sid]
+
     except Exception as cleanup_e:
         app.logger.error(f"清理 PTY {sid} 时出错: {cleanup_e}")
+        # 即使清理出错也要确保移除
+        if sid in pty_procs:
+            del pty_procs[sid]
 
 
 @socketio.on('connect')
@@ -1134,11 +1163,17 @@ def handle_start_terminal(data):
     if pid == pty.CHILD:
         # 子进程：执行 incus exec
         try:
+            os.setsid() # 创建新会话和进程组
+
             env = os.environ.copy()
             env['TERM'] = 'xterm-256color'
             env['LANG'] = 'zh_CN.UTF-8' # 设置为中文环境
             command = ['incus', 'exec', container_name, '--', '/bin/bash', '-l']
+            app.logger.info(f"子进程 (PID: {os.getpid()}) 正在执行: {' '.join(command)}")
             os.execvpe(command[0], command, env)
+        except FileNotFoundError:
+             app.logger.error(f"子进程执行 'incus' 失败: 命令未找到。PATH: {os.environ.get('PATH')}")
+             os._exit(127)
         except Exception as e:
             app.logger.error(f"子进程执行 'incus' 失败: {e}")
             os._exit(1)
@@ -1147,13 +1182,21 @@ def handle_start_terminal(data):
         try:
             set_winsize(master_fd, 24, 80) # 设置默认大小
             # 存储进程和 fd
-            pty_procs[sid] = {'pid': pid, 'fd': master_fd}
-            
-            # 创建一个临时的 Popen 对象来存储 pid，以便于轮询
+            pty_procs[sid] = {'pid': pid, 'fd': master_fd, 'proc': None}
+
+            # 改进 poll 检查
+            def poll_check(p_id):
+                try:
+                    res_pid, status = os.waitpid(p_id, os.WNOHANG)
+                    return res_pid != 0 # True if terminated
+                except OSError as e:
+                    app.logger.warning(f"waitpid 错误 for PID {p_id} (SID: {sid}): {e}")
+                    return True # Assume terminated if waitpid fails
+
             class DummyProc: pass
             proc = DummyProc()
             proc.pid = pid
-            proc.poll = lambda: os.waitpid(pid, os.WNOHANG)[0] != 0 if pid in [p['pid'] for p in pty_procs.values()] else True
+            proc.poll = lambda: poll_check(pid)
             pty_procs[sid]['proc'] = proc
 
 
@@ -1172,6 +1215,7 @@ def handle_start_terminal(data):
                 try: os.kill(pid, signal.SIGKILL)
                 except: pass
             if sid in pty_procs: del pty_procs[sid]
+
 
 @socketio.on('terminal_input')
 def handle_terminal_input(data):
@@ -1205,23 +1249,34 @@ def handle_disconnect():
     app.logger.info(f"SocketIO 客户端已断开: {sid}")
     if sid in pty_procs:
         app.logger.info(f"正在为断开连接的 SID 清理 PTY: {sid}")
-        proc_info = pty_procs[sid]
-        pid = proc_info['pid']
-        fd = proc_info['fd']
+        proc_info = pty_procs[sid] # 获取信息
+        pid = proc_info.get('pid')
+        fd = proc_info.get('fd')
 
-        try: os.close(fd)
-        except: pass
-        
-        try:
-            os.killpg(os.getpgid(pid), signal.SIGTERM)
-            time.sleep(0.1)
-            os.killpg(os.getpgid(pid), signal.SIGKILL)
-        except ProcessLookupError:
-             app.logger.info(f"进程 {pid} (SID: {sid}) 已不存在。")
-        except Exception as e:
-            app.logger.error(f"杀死 PTY 进程 {pid} (SID: {sid}) 时出错: {e}")
-
+        # 先从字典中移除，通知读取线程停止
         del pty_procs[sid]
+
+        if fd:
+            try: os.close(fd)
+            except: pass
+        
+        if pid:
+            try:
+                pgid = os.getpgid(pid)
+                os.killpg(pgid, signal.SIGTERM)
+                time.sleep(0.1)
+                try:
+                    os.killpg(pgid, 0) # 检查
+                    os.killpg(pgid, signal.SIGKILL)
+                except ProcessLookupError: pass
+            except ProcessLookupError:
+                 app.logger.info(f"断开连接时进程 {pid} (SID: {sid}) 已不存在。")
+            except Exception as e:
+                app.logger.error(f"断开连接时杀死 PTY 进程/组 {pid} (SID: {sid}) 时出错: {e}")
+                try: # 后备方案
+                    os.kill(pid, signal.SIGKILL)
+                except: pass
+
         app.logger.info(f"PTY 清理完成 {sid}。")
 
 
