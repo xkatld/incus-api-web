@@ -1041,18 +1041,15 @@ def delete_nat_rule(rule_id):
 
 def set_winsize(fd, row, col, xpix=0, ypix=0):
     """设置 PTY 的窗口大小"""
-    try:
-        winsize = struct.pack("HHHH", row, col, xpix, ypix)
-        fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
-    except Exception as e:
-        app.logger.warning(f"设置 PTY 窗口大小失败: {e}")
+    winsize = struct.pack("HHHH", row, col, xpix, ypix)
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
 
 def read_and_forward_pty_output(sid, master_fd):
     """读取 PTY 输出并转发到客户端"""
     while True:
         try:
             # 检查会话和进程是否存在
-            if sid not in pty_procs or pty_procs[sid].get('proc') is None or pty_procs[sid]['proc'].poll() is not None:
+            if sid not in pty_procs or pty_procs[sid]['proc'].poll() is not None:
                 app.logger.info(f"PTY process or session {sid} gone. Stopping read thread.")
                 break
 
@@ -1080,40 +1077,22 @@ def read_and_forward_pty_output(sid, master_fd):
         # 通知客户端关闭，并尝试清理
         socketio.emit('terminal_closed', {'message': '终端会话已关闭。'}, room=sid)
         if sid in pty_procs:
-           cleanup_pty_session(sid)
+            proc_info = pty_procs[sid]
+            proc = proc_info['proc']
+            fd = proc_info['fd']
+            try: os.close(fd)
+            except: pass
+            if proc.poll() is None:
+                try:
+                    os.killpg(os.getpgid(proc.pid), signal.SIGTERM)
+                    time.sleep(0.1)
+                    if proc.poll() is None:
+                        os.killpg(os.getpgid(proc.pid), signal.SIGKILL)
+                except Exception as kill_e:
+                    app.logger.error(f"杀死 PTY 进程 {sid} 时出错: {kill_e}")
+            del pty_procs[sid]
     except Exception as cleanup_e:
         app.logger.error(f"清理 PTY {sid} 时出错: {cleanup_e}")
-
-def cleanup_pty_session(sid):
-    """清理指定的 PTY 会话"""
-    if sid in pty_procs:
-        app.logger.info(f"正在清理 PTY 会话: {sid}")
-        proc_info = pty_procs.pop(sid, None) # 原子地移除
-        if proc_info:
-            pid = proc_info['pid']
-            fd = proc_info['fd']
-            proc = proc_info['proc']
-
-            try:
-                os.close(fd)
-            except OSError as e:
-                app.logger.warning(f"关闭 master_fd {fd} (SID: {sid}) 时出错: {e}")
-
-            if proc and proc.poll() is None:
-                try:
-                    pgid = os.getpgid(pid)
-                    os.killpg(pgid, signal.SIGTERM)
-                    time.sleep(0.2) # 给它一点时间
-                    os.killpg(pgid, signal.SIGKILL) # 强制杀死
-                    app.logger.info(f"已发送 SIGKILL 到 PTY 进程组 {pgid} (SID: {sid})")
-                except ProcessLookupError:
-                    app.logger.info(f"PTY 进程 {pid} (SID: {sid}) 已不存在。")
-                except Exception as e:
-                    app.logger.error(f"杀死 PTY 进程 {pid} (SID: {sid}) 时出错: {e}")
-            else:
-                 app.logger.info(f"PTY 进程 {pid} (SID: {sid}) 在清理时已结束。")
-        else:
-            app.logger.warning(f"尝试清理 {sid} 时，会话已不存在。")
 
 
 @socketio.on('connect')
@@ -1155,38 +1134,28 @@ def handle_start_terminal(data):
     if pid == pty.CHILD:
         # 子进程：执行 incus exec
         try:
-            # 确保子进程是一个新的会话领导者
-            os.setsid()
             env = os.environ.copy()
             env['TERM'] = 'xterm-256color'
             env['LANG'] = 'zh_CN.UTF-8' # 设置为中文环境
-            # 确保 SHELL 环境变量设置正确
-            env['SHELL'] = '/bin/bash'
-            command = ['incus', 'exec', container_name, '--env', 'TERM=xterm-256color', '--env', f'LANG={env["LANG"]}', '--', '/bin/bash', '-l']
+            command = ['incus', 'exec', container_name, '--', '/bin/bash', '-l']
             os.execvpe(command[0], command, env)
         except Exception as e:
             app.logger.error(f"子进程执行 'incus' 失败: {e}")
-            os._exit(1) # 确保子进程退出
+            os._exit(1)
     else:
         # 父进程：管理 PTY 和 WebSocket
         try:
-            # 使用 subprocess.Popen 来更好地管理进程引用
-            # 注意：这里的 Popen 只是为了获取一个结构体，实际进程是 pid
-            # 我们需要一种方法来检查 pid 是否还在运行
-            proc = subprocess.Popen(['/bin/true'])
-            proc.pid = pid
-            # 定义一个简单的 poll 方法
-            def check_poll():
-                 try:
-                     p, status = os.waitpid(pid, os.WNOHANG)
-                     return p != 0 # 如果 p!=0, 说明子进程已结束
-                 except ChildProcessError:
-                     return True # 如果找不到进程，说明已结束
-
-            proc.poll = check_poll
-
-            pty_procs[sid] = {'pid': pid, 'fd': master_fd, 'proc': proc}
             set_winsize(master_fd, 24, 80) # 设置默认大小
+            # 存储进程和 fd
+            pty_procs[sid] = {'pid': pid, 'fd': master_fd}
+            
+            # 创建一个临时的 Popen 对象来存储 pid，以便于轮询
+            class DummyProc: pass
+            proc = DummyProc()
+            proc.pid = pid
+            proc.poll = lambda: os.waitpid(pid, os.WNOHANG)[0] != 0 if pid in [p['pid'] for p in pty_procs.values()] else True
+            pty_procs[sid]['proc'] = proc
+
 
             # 启动一个线程来读取 PTY 输出
             thread = threading.Thread(target=read_and_forward_pty_output, args=(sid, master_fd))
@@ -1204,7 +1173,6 @@ def handle_start_terminal(data):
                 except: pass
             if sid in pty_procs: del pty_procs[sid]
 
-
 @socketio.on('terminal_input')
 def handle_terminal_input(data):
     """将客户端输入转发到 PTY"""
@@ -1214,7 +1182,6 @@ def handle_terminal_input(data):
             os.write(pty_procs[sid]['fd'], data['input'].encode('utf-8'))
         except OSError as e:
             app.logger.error(f"写入 PTY {sid} 时出错: {e}")
-            cleanup_pty_session(sid) # 写入失败可能意味着 PTY 已关闭
     else:
         app.logger.warning(f"收到未知 SID 的终端输入: {sid}")
 
@@ -1236,7 +1203,26 @@ def handle_disconnect():
     """当客户端断开连接时清理 PTY"""
     sid = request.sid
     app.logger.info(f"SocketIO 客户端已断开: {sid}")
-    cleanup_pty_session(sid) # 调用清理函数
+    if sid in pty_procs:
+        app.logger.info(f"正在为断开连接的 SID 清理 PTY: {sid}")
+        proc_info = pty_procs[sid]
+        pid = proc_info['pid']
+        fd = proc_info['fd']
+
+        try: os.close(fd)
+        except: pass
+        
+        try:
+            os.killpg(os.getpgid(pid), signal.SIGTERM)
+            time.sleep(0.1)
+            os.killpg(os.getpgid(pid), signal.SIGKILL)
+        except ProcessLookupError:
+             app.logger.info(f"进程 {pid} (SID: {sid}) 已不存在。")
+        except Exception as e:
+            app.logger.error(f"杀死 PTY 进程 {pid} (SID: {sid}) 时出错: {e}")
+
+        del pty_procs[sid]
+        app.logger.info(f"PTY 清理完成 {sid}。")
 
 
 # --- 结束新增 SocketIO PTY 功能 ---
@@ -1386,12 +1372,9 @@ if __name__ == '__main__':
     # 确保 gevent 和 gevent-websocket 已安装
     try:
         import gevent
-        # geventwebsocket 通常不是直接导入，但确保它已安装
-        from gevent import monkey
-        monkey.patch_all() # 非常重要，用于使标准库异步兼容
-        print("Gevent monkey patching 应用成功。")
+        import geventwebsocket
     except ImportError:
-        print("错误: 缺少 gevent。请运行 'pip install gevent gevent-websocket'")
+        print("错误: 缺少 gevent 或 gevent-websocket。请运行 'pip install gevent gevent-websocket'")
         sys.exit(1)
 
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
