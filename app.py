@@ -1289,18 +1289,3 @@ def perform_initial_setup():
          print("警告：执行 'iptables --version' 超时。")
     except Exception as e:
          print(f"启动时 iptables 检查发生异常: {e}")
-
-
-if __name__ == '__main__':
-    try:
-        import gevent
-        import geventwebsocket
-    except ImportError:
-        print("错误: 缺少 gevent 或 gevent-websocket。请运行 'pip install gevent gevent-websocket'")
-        sys.exit(1)
-
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        perform_initial_setup()
-
-    print("启动 Flask-SocketIO Web 服务器 (使用 gevent)...")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=False)
