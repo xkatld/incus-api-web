@@ -19,8 +19,8 @@ import sys
 import secrets
 import hashlib
 from functools import wraps
-import paramiko # 引入 paramiko
-import threading # 使用 threading (gevent会打补丁) 或直接 gevent.spawn
+import paramiko
+import threading
 
 app = Flask(__name__)
 app.debug = True
@@ -29,10 +29,8 @@ socketio = SocketIO(app, async_mode='gevent')
 DATABASE_NAME = 'incus_manager.db'
 SETTINGS = {}
 
-# 存储活动的 SSH 连接
 ssh_connections = {}
 
-# --- (数据库和辅助函数，保持不变) ---
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_NAME)
     conn.row_factory = sqlite3.Row
@@ -453,7 +451,6 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
     except Exception as e:
         app.logger.error(f"清理孤立NAT规则时发生异常: {e}")
 
-# --- (Flask 路由，保持不变) ---
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if not SETTINGS:
@@ -1032,9 +1029,7 @@ def delete_nat_rule(rule_id):
         app.logger.error(f"iptables delete command failed for rule ID {rule_id}: {iptables_message}")
         return jsonify({'status': 'error', 'message': message}), 500
 
-# --- SSH SocketIO 功能 ---
 def cleanup_ssh(sid):
-    """清理 SSH 连接资源"""
     if sid in ssh_connections:
         app.logger.info(f"正在清理 SID {sid} 的 SSH 连接。")
         connection = ssh_connections.pop(sid, None)
@@ -1052,7 +1047,6 @@ def cleanup_ssh(sid):
         app.logger.info(f"SID {sid} 的 SSH 清理完成。")
 
 def forward_ssh_to_ws(sid, chan):
-    """从 SSH 读取数据并转发到 WebSocket"""
     try:
         while chan.active and sid in ssh_connections:
             data = chan.recv(4096)
@@ -1068,21 +1062,19 @@ def forward_ssh_to_ws(sid, chan):
 
 @socketio.on('connect')
 def handle_connect():
-    """处理新的 SocketIO 连接，检查认证"""
     sid = request.sid
     app.logger.info(f"SocketIO 客户端已连接: {sid}")
     if not session.get('logged_in'):
         app.logger.warning(f"未经身份验证的 SocketIO 连接尝试来自 {sid}。正在断开。")
         emit('terminal_closed', {'message': '认证失败。请重新登录。'})
-        return False # 拒绝连接
+        return False
     app.logger.info(f"SocketIO 认证成功 for {sid}, 发送 auth_success。")
     emit('auth_success', {'message': '认证成功，准备启动终端。'})
 
 @socketio.on('ssh_connect')
 def handle_ssh_connect(data):
-    """处理 SSH 连接请求"""
     sid = request.sid
-    app.logger.info(f"SID {sid} received ssh_connect.") # 添加日志
+    app.logger.info(f"SID {sid} received ssh_connect.")
 
     if not session.get('logged_in'):
         app.logger.warning(f"SID {sid} ssh_connect 认证失败。")
@@ -1130,7 +1122,6 @@ def handle_ssh_connect(data):
 
 @socketio.on('terminal_input')
 def handle_terminal_input(data):
-    """将客户端输入转发到 SSH"""
     sid = request.sid
     if sid in ssh_connections:
         try:
@@ -1144,7 +1135,6 @@ def handle_terminal_input(data):
 
 @socketio.on('ssh_resize')
 def handle_ssh_resize(data):
-    """调整 SSH 终端大小"""
     sid = request.sid
     if sid in ssh_connections:
         try:
@@ -1157,14 +1147,10 @@ def handle_ssh_resize(data):
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """当客户端断开连接时清理 SSH"""
     sid = request.sid
     app.logger.info(f"SocketIO 客户端已断开: {sid}")
     cleanup_ssh(sid)
 
-# --- 结束 SSH SocketIO 功能 ---
-
-# --- (启动和设置代码，保持不变) ---
 def perform_initial_setup():
     print("\n============================================")
     print(" Incus Web 管理器启动信息")
@@ -1306,7 +1292,6 @@ def perform_initial_setup():
 
 
 if __name__ == '__main__':
-    # 确保 gevent 和 gevent-websocket 已安装
     try:
         import gevent
         import geventwebsocket
@@ -1318,5 +1303,4 @@ if __name__ == '__main__':
         perform_initial_setup()
 
     print("启动 Flask-SocketIO Web 服务器 (使用 gevent)...")
-    # 使用 socketio.run 代替 app.run
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=False)
