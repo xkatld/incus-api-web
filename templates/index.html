@@ -33,7 +33,7 @@
             z-index: 1050;
         }
         .modal { z-index: 1050; }
-        .modal-backdrop { z-index: 1049; } /* Ensure backdrop is behind modal */
+        .modal-backdrop { z-index: 1049; }
 
         @media (min-width: 768px) {
              .container-list-mobile {
@@ -646,7 +646,7 @@
     </div>
 
     <div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl"> 
+        <div class="modal-dialog modal-xl">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="terminalModalLabel">容器终端</h5>
@@ -1302,9 +1302,10 @@ function openTerminalModal(containerName) {
     term.focus();
 
     const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${wsProtocol}//${window.location.host}/terminal/${containerName}`;
+    const namespaceUrl = `${wsProtocol}//${window.location.host}/terminal`;
 
-    termSocket = io.connect(wsUrl, {
+    termSocket = io.connect(namespaceUrl, {
+        query: { containerName: containerName },
         transports: ['websocket']
     });
 
@@ -1331,24 +1332,22 @@ function openTerminalModal(containerName) {
             errorMsg = error.message;
         } else if (typeof error === 'string') {
             errorMsg = error;
+        } else if (error && error.description) {
+            errorMsg = error.description;
+        } else if (error && error.data) {
+             try {
+                 errorMsg = JSON.stringify(error.data);
+             } catch(e) { }
         }
-        // Log the full error object to the browser console for more details
+
         console.error(`WebSocket connection error for container ${containerName}:`, error);
-        
+
         if (term) {
             term.write(`\r\n\x1b[31m连接错误: ${errorMsg}\x1b[0m\r\n`);
-            // If Socket.IO passes custom data in error object, try to display it
-            if (error && typeof error.data === 'string') {
-                 term.write(`\r\n\x1b[31mData: ${error.data}\x1b[0m\r\n`);
-            } else if (error && typeof error.data === 'object' && error.data !== null) {
-                try {
-                    term.write(`\r\n\x1b[31mData: ${JSON.stringify(error.data)}\x1b[0m\r\n`);
-                } catch (e) { /* ignore stringify error */ }
-            }
         }
         showToast(`无法连接到 ${containerName} 的终端: ${errorMsg}`, 'danger');
     });
-    
+
     let resizeTimeout;
     const debouncedFit = () => {
         clearTimeout(resizeTimeout);
@@ -1372,7 +1371,7 @@ function openTerminalModal(containerName) {
             term.focus();
         }
     });
-    
+
     $(window).off('resize.terminal').on('resize.terminal', () => {
         if (bsTerminalModal && termModalElement.classList.contains('show') && term && term.element) {
             debouncedFit();
