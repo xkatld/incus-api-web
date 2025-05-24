@@ -7,6 +7,10 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
     <style>
         body { }
         #execOutput, #infoContent pre { white-space: pre-wrap; background-color: #f5f5f5; border: 1px solid #ccc; padding: 10px; max-height: 300px; overflow-y: auto; font-family: monospace; font-size: 0.9em; }
@@ -24,10 +28,13 @@
             position: fixed;
             top: 20px;
             right: 20px;
-            z-index: 1050;
+            z-index: 1060;
         }
         .modal { z-index: 1050; }
         .modal-backdrop { z-index: 1049; }
+        #sshModal { z-index: 1055; }
+        #sshModal .modal-backdrop { z-index: 1054; }
+
         @media (min-width: 768px) {
              .container-list-mobile {
                 display: none;
@@ -173,6 +180,14 @@
             min-width: 80px;
             text-align: center;
         }
+        #terminal {
+            height: 500px;
+            background-color: #000;
+            padding: 5px;
+        }
+        .xterm .xterm-viewport {
+            overflow-y: hidden !important;
+        }
 
     </style>
 </head>
@@ -257,6 +272,7 @@
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
+                                            <li><button class="dropdown-item" type="button" onclick="openSshModal('{{ c.name }}')">在线SSH</button></li>
                                             {% elif c.status == 'Stopped' %}
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
                                             {% endif %}
@@ -301,6 +317,7 @@
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
+                                        <li><button class="dropdown-item" type="button" onclick="openSshModal('{{ c.name }}')">在线SSH</button></li>
                                         {% elif c.status == 'Stopped' %}
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
                                         {% endif %}
@@ -616,6 +633,20 @@
         </div>
     </div>
 
+    <div class="modal fade" id="sshModal" tabindex="-1" aria-labelledby="sshModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="sshModalLabel">在线 SSH 终端</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-0">
+                    <div id="terminal"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
 <script>
 let captchaAnswer = 0;
 
@@ -769,7 +800,6 @@ $('#confirmActionButton').click(function() {
         $.ajax({
             url: `/container/nat_rule/${ruleId}`,
             type: 'DELETE',
-            headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
             success: function(data) {
                 showToast(data.message, data.status);
                 if (data.status === 'success' || data.status === 'warning') {
@@ -838,7 +868,6 @@ function handleCreateContainerFormSubmit(event) {
         url: "{{ url_for('create_container') }}",
         type: "POST",
         data: formData,
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
@@ -883,7 +912,6 @@ function performAction(containerName, action, buttonElement) {
         url: `/container/${containerName}/action`,
         type: "POST",
         data: { action: action },
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
@@ -922,7 +950,6 @@ function showInfo(containerName, buttonElement) {
     $.ajax({
         url: `/container/${containerName}/info`,
         type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
              if (data.status === 'NotFound') {
                  basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
@@ -1014,7 +1041,6 @@ function loadNatRules(containerName) {
      $.ajax({
         url: `/container/${containerName}/nat_rules`,
         type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             natRulesContent.empty();
             if (data.status === 'success' && data.rules && data.rules.length > 0) {
@@ -1087,7 +1113,6 @@ $('#execCommandForm').submit(function(event) {
         url: `/container/${containerName}/exec`,
         type: "POST",
         data: { command: command },
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             if (data.status === 'success') {
                 outputArea.text(data.output);
@@ -1129,7 +1154,6 @@ function openNatModal(containerName) {
     $.ajax({
         url: `/container/${containerName}/info`,
         type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
              if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
                  const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
@@ -1178,7 +1202,6 @@ $('#addNatForm').submit(function(event) {
             container_port: containerPort,
             protocol: protocol
         },
-         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success' || data.status === 'warning') {
@@ -1209,6 +1232,102 @@ $('#addNatForm').submit(function(event) {
         }
     });
 });
+
+let term;
+let fitAddon;
+let socket;
+
+function openSshModal(containerName) {
+    $('#sshModalLabel').text(`在线 SSH: ${containerName}`);
+    const sshModalEl = document.getElementById('sshModal');
+    const sshModal = new bootstrap.Modal(sshModalEl);
+
+    sshModalEl.addEventListener('shown.bs.modal', function () {
+        $.get(`/container/${containerName}/info`, function(data) {
+            if (data.ip && data.ip !== 'N/A' && data.status === 'Running') {
+                initializeTerminal(containerName, data.ip);
+            } else {
+                $('#terminal').html('<div class="alert alert-danger p-3 m-3">无法获取容器IP地址或容器未运行，无法启动SSH。</div>');
+            }
+        }).fail(function() {
+             $('#terminal').html('<div class="alert alert-danger p-3 m-3">获取容器信息失败，无法启动SSH。</div>');
+        });
+    }, { once: true });
+
+    sshModal.show();
+}
+
+function initializeTerminal(containerName, ip) {
+    const terminalContainer = document.getElementById('terminal');
+    terminalContainer.innerHTML = '';
+
+    term = new Terminal({ cursorBlink: true, rows: 25, cols: 80, theme: { background: '#000000'} });
+    fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(terminalContainer);
+    fitAddon.fit();
+    term.focus();
+
+    term.writeln('正在连接到服务器...');
+
+    socket = io();
+
+    socket.on('connect', () => {
+        term.writeln('✅ 连接成功，正在启动SSH会话...');
+        socket.emit('start_ssh', { 'container': containerName, 'ip': ip, 'cols': term.cols, 'rows': term.rows });
+    });
+
+    socket.on('ssh_output', (data) => {
+        term.write(data);
+    });
+
+    socket.on('disconnect', () => {
+        term.writeln('\r\n❌ 与服务器断开连接。');
+        if(socket) socket.disconnect();
+    });
+
+    socket.on('ssh_error', (message) => {
+        term.writeln(`\r\n❌ SSH 错误: ${message}`);
+        if(socket) socket.disconnect();
+    });
+
+    term.onData((data) => {
+        if(socket && socket.connected) {
+            socket.emit('ssh_input', { 'input': data });
+        }
+    });
+
+     $(window).on('resize.ssh', function() {
+        if(fitAddon && term) {
+            fitAddon.fit();
+            if (socket && socket.connected) {
+                socket.emit('ssh_resize', { 'cols': term.cols, 'rows': term.rows });
+            }
+        }
+     });
+
+     $('#sshModal').on('shown.bs.modal.ssh', function () {
+         if(fitAddon && term) {
+             fitAddon.fit();
+             term.focus();
+         }
+     });
+}
+
+$('#sshModal').on('hidden.bs.modal', function () {
+    if (socket) {
+        socket.disconnect();
+        socket = null;
+    }
+    if (term) {
+        term.dispose();
+        term = null;
+    }
+    $('#terminal').html('');
+    $(window).off('resize.ssh');
+    $('#sshModal').off('shown.bs.modal.ssh');
+});
+
 
 $('#infoModal').on('hidden.bs.modal', function () {
   $('#basicInfoContent').html('正在加载基础信息...');
