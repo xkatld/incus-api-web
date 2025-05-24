@@ -1,12 +1,4 @@
-try:
-    from gevent import monkey
-    monkey.patch_all()
-    print("Gevent monkey-patching applied.")
-except ImportError:
-    print("警告: 未找到 Gevent，跳过猴子补丁。SocketIO 可能无法正常工作。")
-
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
-from flask_socketio import SocketIO, emit
 import subprocess
 import json
 import sqlite3
@@ -19,17 +11,15 @@ import sys
 import secrets
 import hashlib
 from functools import wraps
-import paramiko
-import threading
 
 app = Flask(__name__)
 app.debug = True
-app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
-socketio = SocketIO(app, async_mode='gevent')
-DATABASE_NAME = 'incus_manager.db'
-SETTINGS = {}
 
-ssh_connections = {}
+app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
+
+DATABASE_NAME = 'incus_manager.db'
+
+SETTINGS = {}
 
 def get_db_connection():
     conn = sqlite3.connect(DATABASE_NAME)
@@ -450,6 +440,7 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
         app.logger.error(f"数据库错误 cleanup_orphaned_nat_rules_in_db: {e}")
     except Exception as e:
         app.logger.error(f"清理孤立NAT规则时发生异常: {e}")
+
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -1029,127 +1020,6 @@ def delete_nat_rule(rule_id):
         app.logger.error(f"iptables delete command failed for rule ID {rule_id}: {iptables_message}")
         return jsonify({'status': 'error', 'message': message}), 500
 
-def cleanup_ssh(sid):
-    if sid in ssh_connections:
-        app.logger.info(f"正在清理 SID {sid} 的 SSH 连接。")
-        connection = ssh_connections.pop(sid, None)
-        if connection:
-            try:
-                if connection.get('ssh_channel'):
-                    connection['ssh_channel'].close()
-            except Exception as e:
-                app.logger.warning(f"关闭 SSH 通道 {sid} 时出错: {e}")
-            try:
-                if connection.get('ssh_client'):
-                    connection['ssh_client'].close()
-            except Exception as e:
-                app.logger.warning(f"关闭 SSH 客户端 {sid} 时出错: {e}")
-        app.logger.info(f"SID {sid} 的 SSH 清理完成。")
-
-def forward_ssh_to_ws(sid, chan):
-    try:
-        while chan.active and sid in ssh_connections:
-            data = chan.recv(4096)
-            if not data:
-                app.logger.info(f"SSH 通道 {sid} 返回空数据，连接可能已关闭。")
-                break
-            socketio.emit('terminal_output', {'output': data.decode('utf-8', errors='replace')}, room=sid)
-    except Exception as e:
-        app.logger.error(f"SSH -> WS 转发错误 {sid}: {e}")
-    finally:
-        socketio.emit('terminal_closed', {'message': 'SSH 连接已关闭。'}, room=sid)
-        cleanup_ssh(sid)
-
-@socketio.on('connect')
-def handle_connect():
-    sid = request.sid
-    app.logger.info(f"SocketIO 客户端已连接: {sid}")
-    if not session.get('logged_in'):
-        app.logger.warning(f"未经身份验证的 SocketIO 连接尝试来自 {sid}。正在断开。")
-        emit('terminal_closed', {'message': '认证失败。请重新登录。'})
-        return False
-    app.logger.info(f"SocketIO 认证成功 for {sid}, 发送 auth_success。")
-    emit('auth_success', {'message': '认证成功，准备启动终端。'})
-
-@socketio.on('ssh_connect')
-def handle_ssh_connect(data):
-    sid = request.sid
-    app.logger.info(f"SID {sid} received ssh_connect.")
-
-    if not session.get('logged_in'):
-        app.logger.warning(f"SID {sid} ssh_connect 认证失败。")
-        emit('terminal_closed', {'message': '认证失败。'})
-        return
-
-    host = data.get('host')
-    port = int(data.get('port', 22))
-    user = data.get('user')
-    password = data.get('password')
-
-    app.logger.info(f"SID {sid} 正在尝试连接 SSH 到 {user}@{host}:{port}")
-
-    if not all([host, user, password]):
-        app.logger.warning(f"SID {sid} 提供的 SSH 参数不足。")
-        emit('terminal_output', {'output': '\r\n错误：主机、用户名和密码不能为空。\r\n'})
-        emit('terminal_closed', {'message': '连接参数不足。'})
-        return
-
-    try:
-        client = paramiko.SSHClient()
-        client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        app.logger.info(f"SID {sid} - 正在调用 paramiko.connect...")
-        client.connect(hostname=host, port=port, username=user, password=password, timeout=15, look_for_keys=False)
-        app.logger.info(f"SID {sid} - paramiko.connect 成功。")
-        chan = client.invoke_shell(term='xterm-256color', width=80, height=24)
-        app.logger.info(f"SID {sid} - SSH 通道已调用。")
-
-        ssh_connections[sid] = {'ssh_client': client, 'ssh_channel': chan}
-
-        socketio.start_background_task(target=forward_ssh_to_ws, sid=sid, chan=chan)
-
-        emit('ssh_ready', {'message': 'SSH 连接成功！'})
-        app.logger.info(f"SID {sid} SSH 连接成功，已发送 ssh_ready。")
-
-    except paramiko.AuthenticationException:
-        app.logger.warning(f"SSH 认证失败 {sid} for {user}@{host}")
-        emit('terminal_output', {'output': '\r\nSSH 认证失败：用户名或密码错误。\r\n'})
-        emit('terminal_closed', {'message': '认证失败。'})
-    except Exception as e:
-        app.logger.error(f"SSH 连接失败 {sid} to {user}@{host}: {e}")
-        emit('terminal_output', {'output': f'\r\nSSH 连接失败: {e}\r\n'})
-        emit('terminal_closed', {'message': f'连接失败: {e}。'})
-
-
-@socketio.on('terminal_input')
-def handle_terminal_input(data):
-    sid = request.sid
-    if sid in ssh_connections:
-        try:
-            ssh_connections[sid]['ssh_channel'].send(data['input'].encode('utf-8'))
-        except Exception as e:
-            app.logger.error(f"写入 SSH {sid} 时出错: {e}")
-            cleanup_ssh(sid)
-    else:
-         app.logger.warning(f"收到未知或已关闭 SID {sid} 的终端输入。")
-
-
-@socketio.on('ssh_resize')
-def handle_ssh_resize(data):
-    sid = request.sid
-    if sid in ssh_connections:
-        try:
-            rows = int(data['rows'])
-            cols = int(data['cols'])
-            ssh_connections[sid]['ssh_channel'].resize_pty(width=cols, height=rows)
-            app.logger.debug(f"已将 {sid} 的 SSH PTY 调整为 {rows}x{cols}")
-        except Exception as e:
-            app.logger.error(f"调整 SSH PTY {sid} 大小时出错: {e}")
-
-@socketio.on('disconnect')
-def handle_disconnect():
-    sid = request.sid
-    app.logger.info(f"SocketIO 客户端已断开: {sid}")
-    cleanup_ssh(sid)
 
 def perform_initial_setup():
     print("\n============================================")
@@ -1197,7 +1067,7 @@ def perform_initial_setup():
             print(f"错误：数据库表 'containers' 缺少必需的列: {', '.join(missing_container_columns)}")
             print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
             sys.exit(1)
-
+        
         if 'traffic_quota_gb' in containers_column_names:
             print(f"提示：数据库表 'containers' 仍存在 'traffic_quota_gb' 列。此功能已移除，该列不再使用。")
 
@@ -1289,3 +1159,11 @@ def perform_initial_setup():
          print("警告：执行 'iptables --version' 超时。")
     except Exception as e:
          print(f"启动时 iptables 检查发生异常: {e}")
+
+
+if __name__ == '__main__':
+    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+        perform_initial_setup()
+
+    print("启动 Flask Web 服务器...")
+    app.run(debug=True, host='0.0.0.0', port=5000)
