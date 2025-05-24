@@ -14,186 +14,47 @@
         #execOutput.success { border-color: #d4edda; background-color: #f8f9fa; color: #155724; }
         #execOutput.error { border-color: #f5c6cb; background-color: #f8d7da; color: #721c24; }
         #infoContent { background-color: #fff; border: none; padding: 0; }
-        .btn-processing {
-            pointer-events: none;
-            opacity: 0.7;
-        }
-        .btn-processing .spinner-border {
-             margin-right: 5px;
-        }
-        #toastContainer {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 1055; /* 确保 Toast 在最上层 */
-        }
+        .btn-processing { pointer-events: none; opacity: 0.7; }
+        .btn-processing .spinner-border { margin-right: 5px; }
+        #toastContainer { position: fixed; top: 20px; right: 20px; z-index: 1055; }
         .modal { z-index: 1050; }
         .modal-backdrop { z-index: 1049; }
         @media (min-width: 768px) {
-             .container-list-mobile {
-                display: none;
-             }
-             .container-list-desktop {
-                 display: block;
-             }
+             .container-list-mobile { display: none; }
+             .container-list-desktop { display: block; }
         }
-         .container-list-mobile {
-            display: block;
-         }
-         .container-list-mobile .card-actions {
-            margin-top: 1rem;
-         }
-          .container-list-mobile .card-text small {
-            font-weight: bold;
-            margin-right: 5px;
-          }
-         .container-list-mobile .card-title {
-             word-break: break-word;
-         }
-        #natRulesList {
-            margin-top: 15px;
-            border-top: 1px solid #eee;
-            padding-top: 15px;
-        }
-        #natRulesList h6 {
-            margin-bottom: 10px;
-        }
-        #natRulesList ul {
-            list-style: none;
-            padding: 0;
-        }
-        #natRulesList li {
-            background-color: #f9f9f9;
-            border: 1px solid #eee;
-            margin-bottom: 8px;
-            padding: 10px;
-            border-radius: 4px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-        #natRulesList li .rule-details {
-            flex-grow: 1;
-            margin-right: 10px;
-            word-break: break-word;
-        }
-         #natRulesList li .rule-actions {
-            flex-shrink: 0;
-            margin-left: auto;
-         }
-        #loginContainer {
-            max-width: 400px;
-            width: 100%;
-            padding: 20px;
-        }
-        .main-content-wrapper {
-            min-height: calc(100vh - 56px - 48px);
-        }
-        .create-container-card {
-            background-color: transparent !important;
-            border: 1px solid #dee2e6 !important;
-        }
-        .create-container-card .card-header {
-            background-color: transparent !important;
-            border-bottom: 1px solid #dee2e6 !important;
-            color: inherit !important;
-            font-weight: bold;
-        }
-        .truncate-text {
-            max-width: 100%;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            display: inline-block;
-            vertical-align: middle;
-        }
-        .actions-dropdown .dropdown-menu {
-            min-width: auto;
-        }
-        .actions-dropdown .dropdown-item {
-            padding: .25rem 1rem;
-        }
-
-        .custom-container-list-row {
-            display: flex;
-            align-items: center;
-            padding: 0.5rem 0;
-            border-bottom: 1px solid #eee;
-        }
-        .custom-container-list-row:last-child {
-            border-bottom: none;
-        }
-
-        .custom-container-list-header {
-            display: flex;
-            align-items: center;
-            font-weight: bold;
-            background-color: #f8f9fa;
-            border-bottom: 2px solid #dee2e6;
-            padding: 0.5rem 0;
-        }
-
-        .custom-col {
-            padding: 0 0.75rem;
-            box-sizing: border-box;
-            word-break: break-word;
-        }
-
-        .custom-col-name {
-            flex: 1;
-            min-width: 90px;
-        }
-
-        .custom-col-status {
-            flex: 2;
-            min-width: 80px;
-            text-align: center;
-        }
-        .custom-col-status .badge {
-            display: inline-block;
-        }
-
-        .custom-col-ip {
-            flex: 2;
-            min-width: 120px;
-        }
-
-        .custom-col-image {
-            flex: 3;
-            min-width: 180px;
-        }
-
-        .custom-col-created {
-            flex: 2;
-            min-width: 120px;
-        }
-
-        .custom-col-actions {
-            flex: 1;
-            min-width: 80px;
-            text-align: center;
-        }
-        /* 新增终端样式 */
-        #terminal {
-            width: 100%;
-            height: 60vh; /* 使用视口高度，可调整 */
-            background-color: #1e1e1e;
-            padding: 5px;
-            border-radius: 4px;
-        }
-        #terminalModal .modal-dialog {
-             max-width: 90%; /* 加宽模态框 */
-        }
-        #terminalModal .modal-body {
-            padding: 5px; /* 减少内边距 */
-            background-color: #1e1e1e; /* 背景色与终端一致 */
-        }
-         #terminalModal .modal-content {
-            background-color: #f8f9fa; /* 模态框整体背景 */
-         }
-
-
+        .container-list-mobile { display: block; }
+        .container-list-mobile .card-actions { margin-top: 1rem; }
+        .container-list-mobile .card-text small { font-weight: bold; margin-right: 5px; }
+        .container-list-mobile .card-title { word-break: break-word; }
+        #natRulesList { margin-top: 15px; border-top: 1px solid #eee; padding-top: 15px; }
+        #natRulesList h6 { margin-bottom: 10px; }
+        #natRulesList ul { list-style: none; padding: 0; }
+        #natRulesList li { background-color: #f9f9f9; border: 1px solid #eee; margin-bottom: 8px; padding: 10px; border-radius: 4px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+        #natRulesList li .rule-details { flex-grow: 1; margin-right: 10px; word-break: break-word; }
+        #natRulesList li .rule-actions { flex-shrink: 0; margin-left: auto; }
+        #loginContainer { max-width: 400px; width: 100%; padding: 20px; }
+        .main-content-wrapper { min-height: calc(100vh - 56px - 48px); }
+        .create-container-card { background-color: transparent !important; border: 1px solid #dee2e6 !important; }
+        .create-container-card .card-header { background-color: transparent !important; border-bottom: 1px solid #dee2e6 !important; color: inherit !important; font-weight: bold; }
+        .truncate-text { max-width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: inline-block; vertical-align: middle; }
+        .actions-dropdown .dropdown-menu { min-width: auto; }
+        .actions-dropdown .dropdown-item { padding: .25rem 1rem; }
+        .custom-container-list-row { display: flex; align-items: center; padding: 0.5rem 0; border-bottom: 1px solid #eee; }
+        .custom-container-list-row:last-child { border-bottom: none; }
+        .custom-container-list-header { display: flex; align-items: center; font-weight: bold; background-color: #f8f9fa; border-bottom: 2px solid #dee2e6; padding: 0.5rem 0; }
+        .custom-col { padding: 0 0.75rem; box-sizing: border-box; word-break: break-word; }
+        .custom-col-name { flex: 1; min-width: 90px; }
+        .custom-col-status { flex: 2; min-width: 80px; text-align: center; }
+        .custom-col-status .badge { display: inline-block; }
+        .custom-col-ip { flex: 2; min-width: 120px; }
+        .custom-col-image { flex: 3; min-width: 180px; }
+        .custom-col-created { flex: 2; min-width: 120px; }
+        .custom-col-actions { flex: 1; min-width: 80px; text-align: center; }
+        #terminal { width: 100%; height: 60vh; background-color: #1e1e1e; padding: 5px; border-radius: 4px; }
+        #terminalModal .modal-dialog { max-width: 90%; }
+        #terminalModal .modal-body { padding: 5px; background-color: #1e1e1e; }
+        #terminalModal .modal-content { background-color: #f8f9fa; }
     </style>
 </head>
 <body class="{% if not session.logged_in %}d-flex justify-content-center align-items-center min-vh-100 bg-light{% else %}bg-light{% endif %}">
@@ -203,22 +64,18 @@
             <h1>Incus Web 管理器</h1>
             <a href="{{ url_for('logout') }}" class="btn btn-outline-danger btn-sm">退出登录</a>
         </div>
-
         {% if incus_error[0] %}
         <div class="alert alert-danger" role="alert">
             <strong>错误:</strong> 无法连接到 Incus 或执行命令失败。显示的数据可能来自数据库缓存。 <br>
             详细信息: {{ incus_error[1] }}
         </div>
         {% endif %}
-
         <div class="row gx-4 main-content-wrapper">
             <div class="col-lg-7 col-md-6 mb-4 mb-md-0">
                 <div class="d-flex justify-content-between align-items-center mb-3">
                     <h2 class="mb-0">容器列表</h2>
                     <div class="d-flex gap-2">
-                        <button type="button" class="btn btn-success btn-sm d-block d-md-none" data-bs-toggle="modal" data-bs-target="#createContainerModalMobile">
-                            创建新容器
-                        </button>
+                        <button type="button" class="btn btn-success btn-sm d-block d-md-none" data-bs-toggle="modal" data-bs-target="#createContainerModalMobile">创建新容器</button>
                         <button class="btn btn-outline-primary btn-sm d-flex align-items-center" onclick="location.reload()">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-clockwise me-1" viewBox="0 0 16 16">
                                 <path fill-rule="evenodd" d="M8 3a5 5 0 1 0 4.546 2.914.5.5 0 0 1 .908-.417A6 6 0 1 1 8 2z"/>
@@ -228,7 +85,6 @@
                         </button>
                     </div>
                 </div>
-
                 <div class="container-list-desktop d-none d-md-block">
                     <div class="custom-container-list-header">
                         <div class="custom-col custom-col-name">名称</div>
@@ -242,41 +98,22 @@
                         {% if containers %}
                             {% for c in containers %}
                             <div class="custom-container-list-row">
-                                <div class="custom-col custom-col-name">
-                                    <div class="truncate-text" title="{{ c.name }}">
-                                        {{ c.name }}
-                                    </div>
-                                </div>
-                                <div class="custom-col custom-col-status">
-                                    <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
-                                </div>
-                                <div class="custom-col custom-col-ip">
-                                    <div class="truncate-text" title="{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}">
-                                        {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}
-                                    </div>
-                                </div>
-                                <div class="custom-col custom-col-image">
-                                    <div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">
-                                        {{ c.image_source if c.image_source else 'N/A' }}
-                                    </div>
-                                </div>
-                                <div class="custom-col custom-col-created">
-                                    <div class="truncate-text" title="{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}">
-                                        {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}
-                                    </div>
-                                </div>
+                                <div class="custom-col custom-col-name"><div class="truncate-text" title="{{ c.name }}">{{ c.name }}</div></div>
+                                <div class="custom-col custom-col-status"><span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span></div>
+                                <div class="custom-col custom-col-ip"><div class="truncate-text" title="{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}">{{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</div></div>
+                                <div class="custom-col custom-col-image"><div class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}">{{ c.image_source if c.image_source else 'N/A' }}</div></div>
+                                <div class="custom-col custom-col-created"><div class="truncate-text" title="{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}">{{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</div></div>
                                 <div class="custom-col custom-col-actions">
                                     <div class="dropdown actions-dropdown">
-                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="actionsDropdownDesktop-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
-                                            操作
-                                        </button>
+                                        <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" id="actionsDropdownDesktop-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">操作</button>
                                         <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdownDesktop-{{ loop.index }}">
                                             <li><button class="dropdown-item" type="button" onclick="showInfo('{{ c.name }}', this)">信息</button></li>
                                             {% if c.status == 'Running' %}
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                             <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
-                                            <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">在线终端</button></li> <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
+                                            <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">在线终端</button></li>
+                                            <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
                                             {% elif c.status == 'Stopped' %}
                                             <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
                                             {% endif %}
@@ -292,8 +129,6 @@
                         {% endif %}
                     </div>
                 </div>
-
-
                 <div class="container-list-mobile d-block d-md-none mt-3">
                     {% for c in containers %}
                     <div class="card mb-3 shadow-sm">
@@ -303,24 +138,19 @@
                                 <span class="badge bg-{% if c.status == 'Running' %}success{% elif c.status == 'Stopped' %}danger{% else %}secondary{% endif %}">{{ c.status }}</span>
                             </div>
                             <p class="card-text mb-1"><small class="text-muted">IP 地址:</small> {{ c.ip if c.ip and c.ip != 'N/A' else '-' }}</p>
-                            <p class="card-text mb-1"><small class="text-muted">镜像:</small>
-                                <span class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}" style="max-width: 200px;">
-                                    {{ c.image_source if c.image_source else 'N/A' }}
-                                </span>
-                            </p>
+                            <p class="card-text mb-1"><small class="text-muted">镜像:</small><span class="truncate-text" title="{{ c.image_source if c.image_source else 'N/A' }}" style="max-width: 200px;">{{ c.image_source if c.image_source else 'N/A' }}</span></p>
                             <p class="card-text mb-3"><small class="text-muted">创建时间:</small> {{ c.created_at.split('T')[0] if c.created_at else 'N/A' }}</p>
                             <div class="card-actions">
                                 <div class="dropdown actions-dropdown w-100">
-                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" id="mobileActionsDropdown-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">
-                                        操作
-                                    </button>
+                                    <button class="btn btn-sm btn-outline-secondary dropdown-toggle w-100" type="button" id="mobileActionsDropdown-{{ loop.index }}" data-bs-toggle="dropdown" aria-expanded="false">操作</button>
                                     <ul class="dropdown-menu dropdown-menu-end w-100" aria-labelledby="mobileActionsDropdown-{{ loop.index }}">
                                         <li><button class="dropdown-item" type="button" onclick="showInfo('{{ c.name }}', this)">信息</button></li>
                                         {% if c.status == 'Running' %}
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'stop', this)">停止</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'restart', this)">重启</button></li>
                                         <li><button class="dropdown-item" type="button" onclick="openExecModal('{{ c.name }}')">执行命令</button></li>
-                                        <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">在线终端</button></li> <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
+                                        <li><button class="dropdown-item" type="button" onclick="openTerminalModal('{{ c.name }}')">在线终端</button></li>
+                                        <li><button class="dropdown-item" type="button" onclick="openNatModal('{{ c.name }}')">添加NAT</button></li>
                                         {% elif c.status == 'Stopped' %}
                                         <li><button class="dropdown-item" type="button" onclick="performAction('{{ c.name }}', 'start', this)">启动</button></li>
                                         {% endif %}
@@ -332,23 +162,17 @@
                         </div>
                     </div>
                     {% else %}
-                    <div class="alert alert-info text-center" role="alert">
-                        没有找到容器或无法连接到 Incus。
-                    </div>
+                    <div class="alert alert-info text-center" role="alert">没有找到容器或无法连接到 Incus。</div>
                     {% endfor %}
                 </div>
             </div>
-
             <div class="col-lg-5 col-md-6">
                 <div class="card create-container-card d-none d-md-block">
                     <div class="card-header">创建新容器 (带资源限制)</div>
                     <div class="card-body">
                         <form id="createContainerForm">
                             <div class="row g-3">
-                                <div class="col-12">
-                                    <label for="containerName" class="form-label">容器名称</label>
-                                    <input type="text" class="form-control" id="containerName" name="name" required>
-                                </div>
+                                <div class="col-12"><label for="containerName" class="form-label">容器名称</label><input type="text" class="form-control" id="containerName" name="name" required></div>
                                 <div class="col-12">
                                     <label for="containerImage" class="form-label">选择镜像</label>
                                     <select class="form-select" id="containerImage" name="image" required>
@@ -357,11 +181,9 @@
                                         <option value="{{ image.name }}">{{ image.description }}</option>
                                         {% endfor %}
                                     </select>
-                                    {% if image_error is defined and image_error[0] %}
-                                    <div class="form-text text-danger">{{ image_error[1] }}</div>
-                                    {% endif %}
+                                    {% if image_error is defined and image_error[0] %}<div class="form-text text-danger">{{ image_error[1] }}</div>{% endif %}
                                 </div>
-                                 <div class="col-12">
+                                <div class="col-12">
                                     <label for="storagePool" class="form-label">选择存储池 (可选)</label>
                                     <select class="form-select" id="storagePool" name="storage_pool">
                                         <option value="" selected>使用默认</option>
@@ -370,50 +192,20 @@
                                         {% endfor %}
                                     </select>
                                     <div class="form-text">提示: 硬盘大小限制仅对 ZFS/Btrfs/LVM 等类型生效。</div>
-                                    {% if storage_error is defined and storage_error[0] %}
-                                    <div class="form-text text-danger">{{ storage_error[1] }}</div>
-                                    {% endif %}
+                                    {% if storage_error is defined and storage_error[0] %}<div class="form-text text-danger">{{ storage_error[1] }}</div>{% endif %}
                                 </div>
-                                <div class="col-6">
-                                    <label for="cpuCores" class="form-label">CPU 核心数 (可选)</label>
-                                    <input type="number" class="form-control" id="cpuCores" name="cpu_cores" min="1" placeholder="例如: 2">
-                                </div>
-                                <div class="col-6">
-                                    <label for="cpuAllowance" class="form-label">CPU 占用率 % (可选)</label>
-                                    <input type="number" class="form-control" id="cpuAllowance" name="cpu_allowance" min="1" max="100" placeholder="例如: 50">
-                                </div>
-                                <div class="col-6">
-                                    <label for="memoryMB" class="form-label">内存 (MB) (可选)</label>
-                                    <input type="number" class="form-control" id="memoryMB" name="memory_mb" min="64" placeholder="例如: 1024">
-                                </div>
-                                <div class="col-6">
-                                    <label for="diskGB" class="form-label">硬盘 (GB) (可选)</label>
-                                    <input type="number" class="form-control" id="diskGB" name="disk_gb" min="1" placeholder="例如: 10">
-                                </div>
-                                <div class="col-6 d-flex align-items-end">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="swapEnabled" name="swap_enabled">
-                                        <label class="form-check-label" for="swapEnabled">
-                                            启用 Swap
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-6 d-flex align-items-end">
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox" id="securityNesting" name="security_nesting">
-                                        <label class="form-check-label" for="securityNesting">
-                                            允许嵌套
-                                        </label>
-                                    </div>
-                                </div>
-                                <div class="col-12">
-                                    <button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button>
-                                </div>
+                                <div class="col-6"><label for="cpuCores" class="form-label">CPU 核心数 (可选)</label><input type="number" class="form-control" id="cpuCores" name="cpu_cores" min="1" placeholder="例如: 2"></div>
+                                <div class="col-6"><label for="cpuAllowance" class="form-label">CPU 占用率 % (可选)</label><input type="number" class="form-control" id="cpuAllowance" name="cpu_allowance" min="1" max="100" placeholder="例如: 50"></div>
+                                <div class="col-6"><label for="memoryMB" class="form-label">内存 (MB) (可选)</label><input type="number" class="form-control" id="memoryMB" name="memory_mb" min="64" placeholder="例如: 1024"></div>
+                                <div class="col-6"><label for="diskGB" class="form-label">硬盘 (GB) (可选)</label><input type="number" class="form-control" id="diskGB" name="disk_gb" min="1" placeholder="例如: 10"></div>
+                                <div class="col-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="swapEnabled" name="swap_enabled"><label class="form-check-label" for="swapEnabled">启用 Swap</label></div></div>
+                                <div class="col-6 d-flex align-items-end"><div class="form-check"><input class="form-check-input" type="checkbox" id="securityNesting" name="security_nesting"><label class="form-check-label" for="securityNesting">允许嵌套</label></div></div>
+                                <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButton">创建容器</button></div>
                             </div>
                         </form>
                     </div>
                 </div>
-                </div>
+            </div>
         </div>
     </div>
     {% else %}
@@ -421,116 +213,67 @@
         <h2 class="text-center mb-4">管理员登录</h2>
         <form method="POST" action="{{ url_for('login') }}" id="loginForm">
             <input type="hidden" name="next" value="{{ request.args.get('next', '') }}">
-            <div class="mb-3">
-                <label for="username" class="form-label">用户名</label>
-                <input type="text" class="form-control" id="username" name="username" required autofocus>
-            </div>
-            <div class="mb-3">
-                <label for="password" class="form-label">密码</label>
-                <input type="password" class="form-control" id="password" name="password" required>
-            </div>
+            <div class="mb-3"><label for="username" class="form-label">用户名</label><input type="text" class="form-control" id="username" name="username" required autofocus></div>
+            <div class="mb-3"><label for="password" class="form-label">密码</label><input type="password" class="form-control" id="password" name="password" required></div>
             <div class="mb-3">
                 <label for="captchaInput" class="form-label">验证码: <span id="captchaQuestion" class="fw-bold"></span></label>
                 <div class="input-group">
                     <input type="text" class="form-control" id="captchaInput" name="captcha" required>
                     <button class="btn btn-outline-secondary" type="button" id="refreshCaptchaBtn" title="刷新验证码">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-arrow-repeat" viewBox="0 0 16 16">
-                          <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
-                          <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.5A5.002 5.002 0 0 0 8 3zM3.5 13A5.002 5.002 0 0 0 8 15c1.552 0 2.94-.707-3.857-1.818a.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.5a5.002 5.002 0 0 0 0 4z"/>
+                            <path d="M11.534 7h3.932a.25.25 0 0 1 .192.41l-1.966 2.36a.25.25 0 0 1-.384 0l-1.966-2.36a.25.25 0 0 1 .192-.41zm-11 2h3.932a.25.25 0 0 0 .192-.41L2.692 6.23a.25.25 0 0 0-.384 0L.342 8.59A.25.25 0 0 0 .534 9z"/>
+                            <path fill-rule="evenodd" d="M8 3c-1.552 0-2.94.707-3.857 1.818a.5.5 0 1 1-.771-.636A6.002 6.002 0 0 1 13.917 7H12.5A5.002 5.002 0 0 0 8 3zM3.5 13A5.002 5.002 0 0 0 8 15c1.552 0 2.94-.707-3.857-1.818a.5.5 0 1 1 .771.636A6.002 6.002 0 0 1 2.083 9H3.5a5.002 5.002 0 0 0 0 4z"/>
                         </svg>
                     </button>
                 </div>
             </div>
-            {% if login_error %}
-            <div class="alert alert-danger" role="alert">
-                {{ login_error }}
-            </div>
-            {% endif %}
+            {% if login_error %}<div class="alert alert-danger" role="alert">{{ login_error }}</div>{% endif %}
             <button type="submit" class="btn btn-primary w-100">登录</button>
         </form>
     </div>
     {% endif %}
-
-    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer">
-    </div>
-
+    <div class="toast-container position-fixed top-0 end-0 p-3" id="toastContainer"></div>
     <div class="modal fade" id="infoModal" tabindex="-1" aria-labelledby="infoModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="infoModalLabel">容器信息</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title" id="infoModalLabel">容器信息</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body">
                     <div id="basicInfoContent">正在加载基础信息...</div>
-                    <div id="natRulesList">
-                        <h6>NAT 规则 (本应用添加)</h6>
-                        <ul id="natRulesContent">
-                            <li>正在加载 NAT 规则...</li>
-                        </ul>
-                         <div id="natRulesError" class="alert alert-warning mt-2 d-none"></div>
-                    </div>
-                     <div id="infoError" class="alert alert-danger mt-2 d-none"></div>
+                    <div id="natRulesList"><h6>NAT 规则 (本应用添加)</h6><ul id="natRulesContent"><li>正在加载 NAT 规则...</li></ul><div id="natRulesError" class="alert alert-warning mt-2 d-none"></div></div>
+                    <div id="infoError" class="alert alert-danger mt-2 d-none"></div>
                 </div>
             </div>
         </div>
     </div>
-
     <div class="modal fade" id="execModal" tabindex="-1" aria-labelledby="execModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="execModalLabel">在容器内执行命令</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title" id="execModalLabel">在容器内执行命令</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body">
                     <form id="execCommandForm">
                         <input type="hidden" id="execContainerName" name="container_name">
-                        <div class="mb-3">
-                            <label for="commandInput" class="form-label">命令 (例如: ls -l / 或 apt update)</label>
-                            <input type="text" class="form-control" id="commandInput" name="command" required>
-                        </div>
+                        <div class="mb-3"><label for="commandInput" class="form-label">命令 (例如: ls -l / 或 apt update)</label><input type="text" class="form-control" id="commandInput" name="command" required></div>
                         <button type="submit" class="btn btn-primary" id="execButton">执行</button>
                     </form>
-                    <h6 class="mt-3">输出:</h6>
-                    <pre id="execOutput" class="mt-2"></pre>
+                    <h6 class="mt-3">输出:</h6><pre id="execOutput" class="mt-2"></pre>
                 </div>
             </div>
         </div>
     </div>
-
     <div class="modal fade" id="natModal" tabindex="-1" aria-labelledby="natModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="natModalLabel">为容器添加 NAT 规则</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title" id="natModalLabel">为容器添加 NAT 规则</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body">
-                    <div class="alert alert-warning" role="alert">
-                        注意：这将在主机上添加一个临时的 iptables NAT 规则。规则在主机重启后会丢失，且需要此Web应用以足够权限(如 root 或 sudo)运行。
-                         成功添加规则时，iptables命令通常没有输出内容。
-                    </div>
+                    <div class="alert alert-warning" role="alert">注意：这将在主机上添加一个临时的 iptables NAT 规则。规则在主机重启后会丢失，且需要此Web应用以足够权限(如 root 或 sudo)运行。成功添加规则时，iptables命令通常没有输出内容。</div>
                     <form id="addNatForm">
                         <input type="hidden" id="natContainerName" name="container_name">
-                         <div class="mb-3">
-                            <label for="natContainerIP" class="form-label">容器 IP 地址 (添加规则时获取)</label>
-                            <input type="text" class="form-control" id="natContainerIP" readonly>
-                        </div>
-                        <div class="mb-3">
-                            <label for="hostPort" class="form-label">主机端口</label>
-                            <input type="number" class="form-control" id="hostPort" name="host_port" required min="1" max="65535">
-                        </div>
-                         <div class="mb-3">
-                            <label for="containerPort" class="form-label">容器端口</label>
-                            <input type="number" class="form-control" id="containerPort" name="container_port" required min="1" max="65535">
-                        </div>
+                        <div class="mb-3"><label for="natContainerIP" class="form-label">容器 IP 地址 (添加规则时获取)</label><input type="text" class="form-control" id="natContainerIP" readonly></div>
+                        <div class="mb-3"><label for="hostPort" class="form-label">主机端口</label><input type="number" class="form-control" id="hostPort" name="host_port" required min="1" max="65535"></div>
+                        <div class="mb-3"><label for="containerPort" class="form-label">容器端口</label><input type="number" class="form-control" id="containerPort" name="container_port" required min="1" max="65535"></div>
                         <div class="mb-3">
                             <label for="protocol" class="form-label">协议</label>
-                            <select class="form-select" id="protocol" name="protocol" required>
-                                <option value="tcp">TCP</option>
-                                <option value="udp">UDP</option>
-                            </select>
+                            <select class="form-select" id="protocol" name="protocol" required><option value="tcp">TCP</option><option value="udp">UDP</option></select>
                         </div>
                         <button type="submit" class="btn btn-primary" id="addNatButton">添加规则</button>
                     </form>
@@ -538,116 +281,58 @@
             </div>
         </div>
     </div>
-
     <div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="confirmModalLabel">请确认</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body" id="confirmModalBody">
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-primary" id="confirmActionButton">确认</button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title" id="confirmModalLabel">请确认</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body" id="confirmModalBody"></div>
+                <div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button><button type="button" class="btn btn-primary" id="confirmActionButton">确认</button></div>
             </div>
         </div>
     </div>
-
     <div class="modal fade" id="createContainerModalMobile" tabindex="-1" aria-labelledby="createContainerModalMobileLabel" aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="createContainerModalMobileLabel">创建新容器 (带资源限制)</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
+                <div class="modal-header"><h5 class="modal-title" id="createContainerModalMobileLabel">创建新容器 (带资源限制)</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
                 <div class="modal-body">
                     <form id="createContainerFormMobile">
                         <div class="row g-3">
-                            <div class="col-12">
-                                <label for="containerNameMobile" class="form-label">容器名称</label>
-                                <input type="text" class="form-control" id="containerNameMobile" name="name" required>
-                            </div>
+                            <div class="col-12"><label for="containerNameMobile" class="form-label">容器名称</label><input type="text" class="form-control" id="containerNameMobile" name="name" required></div>
                             <div class="col-12">
                                 <label for="containerImageMobile" class="form-label">选择镜像</label>
                                 <select class="form-select" id="containerImageMobile" name="image" required>
                                     <option value="" selected disabled>请选择一个镜像</option>
-                                    {% for image in images %}
-                                    <option value="{{ image.name }}">{{ image.description }}</option>
-                                    {% endfor %}
+                                    {% for image in images %}<option value="{{ image.name }}">{{ image.description }}</option>{% endfor %}
                                 </select>
-                                {% if image_error is defined and image_error[0] %}
-                                <div class="form-text text-danger">{{ image_error[1] }}</div>
-                                {% endif %}
+                                {% if image_error is defined and image_error[0] %}<div class="form-text text-danger">{{ image_error[1] }}</div>{% endif %}
                             </div>
-                             <div class="col-12">
+                            <div class="col-12">
                                 <label for="storagePoolMobile" class="form-label">选择存储池 (可选)</label>
                                 <select class="form-select" id="storagePoolMobile" name="storage_pool">
                                     <option value="" selected>使用默认</option>
-                                    {% for pool in available_pools %}
-                                    <option value="{{ pool }}">{{ pool }}</option>
-                                    {% endfor %}
+                                    {% for pool in available_pools %}<option value="{{ pool }}">{{ pool }}</option>{% endfor %}
                                 </select>
-                                {% if storage_error is defined and storage_error[0] %}
-                                <div class="form-text text-danger">{{ storage_error[1] }}</div>
-                                {% endif %}
+                                {% if storage_error is defined and storage_error[0] %}<div class="form-text text-danger">{{ storage_error[1] }}</div>{% endif %}
                             </div>
-                            <div class="col-6">
-                                <label for="cpuCoresMobile" class="form-label">CPU 核数</label>
-                                <input type="number" class="form-control" id="cpuCoresMobile" name="cpu_cores" min="1" placeholder="可选">
-                            </div>
-                            <div class="col-6">
-                                <label for="cpuAllowanceMobile" class="form-label">CPU %</label>
-                                <input type="number" class="form-control" id="cpuAllowanceMobile" name="cpu_allowance" min="1" max="100" placeholder="可选">
-                            </div>
-                            <div class="col-6">
-                                <label for="memoryMBMobile" class="form-label">内存(MB)</label>
-                                <input type="number" class="form-control" id="memoryMBMobile" name="memory_mb" min="64" placeholder="可选">
-                            </div>
-                            <div class="col-6">
-                                <label for="diskGBMobile" class="form-label">硬盘(GB)</label>
-                                <input type="number" class="form-control" id="diskGBMobile" name="disk_gb" min="1" placeholder="可选">
-                            </div>
-                            <div class="col-6 d-flex align-items-center">
-                                 <div class="form-check">
-                                     <input class="form-check-input" type="checkbox" id="swapEnabledMobile" name="swap_enabled">
-                                     <label class="form-check-label" for="swapEnabledMobile">
-                                         启用 Swap
-                                     </label>
-                                 </div>
-                            </div>
-                            <div class="col-6 d-flex align-items-center">
-                                 <div class="form-check">
-                                     <input class="form-check-input" type="checkbox" id="securityNestingMobile" name="security_nesting">
-                                     <label class="form-check-label" for="securityNestingMobile">
-                                         允许嵌套
-                                     </label>
-                                 </div>
-                            </div>
-                            <div class="col-12">
-                                <button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button>
-                            </div>
+                            <div class="col-6"><label for="cpuCoresMobile" class="form-label">CPU 核数</label><input type="number" class="form-control" id="cpuCoresMobile" name="cpu_cores" min="1" placeholder="可选"></div>
+                            <div class="col-6"><label for="cpuAllowanceMobile" class="form-label">CPU %</label><input type="number" class="form-control" id="cpuAllowanceMobile" name="cpu_allowance" min="1" max="100" placeholder="可选"></div>
+                            <div class="col-6"><label for="memoryMBMobile" class="form-label">内存(MB)</label><input type="number" class="form-control" id="memoryMBMobile" name="memory_mb" min="64" placeholder="可选"></div>
+                            <div class="col-6"><label for="diskGBMobile" class="form-label">硬盘(GB)</label><input type="number" class="form-control" id="diskGBMobile" name="disk_gb" min="1" placeholder="可选"></div>
+                            <div class="col-6 d-flex align-items-center"><div class="form-check"><input class="form-check-input" type="checkbox" id="swapEnabledMobile" name="swap_enabled"><label class="form-check-label" for="swapEnabledMobile">启用 Swap</label></div></div>
+                            <div class="col-6 d-flex align-items-center"><div class="form-check"><input class="form-check-input" type="checkbox" id="securityNestingMobile" name="security_nesting"><label class="form-check-label" for="securityNestingMobile">允许嵌套</label></div></div>
+                            <div class="col-12"><button type="submit" class="btn btn-primary w-100" id="createButtonMobile">创建容器</button></div>
                         </div>
                     </form>
                 </div>
             </div>
         </div>
     </div>
-
     <div class="modal fade" id="terminalModal" tabindex="-1" aria-labelledby="terminalModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-xl"> <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="terminalModalLabel">在线终端</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                   <div id="terminal"></div> </div>
-                 <div class="modal-footer">
-                    <span id="terminalStatus" class="me-auto text-muted small">未连接</span>
-                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button>
-                </div>
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header"><h5 class="modal-title" id="terminalModalLabel">在线终端</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div>
+                <div class="modal-body"><div id="terminal"></div></div>
+                <div class="modal-footer"><span id="terminalStatus" class="me-auto text-muted small">未连接</span><button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">关闭</button></div>
             </div>
         </div>
     </div>
@@ -655,32 +340,22 @@
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
-
 <script>
 let captchaAnswer = 0;
-
 function generateCaptcha() {
     const num1 = Math.ceil(Math.random() * 9) + 1;
     const num2 = Math.ceil(Math.random() * 9) + 1;
     captchaAnswer = num1 + num2;
     const captchaQuestionEl = document.getElementById('captchaQuestion');
-    if (captchaQuestionEl) {
-        captchaQuestionEl.innerText = `${num1} + ${num2} = ?`;
-    }
+    if (captchaQuestionEl) { captchaQuestionEl.innerText = `${num1} + ${num2} = ?`; }
     const captchaInputEl = document.getElementById('captchaInput');
-    if (captchaInputEl) {
-        captchaInputEl.value = '';
-    }
+    if (captchaInputEl) { captchaInputEl.value = ''; }
 }
-
 document.addEventListener('DOMContentLoaded', function() {
     if (document.getElementById('loginForm')) {
         generateCaptcha();
         const refreshButton = document.getElementById('refreshCaptchaBtn');
-        if(refreshButton) {
-            refreshButton.addEventListener('click', generateCaptcha);
-        }
-
+        if(refreshButton) { refreshButton.addEventListener('click', generateCaptcha); }
         const loginForm = document.getElementById('loginForm');
         loginForm.addEventListener('submit', function(event) {
             const userAnswer = parseInt(document.getElementById('captchaInput').value, 10);
@@ -692,42 +367,22 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
-
-
 function showToast(message, type = 'info') {
     let toastType = 'info';
-    if (type === 'success') {
-        toastType = 'success';
-    } else if (type === 'error') {
-        toastType = 'danger';
-    } else if (type === 'warning') {
-        toastType = 'warning';
-    }
+    if (type === 'success') { toastType = 'success'; }
+    else if (type === 'error') { toastType = 'danger'; }
+    else if (type === 'warning') { toastType = 'warning'; }
     const toastContainer = $('#toastContainer');
-    const toastHtml = `
-        <div class="toast align-items-center text-bg-${toastType} border-0" role="alert" aria-live="assertive" aria-atomic="true">
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${message}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button>
-            </div>
-        </div>
-    `;
+    const toastHtml = `<div class="toast align-items-center text-bg-${toastType} border-0" role="alert" aria-live="assertive" aria-atomic="true"><div class="d-flex"><div class="toast-body">${message}</div><button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast" aria-label="Close"></button></div></div>`;
     const toastElement = $(toastHtml);
     toastContainer.append(toastElement);
     const toast = new bootstrap.Toast(toastElement[0]);
     toast.show();
-    toastElement.on('hidden.bs.toast', function () {
-        $(this).remove();
-    });
+    toastElement.on('hidden.bs.toast', function () { $(this).remove(); });
 }
-
 function setButtonProcessing(button, isProcessing) {
     const $button = $(button);
-    if (!$button.length) {
-        return;
-    }
+    if (!$button.length) { return; }
     if (isProcessing) {
         if (!$button.data('original-html')) {
             $button.data('original-html', $button.html());
@@ -746,12 +401,10 @@ function setButtonProcessing(button, isProcessing) {
         }
     }
 }
-
 let currentConfirmAction = null;
 let currentConfirmContainerName = null;
 let currentConfirmRuleId = null;
 let currentConfirmButtonElement = null;
-
 function showConfirmationModal(actionType, nameOrId, buttonElement) {
     currentConfirmAction = actionType;
     currentConfirmButtonElement = buttonElement;
@@ -789,7 +442,6 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
     confirmModal.show();
 }
-
 $('#confirmActionButton').click(function() {
     const actionType = currentConfirmAction;
     const buttonElement = currentConfirmButtonElement;
@@ -801,24 +453,17 @@ $('#confirmActionButton').click(function() {
         return;
     }
     setButtonProcessing(confirmButton, true);
-     if (actionType !== 'delete_nat_rule') {
-         setButtonProcessing(buttonElement, true);
-     }
+     if (actionType !== 'delete_nat_rule') { setButtonProcessing(buttonElement, true); }
     if (actionType === 'delete_nat_rule') {
         const ruleId = currentConfirmRuleId;
         $.ajax({
-            url: `/container/nat_rule/${ruleId}`,
-            type: 'DELETE',
-            headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+            url: `/container/nat_rule/${ruleId}`, type: 'DELETE', headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
             success: function(data) {
                 showToast(data.message, data.status);
                 if (data.status === 'success' || data.status === 'warning') {
                     const containerNameInModalLabel = $('#infoModalLabel').text().replace('容器信息: ', '');
-                    if (containerNameInModalLabel) {
-                        loadNatRules(containerNameInModalLabel);
-                    } else {
-                         setTimeout(() => location.reload(), 1000);
-                    }
+                    if (containerNameInModalLabel) { loadNatRules(containerNameInModalLabel); }
+                    else { setTimeout(() => location.reload(), 1000); }
                 }
             },
             error: function(jqXHR) {
@@ -842,9 +487,7 @@ $('#confirmActionButton').click(function() {
         let action = actionType.replace('_container', '');
         $.post(`/container/${containerName}/action`, { action: action }, function(data) {
             showToast(data.message, data.status);
-            if (data.status === 'success') {
-                 setTimeout(() => location.reload(), 1000);
-            }
+            if (data.status === 'success') { setTimeout(() => location.reload(), 1000); }
         }).fail(function(jqXHR) {
              if (jqXHR.status === 401) {
                 showToast("操作需要认证，请重新登录。", 'danger');
@@ -861,13 +504,9 @@ $('#confirmActionButton').click(function() {
         });
     }
 });
-
 $('#confirmModal').on('hidden.bs.modal', function () {
-    currentConfirmAction = null;
-    currentConfirmContainerName = null;
-    currentConfirmRuleId = null;
+    currentConfirmAction = null; currentConfirmContainerName = null; currentConfirmRuleId = null;
 });
-
 function handleCreateContainerFormSubmit(event) {
     event.preventDefault();
     const form = $(this);
@@ -875,10 +514,7 @@ function handleCreateContainerFormSubmit(event) {
     setButtonProcessing(submitButton, true);
     var formData = form.serialize();
     $.ajax({
-        url: "{{ url_for('create_container') }}",
-        type: "POST",
-        data: formData,
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+        url: "{{ url_for('create_container') }}", type: "POST", data: formData, headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
@@ -899,38 +535,21 @@ function handleCreateContainerFormSubmit(event) {
                 showToast("错误: " + message, 'danger');
              }
         },
-        complete: function() {
-            setButtonProcessing(submitButton, false);
-        }
+        complete: function() { setButtonProcessing(submitButton, false); }
     });
 }
-
 $('#createContainerForm').submit(handleCreateContainerFormSubmit);
 $('#createContainerFormMobile').submit(handleCreateContainerFormSubmit);
-
-
 function performAction(containerName, action, buttonElement) {
-    if (action === 'restart') {
-        showConfirmationModal('restart_container', containerName, buttonElement);
-        return;
-    }
-    if (action === 'delete') {
-        showConfirmationModal('delete_container', containerName, buttonElement);
-        return;
-    }
+    if (action === 'restart') { showConfirmationModal('restart_container', containerName, buttonElement); return; }
+    if (action === 'delete') { showConfirmationModal('delete_container', containerName, buttonElement); return; }
     setButtonProcessing(buttonElement, true);
     $.ajax({
-        url: `/container/${containerName}/action`,
-        type: "POST",
-        data: { action: action },
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+        url: `/container/${containerName}/action`, type: "POST", data: { action: action }, headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
-            if (data.status === 'success') {
-                 setTimeout(() => location.reload(), 1000);
-            } else {
-                 setButtonProcessing(buttonElement, false);
-            }
+            if (data.status === 'success') { setTimeout(() => location.reload(), 1000); }
+            else { setButtonProcessing(buttonElement, false); }
         },
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
@@ -944,7 +563,6 @@ function performAction(containerName, action, buttonElement) {
         }
     });
 }
-
 function showInfo(containerName, buttonElement) {
     const basicInfoContent = $('#basicInfoContent');
     const natRulesListContainer = $('#natRulesList');
@@ -956,13 +574,11 @@ function showInfo(containerName, buttonElement) {
     basicInfoContent.html('正在加载基础信息...');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
-     infoError.addClass('d-none').text('');
+    infoError.addClass('d-none').text('');
     natRulesListContainer.show();
     setButtonProcessing(buttonElement, true);
     $.ajax({
-        url: `/container/${containerName}/info`,
-        type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+        url: `/container/${containerName}/info`, type: "GET", headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
              if (data.status === 'NotFound') {
                  basicInfoContent.html(`<strong>错误:</strong> ${data.message}`);
@@ -971,59 +587,21 @@ function showInfo(containerName, buttonElement) {
                  natRulesListContainer.hide();
                  return;
              }
-
             let limitsHtml = '<h6>资源限制:</h6><ul class="list-unstyled">';
             let hasLimits = false;
-            if (data.config && data.config['limits.cpu']) {
-                limitsHtml += `<li><strong>CPU 核心数:</strong> ${data.config['limits.cpu']}</li>`;
-                hasLimits = true;
-            }
-            if (data.config && data.config['limits.cpu.allowance']) {
-                limitsHtml += `<li><strong>CPU 占用率:</strong> ${data.config['limits.cpu.allowance']}</li>`;
-                hasLimits = true;
-            }
-             if (data.config && data.config['limits.memory']) {
-                limitsHtml += `<li><strong>内存:</strong> ${data.config['limits.memory']}</li>`;
-                hasLimits = true;
-            }
-             if (data.config && data.config['limits.memory.swap']) {
-                limitsHtml += `<li><strong>启用 Swap:</strong> ${data.config['limits.memory.swap']}</li>`;
-                hasLimits = true;
-            }
-            if (data.config && data.config['security.nesting']) {
-                limitsHtml += `<li><strong>允许嵌套:</strong> ${data.config['security.nesting']}</li>`;
-                hasLimits = true;
-            }
+            if (data.config && data.config['limits.cpu']) { limitsHtml += `<li><strong>CPU 核心数:</strong> ${data.config['limits.cpu']}</li>`; hasLimits = true; }
+            if (data.config && data.config['limits.cpu.allowance']) { limitsHtml += `<li><strong>CPU 占用率:</strong> ${data.config['limits.cpu.allowance']}</li>`; hasLimits = true; }
+            if (data.config && data.config['limits.memory']) { limitsHtml += `<li><strong>内存:</strong> ${data.config['limits.memory']}</li>`; hasLimits = true; }
+            if (data.config && data.config['limits.memory.swap']) { limitsHtml += `<li><strong>启用 Swap:</strong> ${data.config['limits.memory.swap']}</li>`; hasLimits = true; }
+            if (data.config && data.config['security.nesting']) { limitsHtml += `<li><strong>允许嵌套:</strong> ${data.config['security.nesting']}</li>`; hasLimits = true; }
             let rootDiskSize = '默认';
-            if(data.devices && data.devices.root && data.devices.root.size) {
-                 rootDiskSize = data.devices.root.size;
-                 hasLimits = true;
-            }
+            if(data.devices && data.devices.root && data.devices.root.size) { rootDiskSize = data.devices.root.size; hasLimits = true; }
             limitsHtml += `<li><strong>硬盘 (root):</strong> ${rootDiskSize}</li>`;
-
-            if (!hasLimits && rootDiskSize === '默认') {
-                 limitsHtml += '<li>未设置特定资源限制。</li>';
-            }
+            if (!hasLimits && rootDiskSize === '默认') { limitsHtml += '<li>未设置特定资源限制。</li>'; }
             limitsHtml += '</ul><hr>';
-
-
-            let infoHtml = `
-                <p><strong>名称:</strong> ${data.name}</p>
-                <p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p>
-                <p><strong>IP 地址:</strong> ${data.ip && data.ip !== 'N/A' ? data.ip : '-'}</p>
-                <p><strong>镜像来源/描述:</strong> ${data.description && data.description !== 'N/A' ? data.description : data.image_source && data.image_source !== 'N/A' ? data.image_source : 'N/A'}</p>
-                <p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p>
-                <p><strong>架构:</strong> ${data.architecture && data.architecture !== 'N/A' ? data.architecture : 'N/A'}</p>
-                <p><strong>类型:</strong> ${data.type}</p>
-                 <p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p>
-                <p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>
-                ${limitsHtml}
-                 <p><small>${data.message}</small></p>
-            `;
+            let infoHtml = `<p><strong>名称:</strong> ${data.name}</p><p><strong>状态:</strong> <span class="badge bg-${data.status === 'Running' ? 'success' : data.status === 'Stopped' ? 'danger' : 'secondary'}">${data.status}</span> (代码: ${data.status_code})</p><p><strong>IP 地址:</strong> ${data.ip && data.ip !== 'N/A' ? data.ip : '-'}</p><p><strong>镜像来源/描述:</strong> ${data.description && data.description !== 'N/A' ? data.description : data.image_source && data.image_source !== 'N/A' ? data.image_source : 'N/A'}</p><p><strong>创建时间:</strong> ${data.created_at ? data.created_at.split('T')[0] : 'N/A'}</p><p><strong>架构:</strong> ${data.architecture && data.architecture !== 'N/A' ? data.architecture : 'N/A'}</p><p><strong>类型:</strong> ${data.type}</p><p><strong>临时容器:</strong> ${data.ephemeral ? '是' : '否'}</p><p><strong>配置文件:</strong> ${data.profiles.join(', ') || '无'}</p>${limitsHtml}<p><small>${data.message}</small></p>`;
             basicInfoContent.html(infoHtml);
-            if (!data.live_data_available && data.status !== 'NotFound') {
-                 showToast(data.message, 'warning');
-            }
+            if (!data.live_data_available && data.status !== 'NotFound') { showToast(data.message, 'warning'); }
             loadNatRules(containerName);
         },
         error: function(jqXHR) {
@@ -1039,37 +617,21 @@ function showInfo(containerName, buttonElement) {
                 showToast("加载容器信息失败。", 'danger');
              }
         },
-        complete: function() {
-            setButtonProcessing(buttonElement, false);
-            infoModal.show();
-        }
+        complete: function() { setButtonProcessing(buttonElement, false); infoModal.show(); }
     });
 }
-
 function loadNatRules(containerName) {
     const natRulesContent = $('#natRulesContent');
-     const natRulesError = $('#natRulesError');
+    const natRulesError = $('#natRulesError');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
     natRulesError.addClass('d-none').text('');
      $.ajax({
-        url: `/container/${containerName}/nat_rules`,
-        type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+        url: `/container/${containerName}/nat_rules`, type: "GET", headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             natRulesContent.empty();
             if (data.status === 'success' && data.rules && data.rules.length > 0) {
                 data.rules.forEach(rule => {
-                    const ruleHtml = `
-                        <li data-rule-id="${rule.id}">
-                            <span class="rule-details">
-                                <strong>ID ${rule.id}:</strong> 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}
-                                <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
-                            </span>
-                            <span class="rule-actions">
-                                 <button class="btn btn-sm btn-danger" onclick="deleteNatRule(${rule.id}, this)">删除</button>
-                            </span>
-                        </li>
-                    `;
+                    const ruleHtml = `<li data-rule-id="${rule.id}"><span class="rule-details"><strong>ID ${rule.id}:</strong> 主机 ${rule.host_port}/${rule.protocol} → 容器 ${rule.ip_at_creation}:${rule.container_port}<br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small></span><span class="rule-actions"><button class="btn btn-sm btn-danger" onclick="deleteNatRule(${rule.id}, this)">删除</button></span></li>`;
                     natRulesContent.append(ruleHtml);
                 });
             } else if (data.status === 'success' && data.rules && data.rules.length === 0) {
@@ -1093,22 +655,16 @@ function loadNatRules(containerName) {
         }
     });
 }
-
-function deleteNatRule(ruleId, buttonElement) {
-    showConfirmationModal('delete_nat_rule', ruleId, buttonElement);
-}
-
+function deleteNatRule(ruleId, buttonElement) { showConfirmationModal('delete_nat_rule', ruleId, buttonElement); }
 function openExecModal(containerName) {
     $('#execContainerName').val(containerName);
     $('#execModalLabel').text(`在 ${containerName} 内执行命令`);
     $('#commandInput').val('');
-    $('#execOutput').text('');
-    $('#execOutput').removeClass('success error');
+    $('#execOutput').text('').removeClass('success error');
     setButtonProcessing($('#execButton'), false);
     var execModal = new bootstrap.Modal(document.getElementById('execModal'));
     execModal.show();
 }
-
 $('#execCommandForm').submit(function(event) {
     event.preventDefault();
     const form = $(this);
@@ -1116,26 +672,17 @@ $('#execCommandForm').submit(function(event) {
     const outputArea = $('#execOutput');
     var containerName = $('#execContainerName').val();
     var command = $('#commandInput').val();
-    if (!command.trim()) {
-        showToast("请输入要执行的命令。", 'warning');
-        return;
-    }
-    outputArea.text('正在执行...');
-    outputArea.removeClass('success error');
+    if (!command.trim()) { showToast("请输入要执行的命令。", 'warning'); return; }
+    outputArea.text('正在执行...').removeClass('success error');
     setButtonProcessing(submitButton, true);
     $.ajax({
-        url: `/container/${containerName}/exec`,
-        type: "POST",
-        data: { command: command },
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+        url: `/container/${containerName}/exec`, type: "POST", data: { command: command }, headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             if (data.status === 'success') {
-                outputArea.text(data.output);
-                outputArea.addClass('success');
+                outputArea.text(data.output).addClass('success');
                 showToast("命令执行成功。", 'success');
             } else {
-                outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出'));
-                outputArea.addClass('error');
+                outputArea.text('命令执行失败:\n' + (data.output || data.message || '无详细输出')).addClass('error');
                 showToast(data.message || "命令执行失败。", 'danger');
             }
         },
@@ -1145,31 +692,23 @@ $('#execCommandForm').submit(function(event) {
                 setTimeout(() => window.location.href = "{{ url_for('login', next=request.url) }}", 1000);
              } else {
                 const message = jqXHR.responseJSON ? (jqXHR.responseJSON.output || jqXHR.responseJSON.message || '未知错误') : "执行命令请求失败。";
-                outputArea.text("请求失败:\n" + message);
-                outputArea.addClass('error');
+                outputArea.text("请求失败:\n" + message).addClass('error');
                 showToast("请求失败。", 'danger');
              }
         },
-        complete: function() {
-            setButtonProcessing(submitButton, false);
-        }
+        complete: function() { setButtonProcessing(submitButton, false); }
     });
 });
-
 function openNatModal(containerName) {
     $('#natContainerName').val(containerName);
     $('#natModalLabel').text(`为容器 ${containerName} 添加 NAT 规则`);
-    $('#hostPort').val('');
-    $('#containerPort').val('');
-    $('#protocol').val('tcp');
+    $('#hostPort').val(''); $('#containerPort').val(''); $('#protocol').val('tcp');
     $('#natContainerIP').val('正在获取 IP...');
     setButtonProcessing($('#addNatButton'), false);
     var natModal = new bootstrap.Modal(document.getElementById('natModal'));
     natModal.show();
     $.ajax({
-        url: `/container/${containerName}/info`,
-        type: "GET",
-        headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+        url: `/container/${containerName}/info`, type: "GET", headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
              if (data.status === 'NotFound' || data.status !== 'Running' || !data.ip || data.ip === 'N/A') {
                  const ipError = data.message || "无法获取容器 IP 地址或容器未运行。";
@@ -1196,7 +735,6 @@ function openNatModal(containerName) {
         }
     });
 }
-
 $('#addNatForm').submit(function(event) {
     event.preventDefault();
     const form = $(this);
@@ -1205,32 +743,16 @@ $('#addNatForm').submit(function(event) {
     const hostPort = $('#hostPort').val();
     const containerPort = $('#containerPort').val();
     const protocol = $('#protocol').val();
-    if (!hostPort || !containerPort || !protocol) {
-        showToast("请填写所有 NAT 规则信息。", 'warning');
-        return;
-    }
+    if (!hostPort || !containerPort || !protocol) { showToast("请填写所有 NAT 规则信息。", 'warning'); return; }
     setButtonProcessing(submitButton, true);
     $.ajax({
-        url: `/container/${containerName}/add_nat_rule`,
-        type: "POST",
-        data: {
-            host_port: hostPort,
-            container_port: containerPort,
-            protocol: protocol
-        },
-         headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
+        url: `/container/${containerName}/add_nat_rule`, type: "POST", data: { host_port: hostPort, container_port: containerPort, protocol: protocol }, headers: { 'X-API-Hash': '{{ API_SECRET_HASH }}' },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success' || data.status === 'warning') {
                  const containerNameInInfoModal = $('#infoModalLabel').text().replace('容器信息: ', '');
-                 if (containerNameInInfoModal === containerName) {
-                     loadNatRules(containerName);
-                 }
-                 if (data.status === 'success') {
-                     $('#hostPort').val('');
-                     $('#containerPort').val('');
-                     $('#protocol').val('tcp');
-                 }
+                 if (containerNameInInfoModal === containerName) { loadNatRules(containerName); }
+                 if (data.status === 'success') { $('#hostPort').val(''); $('#containerPort').val(''); $('#protocol').val('tcp'); }
             }
         },
         error: function(jqXHR) {
@@ -1244,42 +766,13 @@ $('#addNatForm').submit(function(event) {
                 showToast(message, 'danger');
              }
         },
-        complete: function() {
-            setButtonProcessing(submitButton, false);
-        }
+        complete: function() { setButtonProcessing(submitButton, false); }
     });
 });
+$('#infoModal').on('hidden.bs.modal', function () { $('#basicInfoContent').html('正在加载基础信息...'); $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>'); $('#natRulesError').addClass('d-none').text(''); $('#infoError').addClass('d-none').text(''); $('#infoModalLabel').text('容器信息'); $('#natRulesList').hide(); });
+$('#execModal').on('hidden.bs.modal', function () { $('#execContainerName').val(''); $('#commandInput').val(''); $('#execOutput').text('').removeClass('success error'); $('#execModalLabel').text('在容器内执行命令'); setButtonProcessing($('#execButton'), false); });
+$('#natModal').on('hidden.bs.modal', function () { $('#natContainerName').val(''); $('#natContainerIP').val(''); $('#hostPort').val(''); $('#containerPort').val(''); $('#protocol').val('tcp'); $('#natModalLabel').text('为容器添加 NAT 规则'); setButtonProcessing($('#addNatButton'), false); $('#addNatButton').prop('disabled', false).text('添加规则'); });
 
-$('#infoModal').on('hidden.bs.modal', function () {
-  $('#basicInfoContent').html('正在加载基础信息...');
-  $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
-  $('#natRulesError').addClass('d-none').text('');
-  $('#infoError').addClass('d-none').text('');
-  $('#infoModalLabel').text('容器信息');
-   $('#natRulesList').hide();
-});
-
-$('#execModal').on('hidden.bs.modal', function () {
-  $('#execContainerName').val('');
-  $('#commandInput').val('');
-  $('#execOutput').text('');
-  $('#execOutput').removeClass('success error');
-  $('#execModalLabel').text('在容器内执行命令');
-  setButtonProcessing($('#execButton'), false);
-});
-
-$('#natModal').on('hidden.bs.modal', function () {
-    $('#natContainerName').val('');
-    $('#natContainerIP').val('');
-    $('#hostPort').val('');
-    $('#containerPort').val('');
-    $('#protocol').val('tcp');
-    $('#natModalLabel').text('为容器添加 NAT 规则');
-    setButtonProcessing($('#addNatButton'), false);
-    $('#addNatButton').prop('disabled', false).text('添加规则');
-});
-
-// --- 新增终端 JavaScript ---
 let term = null;
 let fitAddon = null;
 let socket = null;
@@ -1290,158 +783,39 @@ const terminalStatus = document.getElementById('terminalStatus');
 function openTerminalModal(containerName) {
     $('#terminalModalLabel').text(`在线终端: ${containerName}`);
     terminalStatus.textContent = '正在连接...';
-
     const terminalModal = new bootstrap.Modal(terminalModalElement);
-
-    // 清理旧实例
-    if (term) {
-        term.dispose();
-        term = null;
-    }
-    if (socket && socket.connected) {
-        socket.disconnect();
-        socket = null;
-    }
-
-    // 初始化 xterm.js
-    term = new Terminal({
-        cursorBlink: true,
-        rows: 25, // 默认行数
-        cols: 80, // 默认列数
-        fontFamily: 'monospace, "Courier New", Courier',
-        fontSize: 14,
-        theme: { // 一个简单的暗色主题
-            background: '#1e1e1e',
-            foreground: '#d4d4d4',
-            cursor: '#d4d4d4',
-            selectionBackground: '#555555',
-        },
-        allowTransparency: true,
-        convertEol: true // 自动转换换行符
-    });
-
-    // 加载 FitAddon
+    if (term) { term.dispose(); term = null; }
+    if (socket && socket.connected) { socket.disconnect(); socket = null; }
+    term = new Terminal({ cursorBlink: true, rows: 25, cols: 80, fontFamily: 'monospace, "Courier New", Courier', fontSize: 14, theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4', selectionBackground: '#555555' }, allowTransparency: true, convertEol: true });
     fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
-
-    // 打开终端并显示模态框
     term.open(terminalContainer);
     terminalModal.show();
-
-    // 确保在模态框显示后调整大小
-    setTimeout(() => {
-        try {
-           fitAddon.fit();
-           term.focus(); // 聚焦终端
-        } catch(e) { console.error("Fit addon error:", e); }
-    }, 250); // 稍作延迟以确保 DOM 渲染完成
-
-    // 连接 Socket.IO
-    socket = io({
-        transports: ['websocket'] // 强制使用 WebSocket
-    });
-
-    // Socket.IO 事件处理
-    socket.on('connect', () => {
-        console.log('Socket.IO 已连接:', socket.id);
-        terminalStatus.textContent = '已连接，等待认证...';
-    });
-
+    setTimeout(() => { try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error:", e); } }, 250);
+    socket = io({ transports: ['websocket'] });
+    socket.on('connect', () => { console.log('Socket.IO 已连接:', socket.id); terminalStatus.textContent = '已连接，等待认证...'; });
     socket.on('auth_success', () => {
         console.log('Socket.IO 认证成功，正在启动终端...');
         terminalStatus.textContent = '认证成功，启动终端...';
         socket.emit('start_terminal', { container_name: containerName });
-        // 发送初始大小
-         setTimeout(() => {
-             if (socket && socket.connected) {
-                socket.emit('resize', { rows: term.rows, cols: term.cols });
-             }
-         }, 100);
+        setTimeout(() => { if (socket && socket.connected) { socket.emit('resize', { rows: term.rows, cols: term.cols }); } }, 100);
     });
-
-    socket.on('terminal_ready', (data) => {
-        console.log('终端已就绪:', data.message);
-        terminalStatus.textContent = `已连接到 ${containerName}`;
-        term.focus();
-    });
-
-    socket.on('terminal_output', (data) => {
-        term.write(data.output);
-    });
-
-    socket.on('terminal_closed', (data) => {
-        console.warn('终端已关闭:', data.message);
-        terminalStatus.textContent = `连接已关闭: ${data.message}`;
-        term.write(`\r\n\r\n--- ${data.message} ---\r\n`);
-        if (socket) socket.disconnect();
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Socket.IO 已断开连接。');
-        if(terminalStatus.textContent.indexOf('关闭') === -1) {
-             terminalStatus.textContent = '连接已断开。';
-             if (term) {
-                term.write('\r\n\r\n--- 连接已断开 ---\r\n');
-             }
-        }
-    });
-
-    socket.on('connect_error', (err) => {
-        console.error('Socket.IO 连接错误:', err);
-        terminalStatus.textContent = `连接错误: ${err.message}`;
-        if (term) {
-           term.write(`\r\n\r\n--- 连接错误: ${err.message} ---\r\n`);
-        }
-    });
-
-    // 将 xterm.js 输入发送到 Socket.IO
-    term.onData((data) => {
-        if (socket && socket.connected) {
-            socket.emit('terminal_input', { 'input': data });
-        }
-    });
-
-    // 将 xterm.js 调整大小信息发送到 Socket.IO
-    term.onResize(({ cols, rows }) => {
-        if (socket && socket.connected) {
-             console.log(`调整大小为 ${rows}x${cols}`);
-            socket.emit('resize', { rows: rows, cols: cols });
-        }
-    });
-
-    // 模态框显示时再次调整大小并聚焦
-    terminalModalElement.addEventListener('shown.bs.modal', () => {
-        try {
-            fitAddon.fit();
-            term.focus();
-        } catch(e) { console.error("Fit addon error on show:", e); }
-    });
-
-    // 模态框隐藏时断开连接并清理资源
+    socket.on('terminal_ready', (data) => { console.log('终端已就绪:', data.message); terminalStatus.textContent = `已连接到 ${containerName}`; term.focus(); });
+    socket.on('terminal_output', (data) => { term.write(data.output); });
+    socket.on('terminal_closed', (data) => { console.warn('终端已关闭:', data.message); terminalStatus.textContent = `连接已关闭: ${data.message}`; term.write(`\r\n\r\n--- ${data.message} ---\r\n`); if (socket) socket.disconnect(); });
+    socket.on('disconnect', () => { console.log('Socket.IO 已断开连接。'); if(terminalStatus.textContent.indexOf('关闭') === -1) { terminalStatus.textContent = '连接已断开。'; if (term) { term.write('\r\n\r\n--- 连接已断开 ---\r\n'); } } });
+    socket.on('connect_error', (err) => { console.error('Socket.IO 连接错误:', err); terminalStatus.textContent = `连接错误: ${err.message}`; if (term) { term.write(`\r\n\r\n--- 连接错误: ${err.message} ---\r\n`); } });
+    term.onData((data) => { if (socket && socket.connected) { socket.emit('terminal_input', { 'input': data }); } });
+    term.onResize(({ cols, rows }) => { if (socket && socket.connected) { console.log(`调整大小为 ${rows}x${cols}`); socket.emit('resize', { rows: rows, cols: cols }); } });
+    terminalModalElement.addEventListener('shown.bs.modal', () => { try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error on show:", e); } });
     terminalModalElement.addEventListener('hidden.bs.modal', () => {
-        if (socket) {
-            socket.disconnect();
-            socket = null;
-        }
-        if (term) {
-            term.dispose();
-            term = null;
-        }
+        if (socket) { socket.disconnect(); socket = null; }
+        if (term) { term.dispose(); term = null; }
         terminalStatus.textContent = '未连接';
         console.log("终端模态框已关闭，资源已释放。");
     });
-
-     // 监听窗口大小变化，自动调整终端
-    $(window).on('resize', function(){
-        if (term && fitAddon && $('#terminalModal').is(':visible')) {
-            try {
-                fitAddon.fit();
-            } catch(e) { console.error("Fit addon error on window resize:", e); }
-        }
-    });
+    $(window).on('resize', function(){ if (term && fitAddon && $('#terminalModal').is(':visible')) { try { fitAddon.fit(); } catch(e) { console.error("Fit addon error on window resize:", e); } } });
 }
-// --- 结束新增终端 JavaScript ---
-
 </script>
 </body>
 </html>
