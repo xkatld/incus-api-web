@@ -1,10 +1,3 @@
-try:
-    from gevent import monkey
-    monkey.patch_all()
-    print("Gevent monkey-patching applied.")
-except ImportError:
-    print("警告: 未找到 Gevent，跳过猴子补丁。SocketIO 可能无法正常工作。")
-
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
 from flask_socketio import SocketIO, emit # 添加 SocketIO
 import subprocess
