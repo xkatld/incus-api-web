@@ -1,5 +1,5 @@
 import eventlet
-eventlet.monkey_patch() # 必须在其他模块导入前调用
+eventlet.monkey_patch()
 
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
 from flask_socketio import SocketIO, emit, join_room, leave_room, disconnect
@@ -422,7 +422,7 @@ def perform_iptables_delete_for_rule(rule_details):
             '-j', 'DNAT',
             '--to-destination', f'{ip_at_creation}:{container_port}'
         ]
-        
+
         app.logger.info(f"Checking iptables rule for ID {rule_details.get('id', 'N/A')}: {' '.join(shlex.quote(part) for part in iptables_check_command)}")
         success_check, _ = run_command(iptables_check_command, parse_json=False, timeout=5)
 
@@ -621,7 +621,7 @@ def index():
         for db_name in vanished_names_from_db:
              remove_container_from_db(db_name)
              app.logger.info(f"根据 Incus 列表移除数据库中不存在的容器和NAT规则记录: {db_name}")
-        
+
         cleanup_orphaned_nat_rules_in_db(incus_container_names_set)
 
 
@@ -653,7 +653,7 @@ def index():
                 alias_entry = next((a for a in aliases if isinstance(a, dict) and a.get('name')), None)
                 if alias_entry:
                      alias_name = alias_entry.get('name')
-            
+
             if not alias_name:
                 fingerprint = img.get('fingerprint')
                 alias_name = fingerprint[:12] if isinstance(fingerprint, str) else 'unknown_image'
@@ -662,7 +662,7 @@ def index():
             description = 'N/A'
             if isinstance(description_props, dict):
                 description = description_props.get('description', 'N/A')
-            
+
             available_images.append({'name': alias_name, 'description': f"{alias_name} ({description})"})
     else:
         image_error = True
@@ -820,7 +820,7 @@ def container_action(name, action=None):
                     if is_bad_or_missing_rule:
                         warning_rule_deletions.append(f"ID {rule.get('id', 'N/A')}: {iptables_message}")
                         app.logger.warning(f"IPTables 规则不存在或错误 (ID {rule.get('id', 'N/A')}): {iptables_message}. 继续删除数据库记录。")
-                    
+
                     db_success_remove, db_msg_remove = remove_nat_rule_from_db(rule['id'])
                     if not db_success_remove:
                         app.logger.error(f"IPTables 规则处理完成 (ID {rule['id']}), 但从数据库删除记录失败: {db_msg_remove}")
@@ -1068,7 +1068,7 @@ def delete_nat_rule(rule_id):
         final_message = f'已成功删除ID为 {rule_id} 的NAT规则记录。'
         if is_bad_or_missing_rule:
              final_message = f'数据库记录已删除 (ID {rule_id})。注意：该规则在 iptables 中未找到或已不存在 ({iptables_message})。'
-        
+
         if not db_success_remove:
              final_message += f" 但从数据库移除记录失败: {db_message_remove}"
              app.logger.error(f"IPTables rule deletion processed for ID {rule['id']}, but failed to remove record from DB: {db_message_remove}")
@@ -1084,8 +1084,8 @@ def delete_nat_rule(rule_id):
 def _forward_pty_output(sid, master_fd):
     try:
         while True:
-            socketio.sleep(0.01) 
-            
+            socketio.sleep(0.01)
+
             if sid not in pty_sessions or pty_sessions[sid]['fd'] != master_fd:
                 app.logger.info(f"PTY read thread for SID {sid}: session seems closed or FD changed, exiting.")
                 break
@@ -1130,31 +1130,28 @@ def _cleanup_pty_session(sid):
         session_data = pty_sessions.pop(sid)
         process = session_data.get('process')
         master_fd = session_data.get('fd')
-        read_thread = session_data.get('read_thread') # This might be a GreenThread object with eventlet
+        read_thread = session_data.get('read_thread')
 
         if process:
             try:
                 if process.poll() is None:
                     process.terminate()
-                    process.wait(timeout=2) # subprocess.wait might not be fully eventlet-friendly
+                    process.wait(timeout=2)
                 if process.poll() is None:
                     process.kill()
                     process.wait(timeout=1)
                 app.logger.info(f"PTY process for SID {sid} (container: {session_data.get('container_name')}) terminated with code: {process.returncode}")
             except Exception as e:
                 app.logger.error(f"Error terminating PTY process for SID {sid}: {e}")
-        
+
         if master_fd is not None:
             try:
                 os.close(master_fd)
                 app.logger.info(f"Closed PTY master FD {master_fd} for SID {sid}")
             except OSError as e:
                 app.logger.error(f"Error closing PTY master FD for SID {sid}: {e}")
-        
-        # For eventlet, background tasks are managed differently.
-        # We don't explicitly join threads in the same way.
-        # The task should end when its target function (_forward_pty_output) returns.
-        if read_thread: # In eventlet, this is the GreenThread object
+
+        if read_thread:
              app.logger.info(f"PTY read task for SID {sid} should be ending or already ended.")
 
 
@@ -1169,42 +1166,32 @@ def terminal_connect(auth_data=None):
 
     error_message_prefix = f"终端连接失败 (SID: {sid}, 容器: {container_name}): "
 
-    if not session.get('logged_in'):
-        msg = "用户未认证。"
+    def reject_connection(msg):
         app.logger.warning(f"{error_message_prefix}{msg}")
         emit('pty_output', {'output': f'\r\n\x1b[31m错误: {msg} 即将断开连接。\x1b[0m\r\n'}, room=sid)
-        # Pass data with disconnect for client's connect_error
-        disconnect(sid) # SocketIO's disconnect will trigger connect_error on client if connection was initiated
-        return False
-
-    if not container_name:
-        msg = "未提供容器名称。"
-        app.logger.error(f"{error_message_prefix}{msg}")
-        emit('pty_output', {'output': f'\r\n\x1b[31m错误: {msg} 即将断开连接。\x1b[0m\r\n'}, room=sid)
+        socketio.sleep(0.1)
         disconnect(sid)
         return False
+
+    if not session.get('logged_in'):
+        return reject_connection("用户未认证。")
+
+    if not container_name:
+        return reject_connection("未提供容器名称。")
 
     app.logger.info(f"Terminal connect for SID {sid}: Authenticated and container name '{container_name}' provided. Checking container status...")
     container_info, raw_info_error = _get_container_raw_info(container_name)
 
-    if raw_info_error: # _get_container_raw_info returned an error message
-        app.logger.error(f"{error_message_prefix}获取容器信息失败: {raw_info_error}")
-        emit('pty_output', {'output': f'\r\n\x1b[31m错误: 获取容器 "{container_name}" 信息失败: {raw_info_error} 即将断开连接。\x1b[0m\r\n'}, room=sid)
-        disconnect(sid)
-        return False
+    if raw_info_error:
+        return reject_connection(f"获取容器信息失败: {raw_info_error}")
 
     if not container_info or container_info.get('status') != 'Running':
         status = container_info.get('status', '未找到') if container_info else '未找到'
-        msg = f"容器 '{container_name}' 未运行或未找到 (状态: {status})。"
-        app.logger.error(f"{error_message_prefix}{msg}")
-        emit('pty_output', {'output': f'\r\n\x1b[31m错误: {msg} 即将断开连接。\x1b[0m\r\n'}, room=sid)
-        disconnect(sid)
-        return False
-    
+        return reject_connection(f"容器 '{container_name}' 未运行或未找到 (状态: {status})。")
+
     app.logger.info(f"Terminal connect for SID {sid}: Container '{container_name}' is Running. Proceeding with PTY setup.")
 
     cmd = ['incus', 'exec', container_name, '--env', 'TERM=xterm', '--env', 'LC_ALL=C.UTF-8', '--env', 'LANG=C.UTF-8', '--', '/bin/bash', '-i']
-    # Consider Alpine: cmd = ['incus', 'exec', container_name, '--env', 'TERM=xterm', '--', '/bin/sh', '-i']
 
     master_fd = None
     slave_fd = None
@@ -1214,11 +1201,10 @@ def terminal_connect(auth_data=None):
         master_fd, slave_fd = pty.openpty()
         app.logger.info(f"Terminal connect for SID {sid}: PTY opened (master: {master_fd}, slave: {slave_fd}). Spawning process: {' '.join(cmd)}")
 
-        # Ensure LANG and LC_ALL are set for the subprocess environment as well
         env = os.environ.copy()
         env['LANG'] = 'C.UTF-8'
         env['LC_ALL'] = 'C.UTF-8'
-        env['TERM'] = 'xterm' # Also ensure TERM is in the direct environment for incus exec
+        env['TERM'] = 'xterm'
 
         process = subprocess.Popen(
             cmd,
@@ -1230,12 +1216,10 @@ def terminal_connect(auth_data=None):
             env=env
         )
         app.logger.info(f"Terminal connect for SID {sid}: Process for '{container_name}' spawned with PID {process.pid}.")
-        
-        # Slave FD is only needed by the child process (incus exec)
-        # It should be closed in the parent immediately after Popen.
+
         os.close(slave_fd)
-        slave_fd = None # Mark as closed to prevent double closing in finally
-        app.logger.info(f"Terminal connect for SID {sid}: Slave FD {slave_fd if slave_fd is not None else 'already closed'} closed in parent.")
+        slave_fd = None
+        app.logger.info(f"Terminal connect for SID {sid}: Slave FD closed in parent.")
 
 
         pty_sessions[sid] = {
@@ -1244,22 +1228,21 @@ def terminal_connect(auth_data=None):
             'container_name': container_name,
             'read_thread': None
         }
-        
+
         app.logger.info(f"Terminal connect for SID {sid}: Starting background task for PTY output forwarding for '{container_name}'.")
-        # Use socketio.start_background_task for eventlet compatibility
         bg_task = socketio.start_background_task(target=_forward_pty_output, sid=sid, master_fd=master_fd)
-        pty_sessions[sid]['read_thread'] = bg_task 
+        pty_sessions[sid]['read_thread'] = bg_task
 
         join_room(sid)
         emit('pty_output', {'output': f'\x1b[32m已连接到容器: {container_name}\x1b[0m\r\n'}, room=sid)
         app.logger.info(f"Terminal session established for SID {sid}, container {container_name}")
-        return True # Successfully connected
+        return True
 
     except Exception as e:
         error_details = f"PTY/Process setup failed: {str(e)}"
-        app.logger.exception(f"{error_message_prefix}{error_details}") # Log full traceback
-        
-        if process and process.poll() is None: # If process started but then an error occurred
+        app.logger.exception(f"{error_message_prefix}{error_details}")
+
+        if process and process.poll() is None:
             try:
                 process.kill()
                 process.wait()
@@ -1267,18 +1250,16 @@ def terminal_connect(auth_data=None):
                 app.logger.error(f"Error killing process during PTY setup failure for SID {sid}: {proc_kill_e}")
 
         if master_fd is not None:
-            try:
-                os.close(master_fd)
-            except OSError: pass # Might be already closed or invalid
-        if slave_fd is not None: # If pty.openpty succeeded but Popen failed or error after
-            try:
-                os.close(slave_fd)
+            try: os.close(master_fd)
             except OSError: pass
-        
-        # Emit a specific error message to the client before disconnecting
+        if slave_fd is not None:
+            try: os.close(slave_fd)
+            except OSError: pass
+
         emit('pty_output', {'output': f'\r\n\x1b[31m错误: 无法设置终端会话: {error_details}\x1b[0m\r\n'}, room=sid)
-        disconnect(sid) # This should trigger connect_error on client
-        return False # Indicate connection failure
+        socketio.sleep(0.1)
+        disconnect(sid)
+        return False
 
 
 @socketio.on('pty_input', namespace='/terminal')
@@ -1355,7 +1336,7 @@ def perform_initial_setup():
             print(f"错误：数据库表 'containers' 在 '{DATABASE_NAME}' 中未找到。")
             print("请确保 'python init_db.py' 已成功运行并创建了表结构。")
             sys.exit(1)
-        
+
         cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='nat_rules';")
         if not cursor.fetchone():
              print(f"错误：数据库表 'nat_rules'在 '{DATABASE_NAME}'中未找到。")
@@ -1411,5 +1392,4 @@ if __name__ == '__main__':
         perform_initial_setup()
 
     print("启动 Flask Web 服务器 (带 SocketIO - eventlet)...")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=True if app.debug else False)
-
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, use_reloader=False)
