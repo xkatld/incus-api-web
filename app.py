@@ -1,4 +1,5 @@
 from flask import Flask, render_template, request, jsonify, redirect, url_for, session, abort
+from flask_socketio import SocketIO
 import subprocess
 import json
 import sqlite3
@@ -11,11 +12,15 @@ import sys
 import secrets
 import hashlib
 from functools import wraps
+import pexpect
+import threading
 
 app = Flask(__name__)
 app.debug = True
 
 app.secret_key = os.environ.get('FLASK_SECRET_KEY', secrets.token_hex(16))
+socketio = SocketIO(app, async_mode='threading')
+children = {}
 
 DATABASE_NAME = 'incus_manager.db'
 
@@ -1021,6 +1026,111 @@ def delete_nat_rule(rule_id):
         return jsonify({'status': 'error', 'message': message}), 500
 
 
+def read_and_forward_ssh_output(sid, child):
+    while child.isalive():
+        try:
+            output = child.read_nonblocking(size=1024, timeout=0.1)
+            if output:
+                 socketio.emit('ssh_output', output, room=sid)
+        except pexpect.TIMEOUT:
+            continue
+        except pexpect.EOF:
+            socketio.emit('ssh_output', '\r\n[SSH会话已结束]', room=sid)
+            break
+        except Exception as e:
+            app.logger.error(f"读取 SSH 输出时发生错误 (SID: {sid}): {e}")
+            try:
+                socketio.emit('ssh_error', f'读取输出错误: {e}', room=sid)
+            except Exception:
+                pass
+            break
+    app.logger.info(f"SSH 输出线程结束 (SID: {sid})")
+    if sid in children:
+        del children[sid]
+
+@socketio.on('connect')
+def handle_connect():
+    app.logger.info(f"客户端连接: {request.sid}")
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    sid = request.sid
+    app.logger.info(f"客户端断开连接: {sid}")
+    if sid in children:
+        child = children[sid]
+        if child.isalive():
+            app.logger.info(f"正在终止 SSH 进程 (SID: {sid})")
+            child.close(force=True)
+        del children[sid]
+
+@socketio.on('start_ssh')
+def handle_start_ssh(data):
+    sid = request.sid
+    container = data.get('container')
+    ip = data.get('ip')
+    cols = data.get('cols', 80)
+    rows = data.get('rows', 24)
+
+    app.logger.info(f"收到 SSH 启动请求 (SID: {sid}): 容器={container}, IP={ip}")
+
+    if not ip or not (ip.startswith('10.') or ip.startswith('172.') or ip.startswith('192.168.') or re.match(r'^[a-f0-9:]+$', ip)): # Allow IPv6 too
+         app.logger.warning(f"拒绝 SSH 请求 (SID: {sid}): 无效或可疑的 IP 地址 {ip}")
+         socketio.emit('ssh_error', f'无效的 IP 地址: {ip}', room=sid)
+         return
+
+    username = 'root'
+    command = f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null {username}@{ip}'
+    app.logger.info(f"正在执行 pexpect: {command} (SID: {sid})")
+
+    try:
+        child = pexpect.spawn(command, encoding='utf-8', timeout=10, logfile=sys.stdout)
+        child.setwinsize(rows, cols)
+        children[sid] = child
+
+        thread = threading.Thread(target=read_and_forward_ssh_output, args=(sid, child))
+        thread.daemon = True
+        thread.start()
+
+        socketio.emit('ssh_output', f'正在尝试连接到 {username}@{ip}...\r\n你可以直接输入 `ssh root@{ip}` 或者其他命令。\r\n如果连接成功，会提示输入密码 (默认为 123456)。\r\n', room=sid)
+
+    except pexpect.exceptions.TIMEOUT:
+        app.logger.error(f"SSH 连接超时 (SID: {sid}): {ip}")
+        socketio.emit('ssh_error', f'连接 {ip} 超时。请检查容器 SSH 服务和网络。', room=sid)
+    except pexpect.exceptions.EOF as e:
+        app.logger.error(f"SSH 连接失败 (EOF) (SID: {sid}): {ip}. Output: {e}")
+        socketio.emit('ssh_error', f'连接 {ip} 失败 (EOF)。可能的原因：SSH服务未运行、认证失败、网络问题。', room=sid)
+    except Exception as e:
+        app.logger.error(f"启动 SSH 时发生错误 (SID: {sid}): {e}")
+        socketio.emit('ssh_error', f'启动 SSH 时发生错误: {e}', room=sid)
+
+
+@socketio.on('ssh_input')
+def handle_ssh_input(data):
+    sid = request.sid
+    if sid in children:
+        child = children[sid]
+        if child.isalive():
+            try:
+                child.send(data['input'])
+            except Exception as e:
+                app.logger.error(f"向 SSH 发送输入时发生错误 (SID: {sid}): {e}")
+        else:
+             socketio.emit('ssh_error', 'SSH 会话已关闭。', room=sid)
+    else:
+        socketio.emit('ssh_error', '未找到活动的 SSH 会话。', room=sid)
+
+@socketio.on('ssh_resize')
+def handle_ssh_resize(data):
+    sid = request.sid
+    if sid in children:
+        child = children[sid]
+        if child.isalive():
+             try:
+                child.setwinsize(data['rows'], data['cols'])
+             except Exception as e:
+                app.logger.warning(f"调整 SSH 终端大小时发生错误 (SID: {sid}): {e}")
+
+
 def perform_initial_setup():
     print("\n============================================")
     print(" Incus Web 管理器启动信息")
@@ -1067,7 +1177,7 @@ def perform_initial_setup():
             print(f"错误：数据库表 'containers' 缺少必需的列: {', '.join(missing_container_columns)}")
             print("请确保 'python init_db.py' 已成功运行并创建了正确的表结构。")
             sys.exit(1)
-        
+
         if 'traffic_quota_gb' in containers_column_names:
             print(f"提示：数据库表 'containers' 仍存在 'traffic_quota_gb' 列。此功能已移除，该列不再使用。")
 
@@ -1160,10 +1270,20 @@ def perform_initial_setup():
     except Exception as e:
          print(f"启动时 iptables 检查发生异常: {e}")
 
+    try:
+        subprocess.run(['ssh', '-V'], check=True, capture_output=True, text=True, timeout=5)
+        print("ssh 命令检查通过。")
+    except FileNotFoundError:
+         print("错误：'ssh' 命令未找到。在线 SSH 功能将无法使用。")
+         sys.exit(1)
+    except Exception as e:
+         print(f"启动时 ssh 检查发生异常: {e}")
+         sys.exit(1)
+
 
 if __name__ == '__main__':
     if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
         perform_initial_setup()
 
-    print("启动 Flask Web 服务器...")
-    app.run(debug=True, host='0.0.0.0', port=5000)
+    print("启动 Flask-SocketIO Web 服务器...")
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
