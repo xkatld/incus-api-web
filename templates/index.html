@@ -380,6 +380,9 @@
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
 <script>
+    // --- (其他 JS 函数: captcha, toast, button processing, confirm modal, create container, perform action, show info, nat rules, exec modal, nat modal) ---
+    // 这些函数保持不变，这里省略以保持简洁，但实际文件中应保留
+
 let captchaAnswer = 0;
 function generateCaptcha() {
     const num1 = Math.ceil(Math.random() * 9) + 1;
@@ -812,130 +815,133 @@ $('#infoModal').on('hidden.bs.modal', function () { $('#basicInfoContent').html(
 $('#execModal').on('hidden.bs.modal', function () { $('#execContainerName').val(''); $('#commandInput').val(''); $('#execOutput').text('').removeClass('success error'); $('#execModalLabel').text('在容器内执行命令'); setButtonProcessing($('#execButton'), false); });
 $('#natModal').on('hidden.bs.modal', function () { $('#natContainerName').val(''); $('#natContainerIP').val(''); $('#hostPort').val(''); $('#containerPort').val(''); $('#protocol').val('tcp'); $('#natModalLabel').text('为容器添加 NAT 规则'); setButtonProcessing($('#addNatButton'), false); $('#addNatButton').prop('disabled', false).text('添加规则'); });
 
-// --- SSH 终端相关代码 ---
-let term = null;
-let fitAddon = null;
-let socket = null;
-const terminalModalElement = document.getElementById('terminalModal');
-const terminalContainer = document.getElementById('terminal');
-const terminalStatus = document.getElementById('terminalStatus');
-const sshModalElement = document.getElementById('sshModal');
-const sshConnectForm = document.getElementById('sshConnectForm');
-let currentContainerName = null;
 
-function openSshModal(containerName, containerIp) {
-    currentContainerName = containerName;
-    $('#sshModalLabel').text(`连接到 ${containerName} (SSH)`);
-    $('#sshContainerName').val(containerName);
-    $('#sshHost').val(containerIp || ''); // 尝试预填充 IP
-    $('#sshPassword').val('');
-    const sshModal = new bootstrap.Modal(sshModalElement);
-    sshModal.show();
-}
+    // --- SSH 终端相关代码 ---
+    let term = null;
+    let fitAddon = null;
+    let socket = null;
+    const terminalModalElement = document.getElementById('terminalModal');
+    const terminalContainer = document.getElementById('terminal');
+    const terminalStatus = document.getElementById('terminalStatus');
+    const sshModalElement = document.getElementById('sshModal');
+    const sshConnectForm = document.getElementById('sshConnectForm');
+    let currentContainerName = null;
 
-sshConnectForm.addEventListener('submit', function(event) {
-    event.preventDefault();
-    const host = $('#sshHost').val();
-    const port = $('#sshPort').val();
-    const user = $('#sshUser').val();
-    const password = $('#sshPassword').val();
+    function openSshModal(containerName, containerIp) {
+        currentContainerName = containerName;
+        $('#sshModalLabel').text(`连接到 ${containerName} (SSH)`);
+        $('#sshContainerName').val(containerName);
+        $('#sshHost').val(containerIp || ''); // 尝试预填充 IP
+        $('#sshPassword').val('');
+        const sshModal = new bootstrap.Modal(sshModalElement);
+        sshModal.show();
+    }
 
-    bootstrap.Modal.getInstance(sshModalElement).hide();
-    startSshSession(currentContainerName, host, port, user, password);
-});
+    sshConnectForm.addEventListener('submit', function(event) {
+        event.preventDefault();
+        const host = $('#sshHost').val();
+        const port = $('#sshPort').val();
+        const user = $('#sshUser').val();
+        const password = $('#sshPassword').val();
 
-function startSshSession(containerName, host, port, user, password) {
-    $('#terminalModalLabel').text(`在线 SSH: ${containerName}`);
-    terminalStatus.textContent = '正在连接...';
-
-    const terminalModal = new bootstrap.Modal(terminalModalElement);
-
-    if (term) { term.dispose(); term = null; }
-    if (socket && socket.connected) { socket.disconnect(); socket = null; }
-
-    term = new Terminal({ cursorBlink: true, rows: 25, cols: 80, fontFamily: 'monospace, "Courier New", Courier', fontSize: 14, theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4', selectionBackground: '#555555' }, allowTransparency: true, convertEol: true });
-    fitAddon = new FitAddon.FitAddon();
-    term.loadAddon(fitAddon);
-    term.open(terminalContainer);
-    terminalModal.show();
-
-    setTimeout(() => { try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error:", e); } }, 250);
-
-    socket = io({ transports: ['websocket'] });
-
-    socket.on('connect', () => {
-        console.log('Socket.IO 已连接:', socket.id);
-        terminalStatus.textContent = '已连接，等待认证...';
+        bootstrap.Modal.getInstance(sshModalElement).hide();
+        startSshSession(currentContainerName, host, port, user, password);
     });
 
-    socket.on('auth_success', () => {
-        console.log('Socket.IO 认证成功，正在连接 SSH...');
-        terminalStatus.textContent = '正在连接 SSH...';
-        socket.emit('ssh_connect', { host: host, port: port, user: user, password: password });
-    });
+    function startSshSession(containerName, host, port, user, password) {
+        $('#terminalModalLabel').text(`在线 SSH: ${containerName}`);
+        terminalStatus.textContent = '正在连接...';
 
-    socket.on('ssh_ready', (data) => {
-        console.log('SSH 已就绪:', data.message);
-        terminalStatus.textContent = `已连接到 ${containerName}`;
-        term.focus();
-        socket.emit('ssh_resize', { rows: term.rows, cols: term.cols });
-    });
+        const terminalModal = new bootstrap.Modal(terminalModalElement);
 
-    socket.on('terminal_output', (data) => {
-        term.write(data.output);
-    });
-
-    socket.on('terminal_closed', (data) => {
-        console.warn('连接已关闭:', data.message);
-        terminalStatus.textContent = `连接已关闭: ${data.message}`;
-        term.write(`\r\n\r\n--- ${data.message} ---\r\n`);
-        if (socket) socket.disconnect();
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Socket.IO 已断开连接。');
-        if(terminalStatus.textContent.indexOf('关闭') === -1) {
-            terminalStatus.textContent = '连接已断开。';
-            if (term) { term.write('\r\n\r\n--- 连接已断开 ---\r\n'); }
-        }
-    });
-
-    socket.on('connect_error', (err) => {
-        console.error('Socket.IO 连接错误:', err);
-        terminalStatus.textContent = `连接错误: ${err.message}`;
-        if (term) { term.write(`\r\n\r\n--- 连接错误: ${err.message} ---\r\n`); }
-    });
-
-    term.onData((data) => {
-        if (socket && socket.connected) {
-            socket.emit('terminal_input', { 'input': data });
-        }
-    });
-
-    term.onResize(({ cols, rows }) => {
-        if (socket && socket.connected) {
-            console.log(`调整大小为 ${rows}x${cols}`);
-            socket.emit('ssh_resize', { rows: rows, cols: cols });
-        }
-    });
-
-    terminalModalElement.addEventListener('shown.bs.modal', () => {
-        try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error on show:", e); }
-    });
-
-    terminalModalElement.addEventListener('hidden.bs.modal', () => {
-        if (socket) { socket.disconnect(); socket = null; }
         if (term) { term.dispose(); term = null; }
-        terminalStatus.textContent = '未连接';
-        console.log("终端模态框已关闭，资源已释放。");
-    });
+        if (socket && socket.connected) { socket.disconnect(); socket = null; }
 
-    $(window).on('resize', function(){
-        if (term && fitAddon && $('#terminalModal').is(':visible')) {
-            try { fitAddon.fit(); } catch(e) { console.error("Fit addon error on window resize:", e); }
-        }
-    });
-}
+        term = new Terminal({ cursorBlink: true, rows: 25, cols: 80, fontFamily: 'monospace, "Courier New", Courier', fontSize: 14, theme: { background: '#1e1e1e', foreground: '#d4d4d4', cursor: '#d4d4d4', selectionBackground: '#555555' }, allowTransparency: true, convertEol: true });
+        fitAddon = new FitAddon.FitAddon();
+        term.loadAddon(fitAddon);
+        term.open(terminalContainer);
+        terminalModal.show();
+
+        setTimeout(() => { try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error:", e); } }, 250);
+
+        socket = io({ transports: ['websocket'] });
+
+        socket.on('connect', () => {
+            console.log('Socket.IO 已连接:', socket.id);
+            terminalStatus.textContent = '已连接，正在认证...'; // 保持这个状态
+        });
+
+        socket.on('auth_success', () => { // **仍然监听 auth_success**
+            console.log('Socket.IO 认证成功，正在连接 SSH...');
+            terminalStatus.textContent = '正在连接 SSH...';
+            // **在认证成功后才发送 SSH 连接请求**
+            socket.emit('ssh_connect', { host: host, port: port, user: user, password: password });
+        });
+
+        socket.on('ssh_ready', (data) => {
+            console.log('SSH 已就绪:', data.message);
+            terminalStatus.textContent = `已连接到 ${containerName}`;
+            term.focus();
+            socket.emit('ssh_resize', { rows: term.rows, cols: term.cols });
+        });
+
+        socket.on('terminal_output', (data) => {
+            term.write(data.output);
+        });
+
+        socket.on('terminal_closed', (data) => {
+            console.warn('连接已关闭:', data.message);
+            terminalStatus.textContent = `连接已关闭: ${data.message}`;
+            term.write(`\r\n\r\n--- ${data.message} ---\r\n`);
+            if (socket) socket.disconnect();
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Socket.IO 已断开连接。');
+            if(terminalStatus.textContent.indexOf('关闭') === -1) {
+                terminalStatus.textContent = '连接已断开。';
+                if (term) { term.write('\r\n\r\n--- 连接已断开 ---\r\n'); }
+            }
+        });
+
+        socket.on('connect_error', (err) => {
+            console.error('Socket.IO 连接错误:', err);
+            terminalStatus.textContent = `连接错误: ${err.message}`;
+            if (term) { term.write(`\r\n\r\n--- 连接错误: ${err.message} ---\r\n`); }
+        });
+
+        term.onData((data) => {
+            if (socket && socket.connected) {
+                socket.emit('terminal_input', { 'input': data });
+            }
+        });
+
+        term.onResize(({ cols, rows }) => {
+            if (socket && socket.connected) {
+                console.log(`调整大小为 ${rows}x${cols}`);
+                socket.emit('ssh_resize', { rows: rows, cols: cols });
+            }
+        });
+
+        terminalModalElement.addEventListener('shown.bs.modal', () => {
+            try { fitAddon.fit(); term.focus(); } catch(e) { console.error("Fit addon error on show:", e); }
+        });
+
+        terminalModalElement.addEventListener('hidden.bs.modal', () => {
+            if (socket) { socket.disconnect(); socket = null; }
+            if (term) { term.dispose(); term = null; }
+            terminalStatus.textContent = '未连接';
+            console.log("终端模态框已关闭，资源已释放。");
+        });
+
+        $(window).on('resize', function(){
+            if (term && fitAddon && $('#terminalModal').is(':visible')) {
+                try { fitAddon.fit(); } catch(e) { console.error("Fit addon error on window resize:", e); }
+            }
+        });
+    }
+
 </script>
 </body>
 </html>
