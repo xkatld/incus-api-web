@@ -444,7 +444,7 @@ $('#execCommandForm').submit(function(event) {
     const submitButton = $('#execButton', form);
     const outputArea = $('#execOutput');
     var containerName = $('#execContainerName').val();
-    var command = $('#commandInput').val();
+    var command = $('#commandInput').val(); // Reads from textarea
     if (!command.trim()) {
         showToast("请输入要执行的命令。", 'warning');
         return;
@@ -487,7 +487,7 @@ $('#execCommandForm').submit(function(event) {
 $('#useQuickCommandBtn').click(function() {
     const selectedCommand = $('#quickCommandSelect').val();
     if (selectedCommand) {
-        $('#commandInput').val(selectedCommand);
+        $('#commandInput').val(selectedCommand); // Sets textarea value
     }
 });
 
@@ -729,14 +729,19 @@ function loadQuickCommands(populateSelect = false) {
 
             if (data.status === 'success' && data.commands && data.commands.length > 0) {
                 data.commands.forEach(cmd => {
+                    // Make command preview safer for HTML and shorter
+                    const safeCommandPreview = cmd.command.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+                    const shortPreview = safeCommandPreview.split('\n')[0].substring(0, 50) + (cmd.command.length > 50 || cmd.command.includes('\n') ? '...' : '');
+
                     const listItem = `
                         <li class="list-group-item d-flex justify-content-between align-items-center" data-command-id="${cmd.id}">
-                            <span><strong>${cmd.name}:</strong> <code>${cmd.command}</code></span>
+                            <span><strong>${cmd.name}:</strong> <code>${shortPreview}</code></span>
                             <button class="btn btn-sm btn-danger" onclick="deleteQuickCommand(${cmd.id}, this)">删除</button>
                         </li>`;
                     list.append(listItem);
                     if (populateSelect) {
-                         const optionItem = `<option value="${cmd.command}">${cmd.name}</option>`;
+                         // Use the full command in the value attribute
+                         const optionItem = `<option value="${cmd.command.replace(/"/g, '&quot;')}">${cmd.name}</option>`;
                          select.append(optionItem);
                     }
                 });
@@ -767,9 +772,9 @@ function addQuickCommand(event) {
     event.preventDefault();
     const form = $('#addQuickCommandForm');
     const nameInput = $('#quickCommandName');
-    const commandInput = $('#quickCommandValue');
+    const commandInput = $('#quickCommandValue'); // Textarea
     const name = nameInput.val().trim();
-    const command = commandInput.val().trim();
+    const command = commandInput.val().trim(); // Reads from textarea
     const addButton = $('#addQuickCommandButton');
 
     if (!name || !command) {
@@ -820,7 +825,7 @@ function deleteQuickCommand(commandId, buttonElement) {
         error: function(jqXHR) {
             const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "删除快捷命令请求失败。";
             showToast("删除失败: " + message, 'danger');
-            loadQuickCommands(true); // Reload even on error to reset button
+            loadQuickCommands(true);
         }
     });
 }
