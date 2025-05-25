@@ -23,6 +23,7 @@ pip install flask flask-socketio pexpect cryptography
 
 ## 运行项目
 ~~~
+#先修改init_db中默认账号密码
 python3 init_db.py
 python3 app.py
 ~~~
