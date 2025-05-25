@@ -1027,7 +1027,13 @@ def delete_nat_rule(rule_id):
 
 
 def read_and_forward_ssh_output(sid, child):
-    while child.isalive():
+    while True:
+        if not child.isalive():
+            app.logger.warning(f"SSH 进程 (SID: {sid}) 似乎已关闭。")
+            try:
+                socketio.emit('ssh_output', '\r\n[SSH会话似乎已中断]', room=sid)
+            except Exception: pass
+            break
         try:
             output = child.read_nonblocking(size=1024, timeout=0.1)
             if output:
@@ -1035,18 +1041,30 @@ def read_and_forward_ssh_output(sid, child):
         except pexpect.TIMEOUT:
             continue
         except pexpect.EOF:
-            socketio.emit('ssh_output', '\r\n[SSH会话已结束]', room=sid)
+            try:
+                socketio.emit('ssh_output', '\r\n[SSH会话已结束]', room=sid)
+            except Exception: pass
             break
         except Exception as e:
-            app.logger.error(f"读取 SSH 输出时发生错误 (SID: {sid}): {e}")
+            if isinstance(e, OSError) and e.errno == 9:
+                 app.logger.warning(f"SSH 读取时遇到 Bad file descriptor (SID: {sid}) - 可能已断开连接。")
+            else:
+                 app.logger.error(f"读取 SSH 输出时发生错误 (SID: {sid}): {e}")
             try:
                 socketio.emit('ssh_error', f'读取输出错误: {e}', room=sid)
             except Exception:
                 pass
             break
+
     app.logger.info(f"SSH 输出线程结束 (SID: {sid})")
-    if sid in children:
-        del children[sid]
+    child_to_remove = children.pop(sid, None)
+    if child_to_remove and child_to_remove.isalive():
+        try:
+            child_to_remove.close(force=True)
+            app.logger.info(f"SSH 线程确保子进程已关闭 (SID: {sid})")
+        except Exception as e:
+            app.logger.error(f"SSH 线程关闭子进程时发生错误 (SID: {sid}): {e}")
+
 
 @socketio.on('connect')
 def handle_connect():
@@ -1057,11 +1075,18 @@ def handle_disconnect():
     sid = request.sid
     app.logger.info(f"客户端断开连接: {sid}")
     if sid in children:
-        child = children[sid]
-        if child.isalive():
+        child = children.pop(sid, None) # Use pop with default None
+        if child and child.isalive():
             app.logger.info(f"正在终止 SSH 进程 (SID: {sid})")
-            child.close(force=True)
-        del children[sid]
+            try:
+                child.close(force=True)
+            except Exception as e:
+                app.logger.error(f"关闭 SSH 进程时发生错误 (SID: {sid}): {e}")
+        elif child:
+             app.logger.info(f"SSH 进程 (SID: {sid}) 已不再活动，无需终止。")
+    else:
+        app.logger.warning(f"Disconnect 事件 for SID {sid}, 但未找到子进程。可能已被关闭。")
+
 
 @socketio.on('start_ssh')
 def handle_start_ssh(data):
@@ -1096,12 +1121,15 @@ def handle_start_ssh(data):
     except pexpect.exceptions.TIMEOUT:
         app.logger.error(f"SSH 连接超时 (SID: {sid}): {ip}")
         socketio.emit('ssh_error', f'连接 {ip} 超时。请检查容器 SSH 服务和网络。', room=sid)
+        children.pop(sid, None) # Clean up on failure
     except pexpect.exceptions.EOF as e:
         app.logger.error(f"SSH 连接失败 (EOF) (SID: {sid}): {ip}. Output: {e}")
         socketio.emit('ssh_error', f'连接 {ip} 失败 (EOF)。可能的原因：SSH服务未运行、认证失败、网络问题。', room=sid)
+        children.pop(sid, None) # Clean up on failure
     except Exception as e:
         app.logger.error(f"启动 SSH 时发生错误 (SID: {sid}): {e}")
         socketio.emit('ssh_error', f'启动 SSH 时发生错误: {e}', room=sid)
+        children.pop(sid, None) # Clean up on failure
 
 
 @socketio.on('ssh_input')
