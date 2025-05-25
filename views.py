@@ -34,7 +34,7 @@ def login():
         'quick_commands': [],
         'quick_commands_error': None,
         'login_error': None,
-        'session': session, 
+        'session': session,
         'request': request
     }
 
@@ -61,7 +61,7 @@ def login():
             logger.warning(f"用户 '{username}' 登录失败。")
             login_context['login_error'] = "用户名或密码错误。"
             return render_template('index.html', **login_context)
-            
+
     return render_template('index.html', **login_context)
 
 @views.route('/logout')
@@ -120,7 +120,7 @@ def index():
                                 ip_address = addr_entry.get('address', 'N/A').split('/')[0]
                                 break
                     if ip_address != 'N/A': break
-            
+
             container_info = {
                 'name': item_name, 'status': item.get('status', '未知'),
                 'image_source': image_source, 'ip': ip_address,
@@ -199,7 +199,6 @@ def create_container():
     memory_mb = request.form.get('memory_mb')
     disk_gb = request.form.get('disk_gb')
     storage_pool = request.form.get('storage_pool')
-    swap_enabled = request.form.get('swap_enabled')
     security_nesting = request.form.get('security_nesting')
 
     if not name or not image:
@@ -215,7 +214,6 @@ def create_container():
         if cpu_allowance: command.extend(['-c', f'limits.cpu.allowance={int(cpu_allowance)}%'])
         if memory_mb: command.extend(['-c', f'limits.memory={int(memory_mb)}MB'])
         if disk_gb: command.extend(['-d', f'root,size={int(disk_gb)}GB'])
-        command.extend(['-c', f'limits.memory.swap={"true" if swap_enabled == "on" else "false"}'])
         if security_nesting == 'on': command.extend(['-c', 'security.nesting=true'])
     except ValueError:
         return jsonify({'status': 'error', 'message': '资源限制参数必须是有效的数字。'}), 400
@@ -244,7 +242,7 @@ def container_action(name):
     if action == 'delete':
         success_db, rules = get_nat_rules_for_container(name)
         if not success_db: return jsonify({'status': 'error', 'message': f'获取NAT规则失败: {rules}'}), 500
-        
+
         failed_deletions = []
         warning_deletions = []
         for rule in rules:
