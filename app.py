@@ -4,6 +4,19 @@ import os
 import sys
 import subprocess
 import logging
+import datetime
+from ipaddress import ip_address
+
+try:
+    from cryptography import x509
+    from cryptography.x509.oid import NameOID
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:
+    CRYPTOGRAPHY_AVAILABLE = False
 
 from config import FLASK_SECRET_KEY, DATABASE_NAME
 from db_manager import load_settings_from_db, get_db_connection
@@ -16,6 +29,74 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.config['SECRET_KEY'] = FLASK_SECRET_KEY
 socketio = SocketIO(app, async_mode='threading')
+
+CERT_FILE = "cert.pem"
+KEY_FILE = "key.pem"
+
+def generate_self_signed_cert():
+    if not CRYPTOGRAPHY_AVAILABLE:
+        logger.warning("缺少 'cryptography' 库，无法生成 SSL 证书。将在 HTTP 模式下运行。请运行 'pip install cryptography'。")
+        return False
+
+    if os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE):
+        logger.info(f"SSL 证书 '{CERT_FILE}' 和密钥 '{KEY_FILE}' 已存在，跳过生成。")
+        return True
+
+    logger.info(f"正在生成自签名 SSL 证书 '{CERT_FILE}' 和密钥 '{KEY_FILE}'...")
+
+    try:
+        key = rsa.generate_private_key(
+            public_exponent=65537,
+            key_size=2048,
+            backend=default_backend()
+        )
+
+        with open(KEY_FILE, "wb") as f:
+            f.write(key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            ))
+
+        subject = issuer = x509.Name([
+            x509.NameAttribute(NameOID.COUNTRY_NAME, u"CN"),
+            x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, u"Beijing"),
+            x509.NameAttribute(NameOID.LOCALITY_NAME, u"Beijing"),
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, u"IncusWebSelfSigned"),
+            x509.NameAttribute(NameOID.COMMON_NAME, u"localhost"),
+        ])
+
+        cert = x509.CertificateBuilder().subject_name(
+            subject
+        ).issuer_name(
+            issuer
+        ).public_key(
+            key.public_key()
+        ).serial_number(
+            x509.random_serial_number()
+        ).not_valid_before(
+            datetime.datetime.utcnow()
+        ).not_valid_after(
+            datetime.datetime.utcnow() + datetime.timedelta(days=3650)
+        ).add_extension(
+            x509.SubjectAlternativeName([
+                x509.DNSName(u"localhost"),
+                x509.IPAddress(ip_address("127.0.0.1")),
+            ]),
+            critical=False,
+        ).sign(key, hashes.SHA256(), default_backend())
+
+        with open(CERT_FILE, "wb") as f:
+            f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+        logger.info("自签名 SSL 证书和密钥生成成功。")
+        return True
+    except Exception as e:
+        logger.error(f"生成自签名 SSL 证书时发生错误: {e}")
+        if os.path.exists(KEY_FILE): os.remove(KEY_FILE)
+        if os.path.exists(CERT_FILE): os.remove(CERT_FILE)
+        return False
+
 
 def perform_initial_setup():
     logger.info("============================================")
@@ -31,11 +112,10 @@ def perform_initial_setup():
         logger.error("错误：无法从数据库加载设置。请运行 'python init_db.py'。")
         sys.exit(1)
 
-    app.config['SETTINGS'] = settings # Store settings in app config
+    app.config['SETTINGS'] = settings
     logger.info(f"管理员用户名: {settings.get('admin_username', 'N/A')}")
     logger.info(f"API 密钥哈希: {settings.get('api_key_hash', 'N/A')}")
 
-    # Check DB tables (basic)
     conn = None
     try:
         conn = get_db_connection()
@@ -55,7 +135,6 @@ def perform_initial_setup():
     finally:
         if conn: conn.close()
 
-    # Check commands
     commands_to_check = {
         'incus': ['incus', '--version'],
         'iptables': ['iptables', '--version'],
@@ -74,17 +153,32 @@ def perform_initial_setup():
     logger.info("============================================")
 
 def create_app():
-    # Register Blueprint
     app.register_blueprint(views)
-
-    # Register SocketIO handlers
     register_socket_handlers(socketio)
-
     return app
 
 if __name__ == '__main__':
     perform_initial_setup()
+    ssl_context = None
+    if generate_self_signed_cert():
+        ssl_context = (CERT_FILE, KEY_FILE)
 
     create_app()
     logger.info("启动 Flask-SocketIO Web 服务器...")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True, use_reloader=False)
+
+    if ssl_context:
+        logger.info(f"将在 HTTPS 模式下运行 (https://0.0.0.0:5000)。")
+        try:
+            socketio.run(app, debug=True, host='0.0.0.0', port=5000,
+                         allow_unsafe_werkzeug=True, use_reloader=False,
+                         certfile=ssl_context[0], keyfile=ssl_context[1])
+        except Exception as e:
+             logger.error(f"启动 HTTPS 服务器失败: {e}")
+             logger.warning("回退到 HTTP 模式运行。")
+             socketio.run(app, debug=True, host='0.0.0.0', port=5000,
+                          allow_unsafe_werkzeug=True, use_reloader=False)
+
+    else:
+        logger.warning("将在 HTTP 模式下运行 (http://0.0.0.0:5000)。")
+        socketio.run(app, debug=True, host='0.0.0.0', port=5000,
+                     allow_unsafe_werkzeug=True, use_reloader=False)
