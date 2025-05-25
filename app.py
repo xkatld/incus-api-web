@@ -30,7 +30,7 @@ def perform_initial_setup():
     if not settings:
         logger.error("错误：无法从数据库加载设置。请运行 'python init_db.py'。")
         sys.exit(1)
-    
+
     app.config['SETTINGS'] = settings # Store settings in app config
     logger.info(f"管理员用户名: {settings.get('admin_username', 'N/A')}")
     logger.info(f"API 密钥哈希: {settings.get('api_key_hash', 'N/A')}")
@@ -76,16 +76,18 @@ def perform_initial_setup():
 def create_app():
     # Register Blueprint
     app.register_blueprint(views)
-    
+
     # Register SocketIO handlers
     register_socket_handlers(socketio)
 
     return app
 
 if __name__ == '__main__':
-    if not app.debug or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
-        perform_initial_setup()
+    # 这段检查是为了防止 Werkzeug reloader 运行两次设置代码
+    # 我们将在 socketio.run 中使用 use_reloader=False 来更直接地解决这个问题
+    perform_initial_setup()
 
     create_app()
     logger.info("启动 Flask-SocketIO Web 服务器...")
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True)
+    # 添加 use_reloader=False 来防止启动信息输出两次
+    socketio.run(app, debug=True, host='0.0.0.0', port=5000, allow_unsafe_werkzeug=True, use_reloader=False)
