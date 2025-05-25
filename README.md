@@ -1,5 +1,5 @@
 ~~~
-v4:实现基础资源限制功能。
+v4.5:重构代码文件和主题,优化资源限制,添加在线ssh功能,优化快捷命令功能,更新使用文档。
 ~~~
 
 环境：Debian12
@@ -20,7 +20,7 @@ curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/i
 ~~~
 git clone https://github.com/xkatld/incus-api-web.git
 cd incus-api-web
-pip install flask
+pip install flask flask-socketio pexpect
 ~~~
 
 ## 运行项目
