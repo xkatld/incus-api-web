@@ -433,6 +433,7 @@ function openExecModal(containerName) {
     $('#execOutput').text('');
     $('#execOutput').removeClass('success error');
     setButtonProcessing($('#execButton'), false);
+    loadQuickCommands(true);
     var execModal = new bootstrap.Modal(document.getElementById('execModal'));
     execModal.show();
 }
@@ -482,6 +483,14 @@ $('#execCommandForm').submit(function(event) {
         }
     });
 });
+
+$('#useQuickCommandBtn').click(function() {
+    const selectedCommand = $('#quickCommandSelect').val();
+    if (selectedCommand) {
+        $('#commandInput').val(selectedCommand);
+    }
+});
+
 
 function openNatModal(containerName) {
     $('#natContainerName').val(containerName);
@@ -686,6 +695,7 @@ $('#execModal').on('hidden.bs.modal', function () {
   $('#execOutput').text('');
   $('#execOutput').removeClass('success error');
   $('#execModalLabel').text('在容器内执行命令');
+  $('#quickCommandSelect').html('<option value="" selected>-- 选择或手动输入 --</option>');
   setButtonProcessing($('#execButton'), false);
 });
 
@@ -698,4 +708,125 @@ $('#natModal').on('hidden.bs.modal', function () {
     $('#natModalLabel').text('为容器添加 NAT 规则');
     setButtonProcessing($('#addNatButton'), false);
     $('#addNatButton').prop('disabled', false).text('添加规则');
+});
+
+function loadQuickCommands(populateSelect = false) {
+    const list = $('#quickCommandsList');
+    const select = $('#quickCommandSelect');
+    list.html('<li class="list-group-item">正在加载...</li>');
+    if (populateSelect) {
+        select.html('<option value="" selected>-- 正在加载 --</option>');
+    }
+
+    $.ajax({
+        url: "/quick_commands",
+        type: "GET",
+        success: function(data) {
+            list.empty();
+            if (populateSelect) {
+                select.html('<option value="" selected>-- 选择或手动输入 --</option>');
+            }
+
+            if (data.status === 'success' && data.commands && data.commands.length > 0) {
+                data.commands.forEach(cmd => {
+                    const listItem = `
+                        <li class="list-group-item d-flex justify-content-between align-items-center" data-command-id="${cmd.id}">
+                            <span><strong>${cmd.name}:</strong> <code>${cmd.command}</code></span>
+                            <button class="btn btn-sm btn-danger" onclick="deleteQuickCommand(${cmd.id}, this)">删除</button>
+                        </li>`;
+                    list.append(listItem);
+                    if (populateSelect) {
+                         const optionItem = `<option value="${cmd.command}">${cmd.name}</option>`;
+                         select.append(optionItem);
+                    }
+                });
+            } else if (data.status === 'success') {
+                list.html('<li class="list-group-item">还没有快捷命令。</li>');
+                 if (populateSelect) {
+                    select.html('<option value="" selected>-- 没有快捷命令 --</option>');
+                 }
+            } else {
+                list.html('<li class="list-group-item text-danger">加载失败。</li>');
+                 if (populateSelect) {
+                    select.html('<option value="" selected>-- 加载失败 --</option>');
+                 }
+                showToast("加载快捷命令失败: " + (data.message || '未知错误'), 'danger');
+            }
+        },
+        error: function(jqXHR) {
+            list.html('<li class="list-group-item text-danger">加载失败。</li>');
+             if (populateSelect) {
+                select.html('<option value="" selected>-- 加载失败 --</option>');
+             }
+            showToast("加载快捷命令请求失败。", 'danger');
+        }
+    });
+}
+
+function addQuickCommand(event) {
+    event.preventDefault();
+    const form = $('#addQuickCommandForm');
+    const nameInput = $('#quickCommandName');
+    const commandInput = $('#quickCommandValue');
+    const name = nameInput.val().trim();
+    const command = commandInput.val().trim();
+    const addButton = $('#addQuickCommandButton');
+
+    if (!name || !command) {
+        showToast("名称和命令都不能为空。", 'warning');
+        return;
+    }
+
+    setButtonProcessing(addButton, true);
+
+    $.ajax({
+        url: "/quick_commands/add",
+        type: "POST",
+        data: { name: name, command: command },
+        success: function(data) {
+            if (data.status === 'success') {
+                showToast("快捷命令添加成功。", 'success');
+                nameInput.val('');
+                commandInput.val('');
+                loadQuickCommands(true);
+            } else {
+                showToast("添加失败: " + data.message, 'danger');
+            }
+        },
+        error: function(jqXHR) {
+            const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "添加快捷命令请求失败。";
+            showToast("错误: " + message, 'danger');
+        },
+        complete: function() {
+            setButtonProcessing(addButton, false);
+        }
+    });
+}
+
+function deleteQuickCommand(commandId, buttonElement) {
+     if (!confirm('确定要删除这个快捷命令吗？')) {
+        return;
+     }
+    setButtonProcessing(buttonElement, true);
+     $.ajax({
+        url: `/quick_commands/delete/${commandId}`,
+        type: 'DELETE',
+        success: function(data) {
+            showToast(data.message, data.status);
+            if (data.status === 'success') {
+                 loadQuickCommands(true);
+            }
+        },
+        error: function(jqXHR) {
+            const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "删除快捷命令请求失败。";
+            showToast("删除失败: " + message, 'danger');
+            loadQuickCommands(true); // Reload even on error to reset button
+        }
+    });
+}
+
+$('#addQuickCommandForm').submit(addQuickCommand);
+
+$('#quickCommandsModal').on('shown.bs.modal', function () {
+    loadQuickCommands(false);
 });
