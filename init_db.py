@@ -6,7 +6,7 @@ import hashlib
 DATABASE_NAME = 'incus_manager.db'
 
 DEFAULT_ADMIN_USERNAME = os.environ.get('DEFAULT_ADMIN_USERNAME', 'admin')
-DEFAULT_ADMIN_PASSWORD = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'adminpassword')
+DEFAULT_ADMIN_PASSWORD = os.environ.get('DEFAULT_ADMIN_PASSWORD', 'password')
 DEFAULT_API_SECRET_KEY = os.environ.get('DEFAULT_API_SECRET_KEY', secrets.token_hex(32))
 
 
