@@ -1,6 +1,4 @@
-~~~
-v5.1：计划设计自签证书模块，使用https提升安全性
-~~~
+v5.1:添加自签证书功能，默认启用HTTPS。
 
 环境：Debian12
 
@@ -20,7 +18,7 @@ curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/i
 ~~~
 git clone https://github.com/xkatld/incus-api-web.git
 cd incus-api-web
-pip install flask flask-socketio pexpect
+pip install flask flask-socketio pexpect cryptography
 ~~~
 
 ## 运行项目
@@ -28,6 +26,9 @@ pip install flask flask-socketio pexpect
 python3 init_db.py
 python3 app.py
 ~~~
+项目现在将尝试生成自签名证书 (`cert.pem`, `key.pem`) 并在 HTTPS (https://0.0.0.0:5000) 上运行。如果生成失败或缺少 `cryptography` 库，它将回退到 HTTP。
+
+**注意：** 首次通过 HTTPS 访问时，您的浏览器会显示安全警告，因为证书是自签名的。您需要接受该警告（通常在“高级”或“详细信息”选项中）才能继续访问。
 
 ## 拉取镜像
 ~~~
@@ -57,6 +58,7 @@ bash -c "$(curl -sSL https://raw.githubusercontent.com/xkatld/incus-api-web/refs
 
 **示例：**
 ~~~
+# 注意：如果启用了HTTPS，请使用 https:// 和可能的 -k (curl) 选项
 curl -X POST \
   -H "X-API-Key-Hash: a2390e4fd8c337a3ea4ceb0a71ca086e9b6426ebf5be1bc92dbb3cb0c1f72909" \
   -d "action=delete" \
