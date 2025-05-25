@@ -159,19 +159,27 @@ def create_app():
 
 if __name__ == '__main__':
     perform_initial_setup()
-    ssl_context = None
+    ssl_context_tuple = None
     if generate_self_signed_cert():
-        ssl_context = (CERT_FILE, KEY_FILE)
+        ssl_context_tuple = (CERT_FILE, KEY_FILE)
 
     create_app()
     logger.info("启动 Flask-SocketIO Web 服务器...")
 
-    if ssl_context:
+    if ssl_context_tuple:
         logger.info(f"将在 HTTPS 模式下运行 (https://0.0.0.0:5000)。")
         try:
+            # 修改这里：使用 ssl_context 而不是 certfile/keyfile
             socketio.run(app, debug=True, host='0.0.0.0', port=5000,
                          allow_unsafe_werkzeug=True, use_reloader=False,
-                         certfile=ssl_context[0], keyfile=ssl_context[1])
+                         ssl_context=ssl_context_tuple)
+        except TypeError as e:
+             logger.error(f"启动 HTTPS 服务器失败: {e}")
+             logger.warning("似乎您的 Flask/Werkzeug 版本与 Flask-SocketIO 的 SSL 参数不兼容或存在问题。")
+             logger.warning("请尝试更新库: pip install --upgrade Flask Flask-SocketIO Werkzeug python-socketio python-engineio")
+             logger.warning("回退到 HTTP 模式运行。")
+             socketio.run(app, debug=True, host='0.0.0.0', port=5000,
+                          allow_unsafe_werkzeug=True, use_reloader=False)
         except Exception as e:
              logger.error(f"启动 HTTPS 服务器失败: {e}")
              logger.warning("回退到 HTTP 模式运行。")
