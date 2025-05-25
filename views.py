@@ -288,12 +288,10 @@ def exec_command_in_container(name):
     command_to_exec = request.form.get('command')
     if not command_to_exec:
         return jsonify({'status': 'error', 'message': '命令不能为空'}), 400
-    try:
-        command_parts = shlex.split(command_to_exec)
-    except ValueError as e:
-        return jsonify({'status': 'error', 'message': f'无效命令格式: {e}'}), 400
 
-    success, output = run_incus_command(['exec', name, '--'] + command_parts, parse_json=False, timeout=120)
+    command_parts = ['exec', name, '--', 'bash', '-c', command_to_exec]
+
+    success, output = run_incus_command(command_parts, parse_json=False, timeout=300)
     status_code = 200 if success else 500
     return jsonify({'status': 'success' if success else 'error', 'output': output}), status_code
 
