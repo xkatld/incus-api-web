@@ -21,14 +21,30 @@ logger = logging.getLogger(__name__)
 @views.route('/login', methods=['GET', 'POST'])
 def login():
     SETTINGS = current_app.config.get('SETTINGS')
+
+    login_context = {
+        'login_form': True,
+        'containers': [],
+        'images': [],
+        'incus_error': (False, None),
+        'image_error': (False, None),
+        'storage_error': (False, None),
+        'available_pools': [],
+        'login_error': None,
+        'session': session, 
+        'request': request
+    }
+
     if not SETTINGS:
-        return render_template('index.html', incus_error=(True, "应用设置未加载。"), containers=[], images=[]), 500
+        login_context['incus_error'] = (True, "应用设置未加载。请检查数据库和 init_db.py 运行情况。")
+        return render_template('index.html', **login_context), 500
 
     admin_username = SETTINGS.get('admin_username')
     admin_password_hash = SETTINGS.get('admin_password_hash')
 
     if not admin_username or not admin_password_hash:
-        return render_template('index.html', incus_error=(True, "数据库中缺少管理员账号或密码哈希设置。"), containers=[], images=[]), 500
+        login_context['incus_error'] = (True, "数据库中缺少管理员账号或密码哈希设置。请运行 init_db.py。")
+        return render_template('index.html', **login_context), 500
 
     if request.method == 'POST':
         username = request.form.get('username')
@@ -40,14 +56,16 @@ def login():
             return redirect(next_url or url_for('views.index'))
         else:
             logger.warning(f"用户 '{username}' 登录失败。")
-            return render_template('index.html', login_error="用户名或密码错误。", containers=[], images=[])
-    return render_template('index.html', login_form=True, containers=[], images=[])
+            login_context['login_error'] = "用户名或密码错误。"
+            return render_template('index.html', **login_context)
+            
+    return render_template('index.html', **login_context)
 
 @views.route('/logout')
 def logout():
     session.pop('logged_in', None)
     logger.info("用户已退出登录。")
-    return redirect(url_for('views.index'))
+    return redirect(url_for('views.login')) # Redirect to login after logout
 
 @views.route('/')
 @login_required
@@ -127,31 +145,36 @@ def index():
 
     success_img, images_data = run_incus_command(['image', 'list', '--format', 'json'])
     available_images = []
-    image_error = not success_img
-    image_error_message = images_data if not success_img else None
+    image_error_flag = not success_img
+    image_error_msg = images_data if not success_img else None
     if success_img and isinstance(images_data, list):
         for img in images_data:
             alias = (img.get('aliases') or [{}])[0].get('name', img.get('fingerprint', 'unknown')[:12])
             desc = img.get('properties', {}).get('description', 'N/A')
             available_images.append({'name': alias, 'description': f"{alias} ({desc})"})
     else:
-        image_error_message = images_data if not success_img else 'Incus 返回了无效的镜像数据格式。'
+        image_error_msg = images_data if not success_img else 'Incus 返回了无效的镜像数据格式。'
 
     success_storage, storage_data = run_incus_command(['storage', 'list', '--format', 'json'])
     available_pools = []
-    storage_error = not success_storage
-    storage_error_message = storage_data if not success_storage else None
+    storage_error_flag = not success_storage
+    storage_error_msg = storage_data if not success_storage else None
     if success_storage and isinstance(storage_data, list):
         available_pools = [pool['name'] for pool in storage_data if 'name' in pool]
     else:
-        storage_error_message = storage_data if not success_storage else "获取存储池列表失败或格式无效。"
+        storage_error_msg = storage_data if not success_storage else "获取存储池列表失败或格式无效。"
 
     return render_template('index.html',
                            containers=listed_containers, images=available_images,
                            incus_error=(incus_error, incus_error_message),
-                           image_error=(image_error, image_error_message),
+                           image_error=(image_error_flag, image_error_msg),
                            available_pools=available_pools,
-                           storage_error=(storage_error, storage_error_message))
+                           storage_error=(storage_error_flag, storage_error_msg),
+                           session=session, # Pass session explicitly
+                           request=request) # Pass request explicitly
+
+
+# ... (其他路由保持不变) ...
 
 @views.route('/container/create', methods=['POST'])
 @web_or_api_authentication_required
