@@ -10,7 +10,8 @@ from db_manager import (
     query_db, sync_container_to_db, remove_container_from_db,
     get_nat_rules_for_container, check_nat_rule_exists_in_db,
     add_nat_rule_to_db, get_nat_rule_by_id, remove_nat_rule_from_db,
-    cleanup_orphaned_nat_rules_in_db
+    cleanup_orphaned_nat_rules_in_db, get_quick_commands,
+    add_quick_command, remove_quick_command_from_db
 )
 from incus_api import get_container_raw_info
 from nat_manager import perform_iptables_delete_for_rule
@@ -30,6 +31,8 @@ def login():
         'image_error': (False, None),
         'storage_error': (False, None),
         'available_pools': [],
+        'quick_commands': [],
+        'quick_commands_error': None,
         'login_error': None,
         'session': session, 
         'request': request
@@ -65,7 +68,7 @@ def login():
 def logout():
     session.pop('logged_in', None)
     logger.info("用户已退出登录。")
-    return redirect(url_for('views.login')) # Redirect to login after logout
+    return redirect(url_for('views.login'))
 
 @views.route('/')
 @login_required
@@ -86,7 +89,7 @@ def index():
         logger.error(f"数据库错误: {e}")
         incus_error = True
         incus_error_message = f"数据库错误： {e}"
-        return render_template('index.html', containers=[], images=[], incus_error=(incus_error, incus_error_message), image_error=(True, "无法加载可用镜像列表."), available_pools=[], storage_error=(True, "无法加载存储池列表."))
+        return render_template('index.html', containers=[], images=[], incus_error=(incus_error, incus_error_message), image_error=(True, "无法加载可用镜像列表."), available_pools=[], storage_error=(True, "无法加载存储池列表."), quick_commands=[], quick_commands_error="数据库错误")
 
     incus_container_names_set = set()
 
@@ -164,17 +167,27 @@ def index():
     else:
         storage_error_msg = storage_data if not success_storage else "获取存储池列表失败或格式无效。"
 
+    success_quick, quick_commands_data = get_quick_commands()
+    quick_commands = []
+    quick_commands_error = None
+    if not success_quick:
+        quick_commands_error = quick_commands_data
+        logger.error(f"无法加载快捷命令: {quick_commands_error}")
+    else:
+        quick_commands = quick_commands_data
+
+
     return render_template('index.html',
                            containers=listed_containers, images=available_images,
                            incus_error=(incus_error, incus_error_message),
                            image_error=(image_error_flag, image_error_msg),
                            available_pools=available_pools,
                            storage_error=(storage_error_flag, storage_error_msg),
-                           session=session, # Pass session explicitly
-                           request=request) # Pass request explicitly
+                           quick_commands=quick_commands,
+                           quick_commands_error=quick_commands_error,
+                           session=session,
+                           request=request)
 
-
-# ... (其他路由保持不变) ...
 
 @views.route('/container/create', methods=['POST'])
 @web_or_api_authentication_required
@@ -239,7 +252,7 @@ def container_action(name):
             if not success_ipt:
                 if is_bad: warning_deletions.append(ipt_msg)
                 else: failed_deletions.append(ipt_msg)
-            remove_nat_rule_from_db(rule['id']) # Always try to remove DB record
+            remove_nat_rule_from_db(rule['id'])
 
         if failed_deletions:
             return jsonify({'status': 'error', 'message': f"删除部分NAT规则失败: {'; '.join(failed_deletions)}"}), 500
@@ -359,3 +372,37 @@ def delete_nat_rule(rule_id):
         return jsonify({'status': 'success' if db_del_ok else 'warning', 'message': msg}), 200
     else:
         return jsonify({'status': 'error', 'message': f'删除 NAT 规则失败: {ipt_msg}'}), 500
+
+
+@views.route('/quick_commands', methods=['GET'])
+@web_or_api_authentication_required
+def list_quick_commands():
+    success, commands = get_quick_commands()
+    if success:
+        return jsonify({'status': 'success', 'commands': commands}), 200
+    else:
+        return jsonify({'status': 'error', 'message': commands}), 500
+
+@views.route('/quick_commands/add', methods=['POST'])
+@web_or_api_authentication_required
+def add_quick_command_route():
+    name = request.form.get('name')
+    command = request.form.get('command')
+
+    if not name or not command:
+        return jsonify({'status': 'error', 'message': '名称和命令不能为空'}), 400
+
+    success, result = add_quick_command(name, command)
+    if success:
+        return jsonify({'status': 'success', 'message': '快捷命令添加成功。', 'id': result}), 200
+    else:
+        return jsonify({'status': 'error', 'message': result}), 409 if "已存在" in str(result) else 500
+
+@views.route('/quick_commands/delete/<int:command_id>', methods=['DELETE'])
+@web_or_api_authentication_required
+def delete_quick_command_route(command_id):
+    success, message = remove_quick_command_from_db(command_id)
+    if success:
+        return jsonify({'status': 'success', 'message': message}), 200
+    else:
+        return jsonify({'status': 'error', 'message': message}), 500
