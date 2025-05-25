@@ -215,3 +215,34 @@ def cleanup_orphaned_nat_rules_in_db(existing_incus_container_names):
         logger.error(f"数据库错误 cleanup_orphaned_nat_rules_in_db: {e}")
     except Exception as e:
         logger.error(f"清理孤立NAT规则时发生异常: {e}")
+
+def get_quick_commands():
+    try:
+        commands = query_db('SELECT id, name, command FROM quick_commands ORDER BY name')
+        return True, [dict(row) for row in commands]
+    except sqlite3.Error as e:
+        logger.error(f"数据库错误 get_quick_commands: {e}")
+        return False, f"从数据库获取快捷命令失败: {e}"
+
+def add_quick_command(name, command):
+    try:
+        query_db('INSERT INTO quick_commands (name, command) VALUES (?, ?)', (name, command))
+        inserted_row = query_db('SELECT last_insert_rowid()', one=True)
+        command_id = inserted_row[0] if inserted_row else None
+        logger.info(f"Added quick command to DB: ID {command_id}, Name: {name}")
+        return True, command_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"快捷命令添加失败: 名称 '{name}' 已存在。")
+        return False, f"名称为 '{name}' 的快捷命令已存在。"
+    except sqlite3.Error as e:
+        logger.error(f"数据库错误 add_quick_command for {name}: {e}")
+        return False, f"添加快捷命令失败: {e}"
+
+def remove_quick_command_from_db(command_id):
+    try:
+        query_db('DELETE FROM quick_commands WHERE id = ?', [command_id])
+        logger.info(f"Removed quick command record from DB: ID {command_id}")
+        return True, "快捷命令记录成功从数据库移除。"
+    except sqlite3.Error as e:
+        logger.error(f"数据库错误 remove_quick_command_from_db for id {command_id}: {e}")
+        return False, f"从数据库移除快捷命令记录失败: {e}"
