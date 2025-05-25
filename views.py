@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, request, jsonify, redirect, url_fo
 import hashlib
 import time
 import shlex
+import logging
 
 from auth import login_required, web_or_api_authentication_required
 from utils import run_incus_command, run_command
