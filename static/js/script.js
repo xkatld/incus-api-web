@@ -102,7 +102,22 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
     let message = '';
     let buttonClass = 'btn-primary';
     let buttonText = '确认';
-    if (actionType === 'restart_container') {
+
+    if (actionType === 'start_container') {
+        currentConfirmContainerName = nameOrId;
+        currentConfirmRuleId = null;
+        modalTitle.text('确认启动');
+        message = `确定要启动容器 <strong>${nameOrId}</strong> 吗？`;
+        buttonClass = 'btn-success';
+        buttonText = '启动';
+    } else if (actionType === 'stop_container') {
+        currentConfirmContainerName = nameOrId;
+        currentConfirmRuleId = null;
+        modalTitle.text('确认停止');
+        message = `确定要停止容器 <strong>${nameOrId}</strong> 吗？`;
+        buttonClass = 'btn-warning';
+        buttonText = '停止';
+    } else if (actionType === 'restart_container') {
         currentConfirmContainerName = nameOrId;
         currentConfirmRuleId = null;
         modalTitle.text('确认重启');
@@ -125,7 +140,7 @@ function showConfirmationModal(actionType, nameOrId, buttonElement) {
         buttonText = '删除规则';
     }
     modalBody.html(message);
-    confirmButton.removeClass('btn-primary btn-warning btn-danger').addClass(buttonClass).text(buttonText);
+    confirmButton.removeClass('btn-primary btn-warning btn-danger btn-success').addClass(buttonClass).text(buttonText);
     setButtonProcessing(confirmButton, false);
     const confirmModal = new bootstrap.Modal(document.getElementById('confirmModal'));
     confirmModal.show();
@@ -215,7 +230,7 @@ function handleCreateContainerFormSubmit(event) {
     setButtonProcessing(submitButton, true);
     var formData = form.serialize();
     $.ajax({
-        url: "/container/create", // Make sure this URL is correct
+        url: "/container/create",
         type: "POST",
         data: formData,
         success: function(data) {
@@ -251,36 +266,13 @@ $('#createContainerFormMobile').submit(handleCreateContainerFormSubmit);
 function performAction(containerName, action, buttonElement) {
     if (action === 'restart') {
         showConfirmationModal('restart_container', containerName, buttonElement);
-        return;
-    }
-    if (action === 'delete') {
+    } else if (action === 'delete') {
         showConfirmationModal('delete_container', containerName, buttonElement);
-        return;
+    } else if (action === 'start') {
+        showConfirmationModal('start_container', containerName, buttonElement);
+    } else if (action === 'stop') {
+        showConfirmationModal('stop_container', containerName, buttonElement);
     }
-    setButtonProcessing(buttonElement, true);
-    $.ajax({
-        url: `/container/${containerName}/action`,
-        type: "POST",
-        data: { action: action },
-        success: function(data) {
-            showToast(data.message, data.status);
-            if (data.status === 'success') {
-                 setTimeout(() => location.reload(), 1000);
-            } else {
-                 setButtonProcessing(buttonElement, false);
-            }
-        },
-        error: function(jqXHR) {
-             if (jqXHR.status === 401) {
-                showToast("操作需要认证，请重新登录。", 'danger');
-                setTimeout(() => window.location.href = "/login?next=" + window.location.pathname, 1000);
-             } else {
-                const message = jqXHR.responseJSON ? (jqXHR.responseJSON.message || "未知错误") : `执行 ${action} 操作请求失败。`;
-                showToast("操作失败: " + message, 'danger');
-                setButtonProcessing(buttonElement, false);
-             }
-        }
-    });
 }
 
 function showInfo(containerName, buttonElement) {
@@ -620,7 +612,7 @@ function initializeTerminal(containerName, ip) {
 
     term.writeln('正在连接到服务器...');
 
-    socket = io(); // Assuming socketio is loaded
+    socket = io();
 
     socket.on('connect', () => {
         term.writeln('✅ 连接成功，正在启动SSH会话...');
