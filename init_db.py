@@ -154,6 +154,22 @@ def create_tables():
         else:
             print("所有基本设置键已存在。跳过默认值插入。")
 
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='quick_commands';")
+        if not cursor.fetchone():
+            print("表 'quick_commands' 不存在，正在创建...")
+            cursor.execute('''
+            CREATE TABLE quick_commands (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                command TEXT NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+            conn.commit()
+            print("表 'quick_commands' 创建成功。")
+        else:
+            print("表 'quick_commands' 已存在。")
+
 
     except sqlite3.Error as e:
         print(f"数据库错误 during table creation or check: {e}")
