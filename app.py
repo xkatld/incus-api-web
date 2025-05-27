@@ -1,5 +1,6 @@
 from flask import Flask
 from flask_socketio import SocketIO
+from flask_restx import Api
 import os
 import sys
 import subprocess
@@ -21,6 +22,7 @@ except ImportError:
 from config import FLASK_SECRET_KEY, DATABASE_NAME
 from db_manager import load_settings_from_db, get_db_connection
 from views import views
+from api_views import api as api_ns
 from sockets import register_socket_handlers
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -28,6 +30,12 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = FLASK_SECRET_KEY
+app.config['RESTX_MASK_SWAGGER'] = False
+app.config['SWAGGER_UI_DOC_EXPANSION'] = 'list'
+app.config['SWAGGER_UI_OPERATION_ID'] = True
+app.config['SWAGGER_UI_REQUEST_DURATION'] = True
+
+
 socketio = SocketIO(app, async_mode='threading')
 
 CERT_FILE = "cert.pem"
@@ -152,6 +160,15 @@ def perform_initial_setup():
 
     logger.info("============================================")
 
+api = Api(app,
+          version='1.0',
+          title='Incus Web API',
+          description='用于管理 Incus 容器的 RESTful API',
+          doc='/api/doc/',
+          prefix='/api')
+
+api.add_namespace(api_ns)
+
 def create_app():
     app.register_blueprint(views)
     register_socket_handlers(socketio)
@@ -165,11 +182,11 @@ if __name__ == '__main__':
 
     create_app()
     logger.info("启动 Flask-SocketIO Web 服务器...")
+    logger.info(f"API 文档可在 /api/doc/ 访问")
 
     if ssl_context_tuple:
         logger.info(f"将在 HTTPS 模式下运行 (https://0.0.0.0:5000)。")
         try:
-            # 修改这里：使用 ssl_context 而不是 certfile/keyfile
             socketio.run(app, debug=True, host='0.0.0.0', port=5000,
                          allow_unsafe_werkzeug=True, use_reloader=False,
                          ssl_context=ssl_context_tuple)
