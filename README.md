@@ -4,8 +4,7 @@ v6.0: 添加 RESTful API 功能 (基于 Flask-RESTx) 和 API 文档。
 
 ## 安装python3
 ~~~
-apt install python3
-apt install python3-pip
+apt install python3 python3-pip -y
 rm /usr/lib/python3.11/EXTERNALLY-MANAGED
 ~~~
 
