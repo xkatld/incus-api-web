@@ -7,8 +7,8 @@ Debian 12
 ```bash
 apt install python3 python3-pip -y
 rm /usr/lib/python3.11/EXTERNALLY-MANAGED
-curl -s [https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/scripts/install_incus.sh](https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/scripts/install_incus.sh) | sudo bash
-git clone [https://github.com/xkatld/incus-api-web.git](https://github.com/xkatld/incus-api-web.git)
+curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/scripts/install_incus.sh | sudo bash
+git clone https://github.com/xkatld/incus-api-web.git
 cd incus-api-web
 pip install Flask Flask-SocketIO pexpect cryptography Flask-RESTx
 ````
