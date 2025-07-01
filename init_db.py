@@ -170,6 +170,22 @@ def create_tables():
         else:
             print("表 'quick_commands' 已存在。")
 
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='reverse_proxy_rules';")
+        if not cursor.fetchone():
+            print("表 'reverse_proxy_rules' 不存在，正在创建...")
+            cursor.execute('''
+            CREATE TABLE reverse_proxy_rules (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                container_name TEXT NOT NULL,
+                domain TEXT UNIQUE NOT NULL,
+                container_port INTEGER NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+            conn.commit()
+            print("表 'reverse_proxy_rules' 创建成功。")
+        else:
+            print("表 'reverse_proxy_rules' 已存在。")
 
     except sqlite3.Error as e:
         print(f"数据库错误 during table creation or check: {e}")

@@ -11,10 +11,13 @@ from db_manager import (
     get_nat_rules_for_container, check_nat_rule_exists_in_db,
     add_nat_rule_to_db, get_nat_rule_by_id, remove_nat_rule_from_db,
     cleanup_orphaned_nat_rules_in_db, get_quick_commands,
-    add_quick_command, remove_quick_command_from_db
+    add_quick_command, remove_quick_command_from_db,
+    add_reverse_proxy_rule_to_db, get_reverse_proxy_rules_for_container,
+    get_reverse_proxy_rule_by_id, remove_reverse_proxy_rule_from_db
 )
 from incus_api import get_container_raw_info
 from nat_manager import perform_iptables_delete_for_rule
+from nginx_manager import create_reverse_proxy, delete_reverse_proxy
 
 views = Blueprint('views', __name__)
 logger = logging.getLogger(__name__)
@@ -402,3 +405,65 @@ def delete_quick_command_route(command_id):
         return jsonify({'status': 'success', 'message': message}), 200
     else:
         return jsonify({'status': 'error', 'message': message}), 500
+
+@views.route('/container/<name>/add_reverse_proxy', methods=['POST'])
+@web_or_api_authentication_required
+def add_reverse_proxy_route(name):
+    domain = request.form.get('domain')
+    container_port_str = request.form.get('container_port')
+
+    if not domain or not container_port_str:
+        return jsonify({'status': 'error', 'message': '域名和容器端口不能为空'}), 400
+    
+    try:
+        container_port = int(container_port_str)
+        if not (1 <= container_port <= 65535):
+            raise ValueError("端口号必须在 1 到 65535 之间。")
+    except (ValueError, TypeError):
+         return jsonify({'status': 'error', 'message': '容器端口号无效'}), 400
+
+    info, error = get_container_raw_info(name)
+    if not info: return jsonify({'status': 'error', 'message': f'获取容器信息失败: {error}'}), 404
+    if info.get('status') != 'Running': return jsonify({'status': 'error', 'message': '容器未运行'}), 400
+    container_ip = info.get('ip')
+    if not container_ip or container_ip == 'N/A': return jsonify({'status': 'error', 'message': '无法获取容器 IP'}), 500
+
+    success_nginx, msg_nginx = create_reverse_proxy(domain, container_ip, container_port)
+
+    if success_nginx:
+        success_db, result_db = add_reverse_proxy_rule_to_db(name, domain, container_port)
+        if success_db:
+            return jsonify({'status': 'success', 'message': '反向代理规则添加成功。', 'rule_id': result_db}), 200
+        else:
+            delete_reverse_proxy(domain)
+            return jsonify({'status': 'error', 'message': f'Nginx 配置成功，但数据库记录失败: {result_db}'}), 500
+    else:
+        return jsonify({'status': 'error', 'message': f'添加反向代理失败: {msg_nginx}'}), 500
+
+@views.route('/container/<name>/reverse_proxy_rules', methods=['GET'])
+@web_or_api_authentication_required
+def list_reverse_proxy_rules(name):
+    success, rules = get_reverse_proxy_rules_for_container(name)
+    if success:
+        return jsonify({'status': 'success', 'rules': rules}), 200
+    else:
+        return jsonify({'status': 'error', 'message': rules}), 500
+
+@views.route('/container/reverse_proxy_rule/<int:rule_id>', methods=['DELETE'])
+@web_or_api_authentication_required
+def delete_reverse_proxy_rule(rule_id):
+    success_db, rule = get_reverse_proxy_rule_by_id(rule_id)
+    if not success_db: return jsonify({'status': 'error', 'message': f'获取规则失败: {rule}'}), 500
+    if not rule: return jsonify({'status': 'warning', 'message': '规则记录未找到'}), 200
+
+    domain = rule['domain']
+    success_nginx, msg_nginx = delete_reverse_proxy(domain)
+
+    if success_nginx:
+        remove_reverse_proxy_rule_from_db(rule_id)
+        return jsonify({'status': 'success', 'message': f'反向代理规则 (域: {domain}) 已成功删除。'}), 200
+    else:
+        if "未找到" in msg_nginx:
+             remove_reverse_proxy_rule_from_db(rule_id)
+             return jsonify({'status': 'warning', 'message': f'Nginx 配置文件未找到，但数据库记录已删除。'}), 200
+        return jsonify({'status': 'error', 'message': f'删除反向代理失败: {msg_nginx}'}), 500

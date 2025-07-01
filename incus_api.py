@@ -34,19 +34,35 @@ def get_container_raw_info(name):
         if isinstance(container_state, dict):
             network_info = container_state.get('network')
             if isinstance(network_info, dict):
-                for iface_name, iface_data in network_info.items():
-                    if isinstance(iface_data, dict):
-                        addresses = iface_data.get('addresses')
-                        if isinstance(addresses, list):
-                            for addr_entry in addresses:
-                                if isinstance(addr_entry, dict):
-                                    addr = addr_entry.get('address')
-                                    family = addr_entry.get('family')
-                                    scope = addr_entry.get('scope')
-                                    if addr and family == 'inet' and scope == 'global':
-                                        info_output['ip'] = addr.split('/')[0]
-                                        break
-                            if info_output['ip'] != 'N/A': break
+                # 优先查找 eth0 网卡的 IP
+                eth0_interface = network_info.get('eth0')
+                if isinstance(eth0_interface, dict):
+                    addresses = eth0_interface.get('addresses')
+                    if isinstance(addresses, list):
+                        for addr_entry in addresses:
+                            if isinstance(addr_entry, dict) and addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
+                                ip = addr_entry.get('address')
+                                if ip:
+                                    info_output['ip'] = ip.split('/')[0]
+                                    break 
+                
+                # 如果 eth0 没有找到IP, 作为备用方案，再查找其他网卡
+                if info_output['ip'] == 'N/A':
+                    for iface_name, iface_data in network_info.items():
+                        if iface_name == 'eth0':
+                            continue # 已经检查过，跳过
+                        if isinstance(iface_data, dict):
+                            addresses = iface_data.get('addresses')
+                            if isinstance(addresses, list):
+                                for addr_entry in addresses:
+                                    if isinstance(addr_entry, dict) and addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
+                                        ip = addr_entry.get('address')
+                                        if ip:
+                                            info_output['ip'] = ip.split('/')[0]
+                                            break
+                        if info_output['ip'] != 'N/A':
+                            break
+
         return info_output, None
 
     elif db_info:

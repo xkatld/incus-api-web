@@ -246,3 +246,45 @@ def remove_quick_command_from_db(command_id):
     except sqlite3.Error as e:
         logger.error(f"数据库错误 remove_quick_command_from_db for id {command_id}: {e}")
         return False, f"从数据库移除快捷命令记录失败: {e}"
+
+def add_reverse_proxy_rule_to_db(container_name, domain, container_port):
+    try:
+        query_db(
+            'INSERT INTO reverse_proxy_rules (container_name, domain, container_port) VALUES (?, ?, ?)',
+            (container_name, domain, container_port)
+        )
+        inserted_row = query_db('SELECT last_insert_rowid()', one=True)
+        rule_id = inserted_row[0] if inserted_row else None
+        logger.info(f"添加反向代理规则到数据库: ID {rule_id}, 域 {domain} -> {container_name}:{container_port}")
+        return True, rule_id
+    except sqlite3.IntegrityError:
+        logger.warning(f"添加反向代理规则失败: 域名 '{domain}' 已存在。")
+        return False, f"域名 '{domain}' 已存在。"
+    except sqlite3.Error as e:
+        logger.error(f"数据库错误 add_reverse_proxy_rule_to_db for {domain}: {e}")
+        return False, f"添加规则到数据库失败: {e}"
+
+def get_reverse_proxy_rules_for_container(container_name):
+    try:
+        rules = query_db('SELECT id, domain, container_port, created_at FROM reverse_proxy_rules WHERE container_name = ?', [container_name])
+        return True, [dict(row) for row in rules]
+    except sqlite3.Error as e:
+        logger.error(f"数据库错误 get_reverse_proxy_rules_for_container for {container_name}: {e}")
+        return False, f"从数据库获取规则失败: {e}"
+
+def get_reverse_proxy_rule_by_id(rule_id):
+    try:
+        rule = query_db('SELECT id, container_name, domain, container_port FROM reverse_proxy_rules WHERE id = ?', [rule_id], one=True)
+        return True, dict(rule) if rule else None
+    except sqlite3.Error as e:
+        logger.error(f"数据库错误 get_reverse_proxy_rule_by_id for id {rule_id}: {e}")
+        return False, f"从数据库获取规则 (ID {rule_id}) 失败: {e}"
+
+def remove_reverse_proxy_rule_from_db(rule_id):
+    try:
+        query_db('DELETE FROM reverse_proxy_rules WHERE id = ?', [rule_id])
+        logger.info(f"从数据库中移除了反向代理规则记录: ID {rule_id}")
+        return True, "规则记录成功从数据库移除。"
+    except sqlite3.Error as e:
+        logger.error(f"数据库错误 remove_reverse_proxy_rule_from_db for id {rule_id}: {e}")
+        return False, f"从数据库移除规则记录失败: {e}"

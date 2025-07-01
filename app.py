@@ -146,7 +146,8 @@ def perform_initial_setup():
     commands_to_check = {
         'incus': ['incus', '--version'],
         'iptables': ['iptables', '--version'],
-        'ssh': ['ssh', '-V']
+        'ssh': ['ssh', '-V'],
+        'nginx': ['nginx', '-v']
     }
     for cmd_name, cmd_args in commands_to_check.items():
         try:

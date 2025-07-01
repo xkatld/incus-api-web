@@ -278,16 +278,22 @@ function performAction(containerName, action, buttonElement) {
 function showInfo(containerName, buttonElement) {
     const basicInfoContent = $('#basicInfoContent');
     const natRulesListContainer = $('#natRulesList');
+    const reverseProxyRulesListContainer = $('#reverseProxyRulesList');
     const natRulesContent = $('#natRulesContent');
+    const reverseProxyRulesContent = $('#reverseProxyRulesContent');
     const natRulesError = $('#natRulesError');
+    const reverseProxyRulesError = $('#reverseProxyRulesError');
     const infoError = $('#infoError');
     const infoModal = new bootstrap.Modal(document.getElementById('infoModal'));
     $('#infoModalLabel').text(`容器信息: ${containerName}`);
     basicInfoContent.html('正在加载基础信息...');
     natRulesContent.html('<li>正在加载 NAT 规则...</li>');
+    reverseProxyRulesContent.html('<li>正在加载反向代理规则...</li>');
     natRulesError.addClass('d-none').text('');
-     infoError.addClass('d-none').text('');
+    reverseProxyRulesError.addClass('d-none').text('');
+    infoError.addClass('d-none').text('');
     natRulesListContainer.show();
+    reverseProxyRulesListContainer.show();
     setButtonProcessing(buttonElement, true);
     $.ajax({
         url: `/container/${containerName}/info`,
@@ -298,6 +304,7 @@ function showInfo(containerName, buttonElement) {
                  infoError.removeClass('d-none').text(data.message);
                  showToast("加载容器信息失败。", 'danger');
                  natRulesListContainer.hide();
+                 reverseProxyRulesListContainer.hide();
                  return;
              }
 
@@ -354,6 +361,7 @@ function showInfo(containerName, buttonElement) {
                  showToast(data.message, 'warning');
             }
             loadNatRules(containerName);
+            loadReverseProxyRules(containerName);
         },
         error: function(jqXHR) {
              if (jqXHR.status === 401) {
@@ -364,7 +372,9 @@ function showInfo(containerName, buttonElement) {
                 basicInfoContent.html(`<strong>错误:</strong> ${message}`);
                 infoError.removeClass('d-none').text(message);
                 natRulesContent.html('<li>无法加载 NAT 规则。</li>');
+                reverseProxyRulesContent.html('<li>无法加载反向代理规则。</li>');
                 natRulesListContainer.hide();
+                reverseProxyRulesListContainer.hide();
                 showToast("加载容器信息失败。", 'danger');
              }
         },
@@ -444,7 +454,7 @@ $('#execCommandForm').submit(function(event) {
     const submitButton = $('#execButton', form);
     const outputArea = $('#execOutput');
     var containerName = $('#execContainerName').val();
-    var command = $('#commandInput').val(); // Reads from textarea
+    var command = $('#commandInput').val();
     if (!command.trim()) {
         showToast("请输入要执行的命令。", 'warning');
         return;
@@ -487,7 +497,7 @@ $('#execCommandForm').submit(function(event) {
 $('#useQuickCommandBtn').click(function() {
     const selectedCommand = $('#quickCommandSelect').val();
     if (selectedCommand) {
-        $('#commandInput').val(selectedCommand); // Sets textarea value
+        $('#commandInput').val(selectedCommand);
     }
 });
 
@@ -683,10 +693,13 @@ $('#sshModal').on('hidden.bs.modal', function () {
 $('#infoModal').on('hidden.bs.modal', function () {
   $('#basicInfoContent').html('正在加载基础信息...');
   $('#natRulesContent').html('<li>正在加载 NAT 规则...</li>');
+  $('#reverseProxyRulesContent').html('<li>正在加载反向代理规则...</li>');
   $('#natRulesError').addClass('d-none').text('');
+  $('#reverseProxyRulesError').addClass('d-none').text('');
   $('#infoError').addClass('d-none').text('');
   $('#infoModalLabel').text('容器信息');
    $('#natRulesList').hide();
+   $('#reverseProxyRulesList').hide();
 });
 
 $('#execModal').on('hidden.bs.modal', function () {
@@ -729,7 +742,6 @@ function loadQuickCommands(populateSelect = false) {
 
             if (data.status === 'success' && data.commands && data.commands.length > 0) {
                 data.commands.forEach(cmd => {
-                    // Make command preview safer for HTML and shorter
                     const safeCommandPreview = cmd.command.replace(/</g, "&lt;").replace(/>/g, "&gt;");
                     const shortPreview = safeCommandPreview.split('\n')[0].substring(0, 50) + (cmd.command.length > 50 || cmd.command.includes('\n') ? '...' : '');
 
@@ -740,7 +752,6 @@ function loadQuickCommands(populateSelect = false) {
                         </li>`;
                     list.append(listItem);
                     if (populateSelect) {
-                         // Use the full command in the value attribute
                          const optionItem = `<option value="${cmd.command.replace(/"/g, '&quot;')}">${cmd.name}</option>`;
                          select.append(optionItem);
                     }
@@ -772,9 +783,9 @@ function addQuickCommand(event) {
     event.preventDefault();
     const form = $('#addQuickCommandForm');
     const nameInput = $('#quickCommandName');
-    const commandInput = $('#quickCommandValue'); // Textarea
+    const commandInput = $('#quickCommandValue');
     const name = nameInput.val().trim();
-    const command = commandInput.val().trim(); // Reads from textarea
+    const command = commandInput.val().trim();
     const addButton = $('#addQuickCommandButton');
 
     if (!name || !command) {
@@ -835,3 +846,117 @@ $('#addQuickCommandForm').submit(addQuickCommand);
 $('#quickCommandsModal').on('shown.bs.modal', function () {
     loadQuickCommands(false);
 });
+
+function openReverseProxyModal(containerName) {
+    $('#reverseProxyContainerName').val(containerName);
+    $('#reverseProxyModalLabel').text(`为容器 ${containerName} 添加反向代理`);
+    $('#domainName').val('');
+    $('#proxyContainerPort').val('3000');
+    setButtonProcessing($('#addReverseProxyButton'), false);
+    var reverseProxyModal = new bootstrap.Modal(document.getElementById('reverseProxyModal'));
+    reverseProxyModal.show();
+}
+
+function loadReverseProxyRules(containerName) {
+    const rulesContent = $('#reverseProxyRulesContent');
+    const rulesError = $('#reverseProxyRulesError');
+    rulesContent.html('<li>正在加载反向代理规则...</li>');
+    rulesError.addClass('d-none').text('');
+
+    $.ajax({
+        url: `/container/${containerName}/reverse_proxy_rules`,
+        type: "GET",
+        success: function(data) {
+            rulesContent.empty();
+            if (data.status === 'success' && data.rules && data.rules.length > 0) {
+                data.rules.forEach(rule => {
+                    const ruleHtml = `
+                        <li data-rule-id="${rule.id}">
+                            <span class="rule-details">
+                                <strong>ID ${rule.id}:</strong> <a href="http://${rule.domain}" target="_blank">${rule.domain}</a> → 容器端口 ${rule.container_port}
+                                <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
+                            </span>
+                            <span class="rule-actions">
+                                 <button class="btn btn-sm btn-danger" onclick="deleteReverseProxyRule(${rule.id}, this)">删除</button>
+                            </span>
+                        </li>
+                    `;
+                    rulesContent.append(ruleHtml);
+                });
+            } else if (data.status === 'success' && data.rules.length === 0) {
+                rulesContent.html('<li>没有反向代理规则记录。</li>');
+            } else {
+                 rulesContent.html('<li>加载反向代理规则失败。</li>');
+                 rulesError.removeClass('d-none').text(data.message || '未知错误');
+            }
+        },
+        error: function(jqXHR) {
+            const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "请求失败";
+            rulesContent.html('<li>加载反向代理规则失败。</li>');
+            rulesError.removeClass('d-none').text(message);
+        }
+    });
+}
+
+$('#addReverseProxyForm').submit(function(event) {
+    event.preventDefault();
+    const form = $(this);
+    const submitButton = $('#addReverseProxyButton', form);
+    const containerName = $('#reverseProxyContainerName').val();
+    const domain = $('#domainName').val();
+    const containerPort = $('#proxyContainerPort').val();
+
+    if (!domain || !containerPort) {
+        showToast("请填写所有字段。", 'warning');
+        return;
+    }
+    setButtonProcessing(submitButton, true);
+
+    $.ajax({
+        url: `/container/${containerName}/add_reverse_proxy`,
+        type: "POST",
+        data: {
+            domain: domain,
+            container_port: containerPort
+        },
+        success: function(data) {
+            showToast(data.message, data.status);
+            if (data.status === 'success') {
+                 loadReverseProxyRules(containerName);
+                 $('#domainName').val('');
+            }
+        },
+        error: function(jqXHR) {
+            const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "添加失败";
+            showToast(message, 'danger');
+        },
+        complete: function() {
+            setButtonProcessing(submitButton, false);
+        }
+    });
+});
+
+function deleteReverseProxyRule(ruleId, buttonElement) {
+    if (!confirm('确定要删除这个反向代理规则吗？\n这将删除对应的 Nginx 配置文件并重载服务。')) {
+        return;
+    }
+    setButtonProcessing(buttonElement, true);
+    $.ajax({
+        url: `/container/reverse_proxy_rule/${ruleId}`,
+        type: 'DELETE',
+        success: function(data) {
+            showToast(data.message, data.status);
+            const containerName = $('#infoModalLabel').text().replace('容器信息: ', '');
+            if (containerName) {
+                loadReverseProxyRules(containerName);
+            }
+        },
+        error: function(jqXHR) {
+            const message = jqXHR.responseJSON ? jqXHR.responseJSON.message : "删除失败";
+            showToast("删除失败: " + message, 'danger');
+        },
+        complete: function() {
+             setButtonProcessing(buttonElement, false);
+        }
+    });
+}
