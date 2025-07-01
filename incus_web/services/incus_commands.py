@@ -30,7 +30,9 @@ def get_container_raw_info(name):
     success_live, live_data = run_incus_command(['list', name, '--format', 'json'])
     if success_live and live_data:
         container_data = live_data[0]
-        ip_address = next((addr['address'].split('/')[0] for iface in container_data.get('state', {}).get('network', {}).values() for addr in iface.get('addresses', []) if addr.get('family') == 'inet' and addr.get('scope') == 'global'), 'N/A')
+        network = container_data.get('state', {}).get('network', {})
+        eth0_addresses = network.get('eth0', {}).get('addresses', [])
+        ip_address = next((addr['address'].split('/')[0] for addr in eth0_addresses if addr.get('family') == 'inet' and addr.get('scope') == 'global'), 'N/A')
         info = container_data
         info['ip'] = ip_address
         info['description'] = container_data.get('config', {}).get('image.description', 'N/A')
