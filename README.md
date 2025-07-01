@@ -1,33 +1,76 @@
-v6.0: 添加 RESTful API 功能 (基于 Flask-RESTx) 和 API 文档。
+### **安装方法**
 
-安装教程看wiki
+**环境要求**:
 
-待加功能
-~~~
-安全强化：
+  * 操作系统: Debian 12
+  * 必备软件: Python 3, Nginx
 
-强制修改初始密码：应在管理员首次登录后，强制要求修改默认密码。
+**安装步骤**:
 
-在线SSH认证改进：移除对固定密码的依赖。可以改为在连接时弹出对话框让用户输入密码，或者实现更安全的密钥认证方式。
+1.  **安装核心依赖**
 
-API密钥管理界面：在Web UI中增加一个专门的页面，用于查看、生成新的API密钥以及废除旧的密钥。
+    ```bash
+    apt update
+    apt install python3 python3-pip git nginx -y
+    ```
 
-核心功能扩展：
+2.  **处理 Debian 12 Python 环境 (如果需要)**
 
-容器快照管理：增加创建、还原、删除容器快照的界面和API。这是容器管理中非常重要的一项功能。
+    ```bash
+    rm /usr/lib/python3.11/EXTERNALLY-MANAGED
+    ```
 
-容器资源在线调整：允许用户在容器运行中或停止后，修改其CPU、内存、硬盘等资源限制。
+3.  **使用脚本一键安装 Incus**
 
-Incus配置文件(Profile)管理：提供查看和为容器应用不同配置文件的功能。
+    ```bash
+    curl -s https://raw.githubusercontent.com/xkatld/incus-api-web/refs/heads/main/scripts/install_incus.sh | sudo bash
+    ```
 
-反向代理SSL支持：既然已经集成了Nginx反向代理功能，可以进一步集成 Let's Encrypt，实现一键为绑定的域名申请和自动续签SSL证书。
+4.  **克隆本项目代码**
 
-监控与日志：
+    ```bash
+    git clone https://github.com/xkatld/incus-api-web.git
+    cd incus-api-web
+    ```
 
-资源监控图表：为每个容器提供CPU、内存、网络和磁盘I/O的实时监控图表，帮助用户更直观地了解容器状态。
+5.  **安装 Python 库**
 
-操作审计日志：记录所有重要的用户操作（如登录、创建/删除容器、修改规则等），方便追踪和审计。
-~~~
+    ```bash
+    pip install Flask Flask-SocketIO pexpect cryptography Flask-RESTx
+    ```
+
+-----
+
+### **注意事项**
+
+1.  **必须初始化数据库**
+    首次运行前，必须执行初始化脚本以创建数据库和管理员账户。
+
+    ```bash
+    python3 scripts/init_db.py
+    ```
+
+      * **默认管理员用户名**: `admin`
+      * **默认管理员密码**: `password`
+
+2.  **Sudo 权限是必须的**
+    本项目的核心功能，如自动管理 NAT 规则和 Nginx 反向代理，依赖于执行 `iptables` 和 `nginx` 命令。请务必确保运行 `app.py` 的用户拥有免密 `sudo` 权限。
+
+3.  **运行项目**
+    初始化完成后，使用以下命令启动 Web 服务：
+
+    ```bash
+    python3 app.py
+    ```
+
+      * 服务默认运行在 `0.0.0.0:5000`。
+      * 请确保防火墙已放行 `5000` 端口以及您计划用于反向代理的公网端口（如 80, 443）。
+
+4.  **API 文档地址**
+    项目的 RESTful API 文档 (Swagger UI) 位于 `/api/doc/`。
+
+      * 访问地址示例: `https://<服务器IP>:5000/api/doc/`
+
 
 ## 演示图片 (Web UI)
 ![image](https://github.com/user-attachments/assets/d11e24e7-d469-43b0-9f3d-e1e8d2f7d0d1)
