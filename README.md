@@ -47,7 +47,7 @@
     首次运行前，必须执行初始化脚本以创建数据库和管理员账户。
 
     ```bash
-    python3 scripts/init_db.py
+    python3 init_db.py
     ```
 
       * **默认管理员用户名**: `admin`
