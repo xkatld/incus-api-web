@@ -40,7 +40,9 @@ def index():
     if success_list:
         incus_container_names = {item['name'] for item in containers_data}
         for item in containers_data:
-            ip_address = next((addr['address'].split('/')[0] for iface in item.get('state', {}).get('network', {}).values() for addr in iface.get('addresses', []) if addr.get('family') == 'inet' and addr.get('scope') == 'global'), 'N/A')
+            network = item.get('state', {}).get('network', {})
+            eth0_addresses = network.get('eth0', {}).get('addresses', [])
+            ip_address = next((addr['address'].split('/')[0] for addr in eth0_addresses if addr.get('family') == 'inet' and addr.get('scope') == 'global'), 'N/A')
             container_info = {
                 'name': item['name'], 'status': item.get('status', '未知'),
                 'image_source': item.get('config', {}).get('image.description', 'N/A'), 'ip': ip_address,
