@@ -7,6 +7,23 @@ from ..db import query_db
 
 logger = logging.getLogger(__name__)
 
+def _get_primary_ip(network_info):
+    if not network_info:
+        return 'N/A'
+    
+    if 'eth0' in network_info and network_info['eth0'].get('addresses'):
+        for addr in network_info['eth0']['addresses']:
+            if addr.get('family') == 'inet' and addr.get('scope') == 'global':
+                return addr.get('address', '').split('/')[0]
+
+    for iface in network_info.values():
+        if iface.get('addresses'):
+            for addr in iface['addresses']:
+                if addr.get('family') == 'inet' and addr.get('scope') == 'global':
+                    return addr.get('address', '').split('/')[0]
+                    
+    return 'N/A'
+
 def run_command(command_parts, parse_json=True, timeout=60):
     try:
         env_vars = os.environ.copy()
@@ -30,9 +47,8 @@ def get_container_raw_info(name):
     success_live, live_data = run_incus_command(['list', name, '--format', 'json'])
     if success_live and live_data:
         container_data = live_data[0]
-        network = container_data.get('state', {}).get('network', {})
-        eth0_addresses = network.get('eth0', {}).get('addresses', [])
-        ip_address = next((addr['address'].split('/')[0] for addr in eth0_addresses if addr.get('family') == 'inet' and addr.get('scope') == 'global'), 'N/A')
+        network_info = container_data.get('state', {}).get('network', {})
+        ip_address = _get_primary_ip(network_info)
         info = container_data
         info['ip'] = ip_address
         info['description'] = container_data.get('config', {}).get('image.description', 'N/A')

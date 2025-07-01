@@ -14,7 +14,7 @@ def read_and_forward_ssh_output(sid, child, socketio):
         try:
             output = child.read_nonblocking(size=1024, timeout=0.1)
             if output:
-                socketio.emit('ssh_output', output, room=sid)
+                socketio.emit('ssh_output', output.decode('utf-8', 'replace'), room=sid)
         except pexpect.TIMEOUT:
             continue
         except pexpect.EOF:
@@ -41,8 +41,10 @@ def register_socket_handlers(socketio):
     def handle_start_ssh(data):
         sid = request.sid
         ip = data.get('ip')
-        if not ip:
-            emit('ssh_error', '无效的 IP 地址', room=sid)
+
+        ip_pattern = re.compile(r"^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$")
+        if not ip or not ip_pattern.match(ip):
+            emit('ssh_error', '错误: 无效的IP地址格式', room=sid)
             return
 
         command = f'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null root@{ip}'

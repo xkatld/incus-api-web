@@ -1,51 +1,84 @@
 import os
+import subprocess
 import logging
-from .incus_commands import run_command
 
 logger = logging.getLogger(__name__)
+
 NGINX_SITES_AVAILABLE = '/etc/nginx/sites-available'
 NGINX_SITES_ENABLED = '/etc/nginx/sites-enabled'
 
-def get_config_path(domain):
-    return os.path.join(NGINX_SITES_AVAILABLE, f'{domain}.conf')
+def is_valid_domain_for_filename(domain):
+    if '/' in domain or '\\' in domain or '..' in domain:
+        return False
+    return True
 
-def generate_config(domain, proxy_target_url):
-    return f"""server {{
-    listen 80;
-    server_name {domain};
-    location / {{
-        proxy_pass {proxy_target_url};
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }}
-}}"""
-
-def test_and_reload_nginx():
-    success_test, out_test = run_command(['sudo', 'nginx', '-t'], parse_json=False)
-    if not success_test: return False, out_test
-    success_reload, out_reload = run_command(['sudo', 'systemctl', 'reload', 'nginx'], parse_json=False)
-    return success_reload, out_reload
-
-def create_reverse_proxy(domain, container_ip, container_port):
-    config_path = get_config_path(domain)
-    if os.path.exists(config_path): return False, "配置文件已存在。"
-    proxy_url = f'http://{container_ip}:{container_port}'
-    config_content = generate_config(domain, proxy_url)
+def run_command(command, check=True):
     try:
-        with open('/tmp/nginx_temp_conf', 'w') as f: f.write(config_content)
-        run_command(['sudo', 'mv', '/tmp/nginx_temp_conf', config_path], parse_json=False)
-        enabled_path = os.path.join(NGINX_SITES_ENABLED, f'{domain}.conf')
-        if not os.path.lexists(enabled_path):
-            run_command(['sudo', 'ln', '-s', config_path, enabled_path], parse_json=False)
-        return test_and_reload_nginx()
+        result = subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            check=check,
+            timeout=30
+        )
+        return True, result.stdout.strip()
+    except FileNotFoundError:
+        logger.error(f"命令未找到: {command[0]}")
+        return False, f"命令未找到: {command[0]}"
+    except subprocess.CalledProcessError as e:
+        logger.error(f"执行命令失败: {command}. 错误: {e.stderr}")
+        return False, e.stderr
+    except subprocess.TimeoutExpired:
+        logger.error(f"执行命令超时: {command}")
+        return False, "命令执行超时"
     except Exception as e:
+        logger.error(f"执行命令时发生未知错误: {command}. 错误: {e}")
         return False, str(e)
 
+def create_reverse_proxy(domain, container_ip, container_port):
+    if not is_valid_domain_for_filename(domain):
+        return False, "域名包含无效字符，无法创建配置文件。"
+
+    config_path = os.path.join(NGINX_SITES_AVAILABLE, domain)
+    if os.path.exists(config_path):
+        return False, "该域名的配置文件已存在。"
+
+    config_content = f"""
+server {{
+    listen 80;
+    server_name {domain};
+
+    location / {{
+        proxy_pass http://{container_ip}:{container_port};
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+}}
+"""
+    try:
+        with open(config_path, 'w') as f:
+            f.write(config_content)
+    except IOError as e:
+        return False, f"写入Nginx配置文件失败: {e}"
+
+    enabled_path = os.path.join(NGINX_SITES_ENABLED, domain)
+    if not os.path.lexists(enabled_path):
+        os.symlink(config_path, enabled_path)
+
+    return run_command(['sudo', 'nginx', '-t']) and run_command(['sudo', 'systemctl', 'reload', 'nginx'])
+
 def delete_reverse_proxy(domain):
-    config_path = get_config_path(domain)
-    if not os.path.exists(config_path): return True, "配置文件未找到。"
-    enabled_path = os.path.join(NGINX_SITES_ENABLED, f'{domain}.conf')
-    if os.path.lexists(enabled_path):
-        run_command(['sudo', 'rm', enabled_path], parse_json=False)
-    run_command(['sudo', 'rm', config_path], parse_json=False)
-    return test_and_reload_nginx()
+    if not is_valid_domain_for_filename(domain):
+        return False, "域名包含无效字符。"
+
+    config_path = os.path.join(NGINX_SITES_AVAILABLE, domain)
+    enabled_path = os.path.join(NGINX_SITES_ENABLED, domain)
+
+    if os.path.exists(enabled_path):
+        os.remove(enabled_path)
+    if os.path.exists(config_path):
+        os.remove(config_path)
+
+    return run_command(['sudo', 'nginx', '-t']) and run_command(['sudo', 'systemctl', 'reload', 'nginx'])
