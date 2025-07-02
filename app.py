@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, send_from_directory
 from flask_socketio import SocketIO
 from flask_restx import Api
 import os
@@ -28,15 +28,17 @@ from core.sockets import register_socket_handlers
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-app = Flask(__name__)
+# 指向 Vue 项目打包后的 dist 目录
+VUE_DIST_PATH = 'dist'
+
+app = Flask(__name__, static_folder=os.path.join(VUE_DIST_PATH, 'assets'))
 app.config['SECRET_KEY'] = FLASK_SECRET_KEY
 app.config['RESTX_MASK_SWAGGER'] = False
 app.config['SWAGGER_UI_DOC_EXPANSION'] = 'list'
 app.config['SWAGGER_UI_OPERATION_ID'] = True
 app.config['SWAGGER_UI_REQUEST_DURATION'] = True
 
-
-socketio = SocketIO(app, async_mode='threading')
+socketio = SocketIO(app, async_mode='threading', cors_allowed_origins="*")
 
 CERT_FILE = "cert.pem"
 KEY_FILE = "key.pem"
@@ -170,8 +172,17 @@ api = Api(app,
 
 api.add_namespace(api_ns)
 
+# 新增: 捕获所有非 API 路由，并指向 Vue 应用的入口
+@app.route('/', defaults={'path': ''})
+@app.route('/<path:path>')
+def catch_all(path):
+    if path != "" and os.path.exists(os.path.join(app.static_folder, '..', path)):
+        return send_from_directory(os.path.join(app.static_folder, '..'), path)
+    else:
+        return send_from_directory(os.path.join(app.static_folder, '..'), 'index.html')
+
 def create_app():
-    app.register_blueprint(views)
+    # app.register_blueprint(views) # 不再需要旧的 views
     register_socket_handlers(socketio)
     return app
 
@@ -184,6 +195,8 @@ if __name__ == '__main__':
     create_app()
     logger.info("启动 Flask-SocketIO Web 服务器...")
     logger.info(f"API 文档可在 /api/doc/ 访问")
+    logger.info(f"前端应用将在根目录 / 提供服务")
+
 
     if ssl_context_tuple:
         logger.info(f"将在 HTTPS 模式下运行 (https://0.0.0.0:5000)。")
