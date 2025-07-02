@@ -2,7 +2,7 @@ import sqlite3
 import logging
 import datetime
 import re
-from config import DATABASE_NAME
+from .config import DATABASE_NAME
 
 logger = logging.getLogger(__name__)
 

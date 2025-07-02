@@ -1,7 +1,7 @@
 import logging
 import re
-from utils import run_incus_command
-from db_manager import query_db
+from .utils import run_incus_command
+from .db_manager import query_db
 
 logger = logging.getLogger(__name__)
 

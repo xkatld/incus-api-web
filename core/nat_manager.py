@@ -1,6 +1,6 @@
 import logging
 import shlex
-from utils import run_command
+from .utils import run_command
 
 logger = logging.getLogger(__name__)
 

@@ -4,9 +4,9 @@ import time
 import shlex
 import logging
 
-from auth import login_required, web_or_api_authentication_required
-from utils import run_incus_command, run_command
-from db_manager import (
+from .auth import login_required, web_or_api_authentication_required
+from .utils import run_incus_command, run_command
+from .db_manager import (
     query_db, sync_container_to_db, remove_container_from_db,
     get_nat_rules_for_container, check_nat_rule_exists_in_db,
     add_nat_rule_to_db, get_nat_rule_by_id, remove_nat_rule_from_db,
@@ -15,9 +15,9 @@ from db_manager import (
     add_reverse_proxy_rule_to_db, get_reverse_proxy_rules_for_container,
     get_reverse_proxy_rule_by_id, remove_reverse_proxy_rule_from_db
 )
-from incus_api import get_container_raw_info
-from nat_manager import perform_iptables_delete_for_rule
-from nginx_manager import create_reverse_proxy, delete_reverse_proxy
+from .incus_api import get_container_raw_info
+from .nat_manager import perform_iptables_delete_for_rule
+from .nginx_manager import create_reverse_proxy, delete_reverse_proxy
 
 views = Blueprint('views', __name__)
 logger = logging.getLogger(__name__)
@@ -116,13 +116,23 @@ def index():
             ip_address = 'N/A'
             network_info = item.get('state', {}).get('network', {})
             if network_info:
-                for iface_data in network_info.values():
-                    if isinstance(iface_data, dict):
-                        for addr_entry in iface_data.get('addresses', []):
-                            if addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
-                                ip_address = addr_entry.get('address', 'N/A').split('/')[0]
-                                break
-                    if ip_address != 'N/A': break
+                if 'eth0' in network_info and isinstance(network_info['eth0'], dict):
+                    for addr_entry in network_info['eth0'].get('addresses', []):
+                        if addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
+                            ip_address = addr_entry.get('address', 'N/A').split('/')[0]
+                            break
+                
+                if ip_address == 'N/A':
+                    for iface_name, iface_data in network_info.items():
+                        if iface_name == 'eth0':
+                            continue # 已经检查过，跳过
+                        if isinstance(iface_data, dict):
+                            for addr_entry in iface_data.get('addresses', []):
+                                if addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
+                                    ip_address = addr_entry.get('address', 'N/A').split('/')[0]
+                                    break
+                        if ip_address != 'N/A':
+                            break
 
             container_info = {
                 'name': item_name, 'status': item.get('status', '未知'),

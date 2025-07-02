@@ -851,7 +851,7 @@ function openReverseProxyModal(containerName) {
     $('#reverseProxyContainerName').val(containerName);
     $('#reverseProxyModalLabel').text(`为容器 ${containerName} 添加反向代理`);
     $('#domainName').val('');
-    $('#proxyContainerPort').val('3000');
+    $('#proxyContainerPort').val('');
     setButtonProcessing($('#addReverseProxyButton'), false);
     var reverseProxyModal = new bootstrap.Modal(document.getElementById('reverseProxyModal'));
     reverseProxyModal.show();

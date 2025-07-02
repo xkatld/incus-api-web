@@ -19,11 +19,11 @@ try:
 except ImportError:
     CRYPTOGRAPHY_AVAILABLE = False
 
-from config import FLASK_SECRET_KEY, DATABASE_NAME
-from db_manager import load_settings_from_db, get_db_connection
-from views import views
-from api_views import api as api_ns
-from sockets import register_socket_handlers
+from core.config import FLASK_SECRET_KEY, DATABASE_NAME
+from core.db_manager import load_settings_from_db, get_db_connection
+from core.views import views
+from core.api_views import api as api_ns
+from core.sockets import register_socket_handlers
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
