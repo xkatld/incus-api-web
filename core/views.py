@@ -116,13 +116,23 @@ def index():
             ip_address = 'N/A'
             network_info = item.get('state', {}).get('network', {})
             if network_info:
-                for iface_data in network_info.values():
-                    if isinstance(iface_data, dict):
-                        for addr_entry in iface_data.get('addresses', []):
-                            if addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
-                                ip_address = addr_entry.get('address', 'N/A').split('/')[0]
-                                break
-                    if ip_address != 'N/A': break
+                if 'eth0' in network_info and isinstance(network_info['eth0'], dict):
+                    for addr_entry in network_info['eth0'].get('addresses', []):
+                        if addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
+                            ip_address = addr_entry.get('address', 'N/A').split('/')[0]
+                            break
+                
+                if ip_address == 'N/A':
+                    for iface_name, iface_data in network_info.items():
+                        if iface_name == 'eth0':
+                            continue # 已经检查过，跳过
+                        if isinstance(iface_data, dict):
+                            for addr_entry in iface_data.get('addresses', []):
+                                if addr_entry.get('family') == 'inet' and addr_entry.get('scope') == 'global':
+                                    ip_address = addr_entry.get('address', 'N/A').split('/')[0]
+                                    break
+                        if ip_address != 'N/A':
+                            break
 
             container_info = {
                 'name': item_name, 'status': item.get('status', '未知'),
