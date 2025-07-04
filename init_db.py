@@ -179,13 +179,27 @@ def create_tables():
                 container_name TEXT NOT NULL,
                 domain TEXT UNIQUE NOT NULL,
                 container_port INTEGER NOT NULL,
+                https_enabled INTEGER DEFAULT 0,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
             ''')
             conn.commit()
             print("表 'reverse_proxy_rules' 创建成功。")
         else:
-            print("表 'reverse_proxy_rules' 已存在。")
+            print("表 'reverse_proxy_rules' 已存在。正在检查 'https_enabled' 列...")
+            cursor.execute("PRAGMA table_info(reverse_proxy_rules);")
+            columns = [info[1] for info in cursor.fetchall()]
+            if 'https_enabled' not in columns:
+                print("检测到表 'reverse_proxy_rules' 缺少列 'https_enabled'，正在添加...")
+                try:
+                    cursor.execute("ALTER TABLE reverse_proxy_rules ADD COLUMN https_enabled INTEGER DEFAULT 0;")
+                    conn.commit()
+                    print("'https_enabled' 列添加成功。")
+                except sqlite3.Error as e:
+                    print(f"错误：添加列 'https_enabled' 失败: {e}")
+            else:
+                print("'https_enabled' 列已存在。")
+
 
     except sqlite3.Error as e:
         print(f"数据库错误 during table creation or check: {e}")

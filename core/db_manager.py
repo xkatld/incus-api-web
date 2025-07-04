@@ -16,6 +16,7 @@ def query_db(query, args=(), one=False):
     cur = conn.cursor()
     try:
         cur.execute(query, args)
+        # 只有在不是 SELECT 查询时才提交
         if not query.strip().upper().startswith('SELECT'):
             conn.commit()
         rv = cur.fetchall()
@@ -23,7 +24,7 @@ def query_db(query, args=(), one=False):
         logger.error(f"数据库查询错误: {e}\nQuery: {query}\nArgs: {args}")
         rv = []
         if conn:
-            conn.rollback()
+            conn.rollback() # 如果出错，回滚事务
     finally:
         if conn:
             conn.close()
@@ -132,9 +133,11 @@ def sync_container_to_db(name, image_source, status, created_at_str):
 
 def remove_container_from_db(name):
     try:
+        # **新增**: 删除容器时，一并删除其关联的反向代理规则
+        query_db('DELETE FROM reverse_proxy_rules WHERE container_name = ?', [name])
         query_db('DELETE FROM nat_rules WHERE container_name = ?', [name])
         query_db('DELETE FROM containers WHERE incus_name = ?', [name])
-        logger.info(f"从数据库中移除了容器及其NAT规则记录: {name}")
+        logger.info(f"从数据库中移除了容器及其所有关联规则(NAT, Reverse Proxy): {name}")
     except sqlite3.Error as e:
          logger.error(f"数据库错误 remove_container_from_db for {name}: {e}")
 
@@ -247,15 +250,22 @@ def remove_quick_command_from_db(command_id):
         logger.error(f"数据库错误 remove_quick_command_from_db for id {command_id}: {e}")
         return False, f"从数据库移除快捷命令记录失败: {e}"
 
-def add_reverse_proxy_rule_to_db(container_name, domain, container_port):
+# --- 反向代理数据库函数 ---
+
+def add_reverse_proxy_rule_to_db(container_name, domain, container_port, https_enabled):
+    """
+    **已修改**: 此函数现在接收 https_enabled (bool) 参数, 并将其作为整数存入数据库。
+    """
     try:
+        # 将布尔值 True/False 转换为整数 1/0
+        https_value = 1 if https_enabled else 0
         query_db(
-            'INSERT INTO reverse_proxy_rules (container_name, domain, container_port) VALUES (?, ?, ?)',
-            (container_name, domain, container_port)
+            'INSERT INTO reverse_proxy_rules (container_name, domain, container_port, https_enabled) VALUES (?, ?, ?, ?)',
+            (container_name, domain, container_port, https_value)
         )
         inserted_row = query_db('SELECT last_insert_rowid()', one=True)
         rule_id = inserted_row[0] if inserted_row else None
-        logger.info(f"添加反向代理规则到数据库: ID {rule_id}, 域 {domain} -> {container_name}:{container_port}")
+        logger.info(f"添加反向代理规则到数据库: ID {rule_id}, 域 {domain} -> {container_name}:{container_port}, HTTPS: {https_enabled}")
         return True, rule_id
     except sqlite3.IntegrityError:
         logger.warning(f"添加反向代理规则失败: 域名 '{domain}' 已存在。")
@@ -265,16 +275,22 @@ def add_reverse_proxy_rule_to_db(container_name, domain, container_port):
         return False, f"添加规则到数据库失败: {e}"
 
 def get_reverse_proxy_rules_for_container(container_name):
+    """
+    **已修改**: 查询时包含 https_enabled 字段。
+    """
     try:
-        rules = query_db('SELECT id, domain, container_port, created_at FROM reverse_proxy_rules WHERE container_name = ?', [container_name])
+        rules = query_db('SELECT id, domain, container_port, https_enabled, created_at FROM reverse_proxy_rules WHERE container_name = ?', [container_name])
         return True, [dict(row) for row in rules]
     except sqlite3.Error as e:
         logger.error(f"数据库错误 get_reverse_proxy_rules_for_container for {container_name}: {e}")
         return False, f"从数据库获取规则失败: {e}"
 
 def get_reverse_proxy_rule_by_id(rule_id):
+    """
+    **已修改**: 查询时包含 https_enabled 字段。
+    """
     try:
-        rule = query_db('SELECT id, container_name, domain, container_port FROM reverse_proxy_rules WHERE id = ?', [rule_id], one=True)
+        rule = query_db('SELECT id, container_name, domain, container_port, https_enabled FROM reverse_proxy_rules WHERE id = ?', [rule_id], one=True)
         return True, dict(rule) if rule else None
     except sqlite3.Error as e:
         logger.error(f"数据库错误 get_reverse_proxy_rule_by_id for id {rule_id}: {e}")

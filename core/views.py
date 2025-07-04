@@ -22,6 +22,7 @@ from .nginx_manager import create_reverse_proxy, delete_reverse_proxy
 views = Blueprint('views', __name__)
 logger = logging.getLogger(__name__)
 
+# ... (login, logout, index 和其他非反向代理的路由保持不变，这里省略以节约篇幅) ...
 @views.route('/login', methods=['GET', 'POST'])
 def login():
     SETTINGS = current_app.config.get('SETTINGS')
@@ -419,8 +420,12 @@ def delete_quick_command_route(command_id):
 @views.route('/container/<name>/add_reverse_proxy', methods=['POST'])
 @web_or_api_authentication_required
 def add_reverse_proxy_route(name):
-    domain = request.form.get('domain')
+    # --- 已修改 ---
+    # 使用 .strip() 方法移除域名前后的空白字符
+    domain = request.form.get('domain', '').strip()
+    
     container_port_str = request.form.get('container_port')
+    https_enabled = request.form.get('https_enabled') == 'on'
 
     if not domain or not container_port_str:
         return jsonify({'status': 'error', 'message': '域名和容器端口不能为空'}), 400
@@ -438,15 +443,16 @@ def add_reverse_proxy_route(name):
     container_ip = info.get('ip')
     if not container_ip or container_ip == 'N/A': return jsonify({'status': 'error', 'message': '无法获取容器 IP'}), 500
 
-    success_nginx, msg_nginx = create_reverse_proxy(domain, container_ip, container_port)
+    success_nginx, msg_nginx = create_reverse_proxy(domain, container_ip, container_port, https_enabled)
 
     if success_nginx:
-        success_db, result_db = add_reverse_proxy_rule_to_db(name, domain, container_port)
+        success_db, result_db = add_reverse_proxy_rule_to_db(name, domain, container_port, https_enabled)
         if success_db:
             return jsonify({'status': 'success', 'message': '反向代理规则添加成功。', 'rule_id': result_db}), 200
         else:
-            delete_reverse_proxy(domain)
-            return jsonify({'status': 'error', 'message': f'Nginx 配置成功，但数据库记录失败: {result_db}'}), 500
+            # 如果数据库失败，回滚 Nginx 操作
+            delete_reverse_proxy(domain, https_enabled) 
+            return jsonify({'status': 'error', 'message': f'Nginx 配置成功，但数据库记录失败: {result_db}. Nginx 配置已回滚。'}), 500
     else:
         return jsonify({'status': 'error', 'message': f'添加反向代理失败: {msg_nginx}'}), 500
 
@@ -467,13 +473,16 @@ def delete_reverse_proxy_rule(rule_id):
     if not rule: return jsonify({'status': 'warning', 'message': '规则记录未找到'}), 200
 
     domain = rule['domain']
-    success_nginx, msg_nginx = delete_reverse_proxy(domain)
+    https_enabled = rule.get('https_enabled', 0) == 1
+    
+    success_nginx, msg_nginx = delete_reverse_proxy(domain, https_enabled)
 
-    if success_nginx:
+    # 无论 Nginx 操作是否完全成功（比如文件未找到），我们都继续删除数据库记录
+    if success_nginx or "未找到" in msg_nginx:
         remove_reverse_proxy_rule_from_db(rule_id)
-        return jsonify({'status': 'success', 'message': f'反向代理规则 (域: {domain}) 已成功删除。'}), 200
-    else:
+        message = f'反向代理规则 (域: {domain}) 已成功删除。'
         if "未找到" in msg_nginx:
-             remove_reverse_proxy_rule_from_db(rule_id)
-             return jsonify({'status': 'warning', 'message': f'Nginx 配置文件未找到，但数据库记录已删除。'}), 200
+            message = f'Nginx 配置文件未找到，但数据库记录已删除。'
+        return jsonify({'status': 'success', 'message': message}), 200
+    else:
         return jsonify({'status': 'error', 'message': f'删除反向代理失败: {msg_nginx}'}), 500

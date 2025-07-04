@@ -852,6 +852,7 @@ function openReverseProxyModal(containerName) {
     $('#reverseProxyModalLabel').text(`为容器 ${containerName} 添加反向代理`);
     $('#domainName').val('');
     $('#proxyContainerPort').val('');
+    $('#httpsEnabled').prop('checked', false);
     setButtonProcessing($('#addReverseProxyButton'), false);
     var reverseProxyModal = new bootstrap.Modal(document.getElementById('reverseProxyModal'));
     reverseProxyModal.show();
@@ -870,10 +871,13 @@ function loadReverseProxyRules(containerName) {
             rulesContent.empty();
             if (data.status === 'success' && data.rules && data.rules.length > 0) {
                 data.rules.forEach(rule => {
+                    const protocol = rule.https_enabled ? 'https' : 'http';
+                    const link = `${protocol}://${rule.domain}`;
+                    const httpsBadge = rule.https_enabled ? '<span class="badge bg-success ms-2">HTTPS</span>' : '';
                     const ruleHtml = `
                         <li data-rule-id="${rule.id}">
                             <span class="rule-details">
-                                <strong>ID ${rule.id}:</strong> <a href="http://${rule.domain}" target="_blank">${rule.domain}</a> → 容器端口 ${rule.container_port}
+                                <strong>ID ${rule.id}:</strong> <a href="${link}" target="_blank">${rule.domain}</a> → 容器端口 ${rule.container_port} ${httpsBadge}
                                 <br><small class="text-muted">记录创建时间: ${rule.created_at ? new Date(rule.created_at).toLocaleString() : 'N/A'}</small>
                             </span>
                             <span class="rule-actions">
@@ -905,6 +909,7 @@ $('#addReverseProxyForm').submit(function(event) {
     const containerName = $('#reverseProxyContainerName').val();
     const domain = $('#domainName').val();
     const containerPort = $('#proxyContainerPort').val();
+    const httpsEnabled = $('#httpsEnabled').is(':checked');
 
     if (!domain || !containerPort) {
         showToast("请填写所有字段。", 'warning');
@@ -917,13 +922,16 @@ $('#addReverseProxyForm').submit(function(event) {
         type: "POST",
         data: {
             domain: domain,
-            container_port: containerPort
+            container_port: containerPort,
+            https_enabled: httpsEnabled ? 'on' : 'off'
         },
         success: function(data) {
             showToast(data.message, data.status);
             if (data.status === 'success') {
                  loadReverseProxyRules(containerName);
                  $('#domainName').val('');
+                 $('#proxyContainerPort').val('');
+                 $('#httpsEnabled').prop('checked', false);
             }
         },
         error: function(jqXHR) {
@@ -937,7 +945,7 @@ $('#addReverseProxyForm').submit(function(event) {
 });
 
 function deleteReverseProxyRule(ruleId, buttonElement) {
-    if (!confirm('确定要删除这个反向代理规则吗？\n这将删除对应的 Nginx 配置文件并重载服务。')) {
+    if (!confirm('确定要删除这个反向代理规则吗？\n这将删除对应的 Nginx 配置文件并重载服务。\n如果开启了HTTPS，还会尝试删除相关证书。')) {
         return;
     }
     setButtonProcessing(buttonElement, true);
