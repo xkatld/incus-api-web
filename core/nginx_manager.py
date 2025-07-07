@@ -16,6 +16,7 @@ def generate_nginx_config(domain, proxy_target_url, https_enabled=False):
 server {{
     listen 80;
     server_name {domain};
+    client_max_body_size 500m;
 
     location / {{
         proxy_pass {proxy_target_url};
@@ -43,6 +44,7 @@ server {{
 server {{
     listen 443 ssl http2;
     server_name {domain};
+    client_max_body_size 100m;
 
     ssl_certificate {ssl_certificate_path};
     ssl_certificate_key {ssl_key_path};
